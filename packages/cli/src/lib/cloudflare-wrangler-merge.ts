@@ -38,7 +38,7 @@ const REQUIRED_COMPAT_FLAG = 'nodejs_compat';
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /** A Flue-owned DO binding for a webhook agent (or the Sandbox class). */
-export interface DoBinding {
+interface DoBinding {
 	class_name: string;
 	name: string;
 }
