@@ -13,7 +13,7 @@
 		"build": "turbo build",
 		"test": "turbo test",
 		"check": "turbo run build check:lint check:types test",
-		"check:lint": "biome lint .",
+		"check:lint": "biome lint . && knip",
 		"check:knip": "knip",
 		"check:types": "turbo run check:types --filter=!apps-www",
 		"format": "turbo run format:lint format:style",
