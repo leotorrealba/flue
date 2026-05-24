@@ -48,29 +48,8 @@ export interface PersistAgentDispatchAdmissionOptions {
 }
 
 export async function persistAgentDispatchAdmission(options: PersistAgentDispatchAdmissionOptions): Promise<DispatchReceipt> {
-	const { input, createContext, runStore, runSubscribers, runRegistry } = options;
+	const { input } = options;
 	if (!isDispatchInput(input)) throw new Error('[flue] Internal dispatch admission received an invalid payload.');
-	if (!runStore) throw new Error('[flue] Durable dispatch admission requires a target Durable Object run store.');
-	const owner = dispatchOwner(input);
-	const existing = await runStore.getRun(input.dispatchId);
-	if (existing) {
-		if (!sameDispatchAdmission(existing.owner, existing.payload, owner, input)) {
-			throw new Error('[flue] Internal dispatch admission conflicts with an existing dispatch id.');
-		}
-		return { dispatchId: input.dispatchId, acceptedAt: input.acceptedAt };
-	}
-	await createRunLifecycle({
-		owner,
-		id: input.id,
-		runId: input.dispatchId,
-		payload: input,
-		request: dispatchRequest(),
-		createContext,
-		runStore,
-		runSubscribers,
-		runRegistry,
-		requireDurableAdmission: true,
-	});
 	return { dispatchId: input.dispatchId, acceptedAt: input.acceptedAt };
 }
 
@@ -92,14 +71,6 @@ async function processAgentDispatch(ctx: FlueContextInternal, agent: CreatedAgen
 		throw new Error('[flue] Internal session does not support dispatch input processing.');
 	}
 	return session.processDispatchInput(input);
-}
-
-function dispatchOwner(input: DispatchInput): Extract<RunOwner, { kind: 'agent' }> {
-	return { kind: 'agent', agentName: input.targetAgent, instanceId: input.id };
-}
-
-function sameDispatchAdmission(existingOwner: RunOwner, existingPayload: unknown, owner: RunOwner, input: DispatchInput): boolean {
-	return JSON.stringify(existingOwner) === JSON.stringify(owner) && JSON.stringify(existingPayload) === JSON.stringify(input);
 }
 
 function isDispatchInput(value: unknown): value is DispatchInput {
@@ -597,6 +568,17 @@ export async function failRecoveredRun(opts: FailRecoveredRunOptions): Promise<v
 
 export async function recoverAgentRun(opts: RecoverRunOptions): Promise<RecoveredRunResult> {
 	const releaseSessionLock = opts.releaseSessionLock ?? acquireAgentSessionLock(opts);
+	if (isDispatchInput(opts.payload)) {
+		try {
+			const ctx = opts.createContext(opts.id, undefined, opts.payload, opts.request);
+			const result = await opts.handler(ctx);
+			return { result, isError: false };
+		} catch (error) {
+			return { isError: true, error };
+		} finally {
+			releaseSessionLock?.();
+		}
+	}
 	try {
 		const events = opts.runStore ? await opts.runStore.getEvents(opts.runId) : [];
 		const terminalEvent = findTerminalRunEvent(events);

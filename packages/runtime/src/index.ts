@@ -61,6 +61,9 @@ export type {
 	FluePublicError,
 	AgentWebSocketClientMessage,
 	WorkflowWebSocketClientMessage,
+	AgentWebSocketServerMessage,
+	WorkflowWebSocketServerMessage,
+	WebSocketErrorMessage,
 	WebSocketServerMessage,
 } from './types.ts';
 

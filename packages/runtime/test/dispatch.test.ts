@@ -3,6 +3,7 @@ import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import {
 	persistAgentDispatchAdmission,
 	createAgentDispatchProcessor,
+	recoverAgentRun,
 	createFlueContext,
 	configureFlueRuntime,
 	InMemoryDispatchQueue,
@@ -129,7 +130,7 @@ describe('global dispatch', () => {
 		expect(events).toEqual([]);
 	});
 
-	it('admits a durable dispatch only after storing its recoverable run payload', async () => {
+	it('admits durable dispatch processing without creating a run record', async () => {
 		const runStore = new InMemoryRunStore();
 		const input: DispatchInput = {
 			dispatchId: 'dispatch-durable',
@@ -143,24 +144,34 @@ describe('global dispatch', () => {
 
 		const receipt = await persistAgentDispatchAdmission({ input, createContext: createTestContext, runStore });
 		expect(receipt).toEqual({ dispatchId: 'dispatch-durable', acceptedAt: '2026-05-21T00:00:00.000Z' });
-		expect(await runStore.getRun('dispatch-durable')).toMatchObject({
-			runId: 'dispatch-durable',
-			owner: { kind: 'agent', agentName: 'moderator', instanceId: 'guild:1' },
-			payload: input,
-			status: 'active',
-		});
+		expect(await runStore.getRun('dispatch-durable')).toBeNull();
 	});
 
-	it('returns the existing receipt for an identical durable admission replay and rejects conflicts', async () => {
+	it('processes a durable dispatch with dispatch identity instead of run lifecycle', async () => {
 		const runStore = new InMemoryRunStore();
 		const input: DispatchInput = {
-			dispatchId: 'dispatch-replay', targetAgent: 'moderator', agent: 'moderator', id: 'guild:1', session: 'case:1',
+			dispatchId: 'dispatch-process', targetAgent: 'moderator', agent: 'moderator', id: 'guild:1', session: 'case:1',
 			input: { text: 'one' }, acceptedAt: '2026-05-21T00:00:00.000Z',
 		};
-		const options = { createContext: createTestContext, runStore };
-		await persistAgentDispatchAdmission({ ...options, input });
-		await expect(persistAgentDispatchAdmission({ ...options, input })).resolves.toEqual({ dispatchId: input.dispatchId, acceptedAt: input.acceptedAt });
-		await expect(persistAgentDispatchAdmission({ ...options, input: { ...input, input: { text: 'changed' } } })).rejects.toThrow('conflicts with an existing dispatch id');
+		let contextRunId: string | undefined = 'unread';
+		const result = await recoverAgentRun({
+			label: 'moderator',
+			owner: { kind: 'agent', agentName: 'moderator', instanceId: input.id },
+			id: input.id,
+			runId: input.dispatchId,
+			payload: input,
+			request: new Request('http://flue.local/_dispatch', { method: 'POST' }),
+			runStore,
+			createContext: (id, runId, payload, request, initialEventIndex) => {
+				contextRunId = runId;
+				return createTestContext(id, runId, payload, request, initialEventIndex);
+			},
+			handler: async () => ({ ok: true }),
+		});
+		expect(result).toEqual({ result: { ok: true }, isError: false });
+		expect(contextRunId).toBeUndefined();
+		expect(await runStore.getRun(input.dispatchId)).toBeNull();
+		expect(await runStore.getEvents(input.dispatchId)).toEqual([]);
 	});
 
 	it('connects dispatch through the Node queue to target session processing', async () => {

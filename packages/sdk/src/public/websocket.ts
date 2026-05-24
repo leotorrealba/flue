@@ -1,9 +1,11 @@
 import type {
 	AgentWebSocketClientMessage,
+	AgentWebSocketServerMessage,
 	FlueEvent,
 	FluePublicError,
 	WebSocketServerMessage,
 	WorkflowWebSocketClientMessage,
+	WorkflowWebSocketServerMessage,
 } from '../types.ts';
 
 export interface WebSocketLike {
@@ -14,30 +16,43 @@ export interface WebSocketLike {
 
 export type WebSocketFactory = (url: string) => WebSocketLike;
 
-export interface SocketInvokeResult {
+export interface AgentSocketInvokeResult {
 	result: unknown;
-	runId?: string;
 }
 
-export interface SocketEventContext {
+export interface WorkflowSocketInvokeResult {
+	result: unknown;
+	runId: string;
+}
+
+export type SocketInvokeResult = AgentSocketInvokeResult | WorkflowSocketInvokeResult;
+
+export interface AgentSocketEventContext {
 	requestId: string;
-	runId?: string;
 }
 
-export type SocketEventListener = (event: FlueEvent, context: SocketEventContext) => void;
+export interface WorkflowSocketEventContext {
+	requestId: string;
+	runId: string;
+}
+
+export type SocketEventContext = AgentSocketEventContext | WorkflowSocketEventContext;
+export type AgentSocketEventListener = (event: FlueEvent, context: AgentSocketEventContext) => void;
+export type WorkflowSocketEventListener = (event: FlueEvent, context: WorkflowSocketEventContext) => void;
+export type SocketEventListener = AgentSocketEventListener | WorkflowSocketEventListener;
 
 export interface AgentSocket {
 	readonly ready: Promise<void>;
-	prompt(message: string, options?: { session?: string }): Promise<SocketInvokeResult>;
+	prompt(message: string, options?: { session?: string }): Promise<AgentSocketInvokeResult>;
 	ping(): Promise<void>;
-	onEvent(listener: SocketEventListener): () => void;
+	onEvent(listener: AgentSocketEventListener): () => void;
 	close(code?: number, reason?: string): void;
 }
 
 export interface WorkflowSocket {
 	readonly ready: Promise<void>;
-	invoke(payload?: unknown): Promise<SocketInvokeResult>;
-	onEvent(listener: SocketEventListener): () => void;
+	invoke(payload?: unknown): Promise<WorkflowSocketInvokeResult>;
+	onEvent(listener: WorkflowSocketEventListener): () => void;
 	close(code?: number, reason?: string): void;
 }
 
@@ -55,8 +70,8 @@ export class FlueSocketError extends Error {
 	}
 }
 
-type PendingRequest = {
-	resolve(value: SocketInvokeResult): void;
+type PendingRequest<TResult> = {
+	resolve(value: TResult): void;
 	reject(error: Error): void;
 };
 
@@ -65,13 +80,16 @@ type PendingPing = {
 	reject(error: Error): void;
 };
 
-class ProtocolSocket {
+type SocketTarget = 'agent' | 'workflow';
+
+class ProtocolSocket<TResult, TContext> {
 	readonly ready: Promise<void>;
 	private readonly socket: WebSocketLike;
+	private readonly target: SocketTarget;
 	private readonly acceptsReady: (message: WebSocketServerMessage) => boolean;
-	private readonly pendingRequests = new Map<string, PendingRequest>();
+	private readonly pendingRequests = new Map<string, PendingRequest<TResult>>();
 	private readonly pendingPings = new Map<string, PendingPing>();
-	private readonly listeners = new Set<SocketEventListener>();
+	private readonly listeners = new Set<(event: FlueEvent, context: TContext) => void>();
 	private resolveReady!: () => void;
 	private rejectReady!: (error: Error) => void;
 	private isReady = false;
@@ -79,8 +97,9 @@ class ProtocolSocket {
 	private terminalError: Error | undefined;
 	private sequence = 0;
 
-	constructor(socket: WebSocketLike, acceptsReady: (message: WebSocketServerMessage) => boolean) {
+	constructor(socket: WebSocketLike, target: SocketTarget, acceptsReady: (message: WebSocketServerMessage) => boolean) {
 		this.socket = socket;
+		this.target = target;
 		this.acceptsReady = acceptsReady;
 		this.ready = new Promise<void>((resolve, reject) => {
 			this.resolveReady = resolve;
@@ -91,7 +110,7 @@ class ProtocolSocket {
 		this.socket.addEventListener('error', () => this.fail(new Error('Flue WebSocket connection failed.')));
 	}
 
-	onEvent(listener: SocketEventListener): () => void {
+	onEvent(listener: (event: FlueEvent, context: TContext) => void): () => void {
 		this.listeners.add(listener);
 		return () => this.listeners.delete(listener);
 	}
@@ -101,10 +120,10 @@ class ProtocolSocket {
 		this.socket.close(code, reason);
 	}
 
-	async request(message: Extract<AgentWebSocketClientMessage, { type: 'prompt' }> | WorkflowWebSocketClientMessage): Promise<SocketInvokeResult> {
+	async request(message: Extract<AgentWebSocketClientMessage, { type: 'prompt' }> | WorkflowWebSocketClientMessage): Promise<TResult> {
 		await this.ready;
 		this.assertOpen();
-		return new Promise<SocketInvokeResult>((resolve, reject) => {
+		return new Promise<TResult>((resolve, reject) => {
 			this.pendingRequests.set(message.requestId, { resolve, reject });
 			try {
 				this.socket.send(JSON.stringify(message));
@@ -138,7 +157,7 @@ class ProtocolSocket {
 
 	private receive(event: unknown): void {
 		const raw = messageData(event);
-		const message = raw === undefined ? undefined : parseServerMessage(raw);
+		const message = raw === undefined ? undefined : parseServerMessage(raw, this.target);
 		if (!message) {
 			this.protocolFailure();
 			return;
@@ -159,18 +178,26 @@ class ProtocolSocket {
 		switch (message.type) {
 			case 'started':
 				return;
-			case 'event':
-				for (const listener of this.listeners) listener(message.event, { requestId: message.requestId, ...(message.runId === undefined ? {} : { runId: message.runId }) });
+			case 'event': {
+				const context = this.target === 'workflow'
+					? { requestId: message.requestId, runId: 'runId' in message ? message.runId : undefined }
+					: { requestId: message.requestId };
+				for (const listener of this.listeners) listener(message.event, context as TContext);
 				return;
+			}
 			case 'result': {
 				const pending = this.pendingRequests.get(message.requestId);
 				if (!pending) return;
 				this.pendingRequests.delete(message.requestId);
-				pending.resolve({ result: message.result, ...(message.runId === undefined ? {} : { runId: message.runId }) });
+				const result = this.target === 'workflow'
+					? { result: message.result, runId: 'runId' in message ? message.runId : undefined }
+					: { result: message.result };
+				pending.resolve(result as TResult);
 				return;
 			}
 			case 'error': {
-				const error = new FlueSocketError(message.error, { requestId: message.requestId, runId: message.runId });
+				const runId = 'runId' in message && typeof message.runId === 'string' ? message.runId : undefined;
+				const error = new FlueSocketError(message.error, { requestId: message.requestId, runId });
 				if (message.requestId) {
 					const pending = this.pendingRequests.get(message.requestId);
 					if (pending) {
@@ -224,17 +251,18 @@ class ProtocolSocket {
 
 class AgentSocketClient implements AgentSocket {
 	readonly ready: Promise<void>;
-	private readonly connection: ProtocolSocket;
+	private readonly connection: ProtocolSocket<AgentSocketInvokeResult, AgentSocketEventContext>;
 
 	constructor(socket: WebSocketLike, name: string, id: string) {
 		this.connection = new ProtocolSocket(
 			socket,
+			'agent',
 			(message) => message.type === 'ready' && message.target === 'agent' && message.name === name && message.instanceId === id,
 		);
 		this.ready = this.connection.ready;
 	}
 
-	prompt(message: string, options: { session?: string } = {}): Promise<SocketInvokeResult> {
+	prompt(message: string, options: { session?: string } = {}): Promise<AgentSocketInvokeResult> {
 		return this.connection.request({
 			version: 1,
 			type: 'prompt',
@@ -248,7 +276,7 @@ class AgentSocketClient implements AgentSocket {
 		return this.connection.ping();
 	}
 
-	onEvent(listener: SocketEventListener): () => void {
+	onEvent(listener: AgentSocketEventListener): () => void {
 		return this.connection.onEvent(listener);
 	}
 
@@ -259,15 +287,15 @@ class AgentSocketClient implements AgentSocket {
 
 class WorkflowSocketClient implements WorkflowSocket {
 	readonly ready: Promise<void>;
-	private readonly connection: ProtocolSocket;
+	private readonly connection: ProtocolSocket<WorkflowSocketInvokeResult, WorkflowSocketEventContext>;
 	private invoked = false;
 
 	constructor(socket: WebSocketLike, name: string) {
-		this.connection = new ProtocolSocket(socket, (message) => message.type === 'ready' && message.target === 'workflow' && message.name === name);
+		this.connection = new ProtocolSocket(socket, 'workflow', (message) => message.type === 'ready' && message.target === 'workflow' && message.name === name);
 		this.ready = this.connection.ready;
 	}
 
-	invoke(payload?: unknown): Promise<SocketInvokeResult> {
+	invoke(payload?: unknown): Promise<WorkflowSocketInvokeResult> {
 		if (this.invoked) return Promise.reject(new Error('A workflow WebSocket accepts only one invocation.'));
 		this.invoked = true;
 		return this.connection.request({
@@ -278,7 +306,7 @@ class WorkflowSocketClient implements WorkflowSocket {
 		});
 	}
 
-	onEvent(listener: SocketEventListener): () => void {
+	onEvent(listener: WorkflowSocketEventListener): () => void {
 		return this.connection.onEvent(listener);
 	}
 
@@ -309,7 +337,7 @@ export function defaultWebSocketFactory(url: string): WebSocketLike {
 	return new Socket(url);
 }
 
-function parseServerMessage(value: string): WebSocketServerMessage | undefined {
+function parseServerMessage(value: string, target: SocketTarget): WebSocketServerMessage | undefined {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(value);
@@ -319,30 +347,28 @@ function parseServerMessage(value: string): WebSocketServerMessage | undefined {
 	if (!isRecord(parsed) || parsed.version !== 1 || typeof parsed.type !== 'string') return undefined;
 	switch (parsed.type) {
 		case 'ready':
-			if (parsed.target === 'agent' && typeof parsed.name === 'string' && typeof parsed.instanceId === 'string') return parsed as unknown as WebSocketServerMessage;
-			if (parsed.target === 'workflow' && typeof parsed.name === 'string') return parsed as unknown as WebSocketServerMessage;
+			if (target === 'agent' && parsed.target === 'agent' && typeof parsed.name === 'string' && typeof parsed.instanceId === 'string') return parsed as unknown as AgentWebSocketServerMessage;
+			if (target === 'workflow' && parsed.target === 'workflow' && typeof parsed.name === 'string') return parsed as unknown as WorkflowWebSocketServerMessage;
 			return undefined;
 		case 'started':
 		case 'result':
-			if (typeof parsed.requestId === 'string' && (parsed.runId === undefined || typeof parsed.runId === 'string')) return parsed as unknown as WebSocketServerMessage;
+			if (typeof parsed.requestId !== 'string') return undefined;
+			if (target === 'agent' && parsed.runId === undefined) return parsed as unknown as AgentWebSocketServerMessage;
+			if (target === 'workflow' && typeof parsed.runId === 'string') return parsed as unknown as WorkflowWebSocketServerMessage;
 			return undefined;
 		case 'event':
-			if (
-				typeof parsed.requestId === 'string' &&
-				(parsed.runId === undefined || typeof parsed.runId === 'string') &&
-				isRecord(parsed.event) &&
-				typeof parsed.event.type === 'string'
-			) {
-				return parsed as unknown as WebSocketServerMessage;
-			}
+			if (typeof parsed.requestId !== 'string' || !isRecord(parsed.event) || typeof parsed.event.type !== 'string') return undefined;
+			if (target === 'agent' && parsed.runId === undefined) return parsed as unknown as AgentWebSocketServerMessage;
+			if (target === 'workflow' && typeof parsed.runId === 'string') return parsed as unknown as WorkflowWebSocketServerMessage;
 			return undefined;
 		case 'error':
 			if (!isPublicError(parsed.error)) return undefined;
 			if (parsed.requestId !== undefined && typeof parsed.requestId !== 'string') return undefined;
-			if (parsed.runId !== undefined && typeof parsed.runId !== 'string') return undefined;
+			if (target === 'agent' && parsed.runId !== undefined) return undefined;
+			if (target === 'workflow' && parsed.runId !== undefined && typeof parsed.runId !== 'string') return undefined;
 			return parsed as unknown as WebSocketServerMessage;
 		case 'pong':
-			if (parsed.requestId === undefined || typeof parsed.requestId === 'string') return parsed as unknown as WebSocketServerMessage;
+			if (target === 'agent' && (parsed.requestId === undefined || typeof parsed.requestId === 'string')) return parsed as unknown as AgentWebSocketServerMessage;
 			return undefined;
 		default:
 			return undefined;

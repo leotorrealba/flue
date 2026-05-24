@@ -1,5 +1,5 @@
 import { InvalidRequestError, toPublicError } from '../errors.ts';
-import type { AgentWebSocketClientMessage, WebSocketServerMessage, WorkflowWebSocketClientMessage } from '../types.ts';
+import type { AgentWebSocketClientMessage, WebSocketErrorMessage, WorkflowWebSocketClientMessage, WorkflowWebSocketServerMessage } from '../types.ts';
 
 export function parseAgentWebSocketMessage(raw: string): AgentWebSocketClientMessage {
 	const value = parseObject(raw);
@@ -29,8 +29,10 @@ export function parseWorkflowWebSocketMessage(raw: string): WorkflowWebSocketCli
 	return { version: 1, type: 'invoke', requestId: value.requestId, payload: value.payload };
 }
 
-export function createWebSocketErrorMessage(error: unknown, requestId?: string, runId?: string): WebSocketServerMessage {
-	return { version: 1, type: 'error', requestId, runId, error: toPublicError(error) };
+export function createWebSocketErrorMessage(error: unknown, requestId?: string, runId?: string): WebSocketErrorMessage | Extract<WorkflowWebSocketServerMessage, { type: 'error' }> {
+	return runId === undefined
+		? { version: 1, type: 'error', requestId, error: toPublicError(error) }
+		: { version: 1, type: 'error', requestId, runId, error: toPublicError(error) };
 }
 
 function parseObject(raw: string): Record<string, unknown> {

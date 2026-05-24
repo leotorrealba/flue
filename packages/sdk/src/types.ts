@@ -92,7 +92,14 @@ export interface WorkflowWebSocketClientMessage {
 	payload?: unknown;
 }
 
-export type WebSocketServerMessage =
+export type WebSocketErrorMessage = {
+	version: 1;
+	type: 'error';
+	requestId?: string;
+	error: FluePublicError;
+};
+
+export type AgentWebSocketServerMessage =
 	| {
 			version: 1;
 			type: 'ready';
@@ -100,6 +107,31 @@ export type WebSocketServerMessage =
 			name: string;
 			instanceId: string;
 	  }
+	| {
+			version: 1;
+			type: 'started';
+			requestId: string;
+	  }
+	| {
+			version: 1;
+			type: 'event';
+			requestId: string;
+			event: FlueEvent;
+	  }
+	| {
+			version: 1;
+			type: 'result';
+			requestId: string;
+			result: unknown;
+	  }
+	| WebSocketErrorMessage
+	| {
+			version: 1;
+			type: 'pong';
+			requestId?: string;
+	  };
+
+export type WorkflowWebSocketServerMessage =
 	| {
 			version: 1;
 			type: 'ready';
@@ -110,34 +142,32 @@ export type WebSocketServerMessage =
 			version: 1;
 			type: 'started';
 			requestId: string;
-			runId?: string;
+			runId: string;
 	  }
 	| {
 			version: 1;
 			type: 'event';
 			requestId: string;
-			runId?: string;
+			runId: string;
 			event: FlueEvent;
 	  }
 	| {
 			version: 1;
 			type: 'result';
 			requestId: string;
-			runId?: string;
+			runId: string;
 			result: unknown;
 	  }
+	| WebSocketErrorMessage
 	| {
 			version: 1;
 			type: 'error';
 			requestId?: string;
-			runId?: string;
+			runId: string;
 			error: FluePublicError;
-	  }
-	| {
-			version: 1;
-			type: 'pong';
-			requestId?: string;
 	  };
+
+export type WebSocketServerMessage = AgentWebSocketServerMessage | WorkflowWebSocketServerMessage;
 
 export type FlueEvent = (
 	| {

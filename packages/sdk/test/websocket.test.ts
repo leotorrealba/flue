@@ -126,19 +126,36 @@ describe('WebSocket clients', () => {
 		await expect(agent.prompt('after failure')).rejects.toBeInstanceOf(FlueSocketError);
 	});
 
-	it('invokes a workflow once and rejects further local invocations', async () => {
+	it('invokes a workflow once and retains workflow run identity', async () => {
 		const { client, sockets } = socketClient();
 		const workflow = client.workflows.connect('triage');
 		const connection = sockets[0];
 		expect(connection?.url).toBe('wss://flue.test/workflows/triage');
 		connection?.socket.message({ version: 1, type: 'ready', target: 'workflow', name: 'triage' });
+		const events: unknown[] = [];
+		workflow.onEvent((event, context) => events.push({ event, context }));
 		const pending = workflow.invoke({ issue: 123 });
 		await Promise.resolve();
 		const request = JSON.parse(connection?.socket.sent[0] ?? '{}') as { requestId: string };
 		expect(request).toMatchObject({ version: 1, type: 'invoke', payload: { issue: 123 } });
+		connection?.socket.message({ version: 1, type: 'event', requestId: request.requestId, runId: 'run_workflow', event: { type: 'text_delta', text: 'working' } });
 		connection?.socket.message({ version: 1, type: 'result', requestId: request.requestId, runId: 'run_workflow', result: { ok: true } });
 		await expect(pending).resolves.toEqual({ result: { ok: true }, runId: 'run_workflow' });
+		expect(events).toEqual([{ event: { type: 'text_delta', text: 'working' }, context: { requestId: request.requestId, runId: 'run_workflow' } }]);
 		await expect(workflow.invoke({ issue: 456 })).rejects.toThrow('only one invocation');
+	});
+
+	it('rejects workflow frames that omit required run identity', async () => {
+		const { client, sockets } = socketClient();
+		const workflow = client.workflows.connect('triage');
+		const socket = sockets[0]?.socket;
+		socket?.message({ version: 1, type: 'ready', target: 'workflow', name: 'triage' });
+		const pending = workflow.invoke({ issue: 123 });
+		await Promise.resolve();
+		const request = JSON.parse(socket?.sent[0] ?? '{}') as { requestId: string };
+		socket?.message({ version: 1, type: 'result', requestId: request.requestId, result: { ok: true } });
+		await expect(pending).rejects.toThrow('invalid protocol message');
+		expect(socket?.closeCalls).toEqual([{ code: 1008, reason: 'Invalid protocol message' }]);
 	});
 
 	it('fails pending work on invalid server protocol frames or connection close', async () => {
