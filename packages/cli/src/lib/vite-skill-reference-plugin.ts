@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { PackagedSkillDirectory, PackagedSkillFile, SkillReference } from '@flue/runtime';
 import { parseSkillMarkdown } from '@flue/runtime/internal';
-import { normalizePath, type Plugin } from 'vite';
+import { normalizePath, type Plugin, transformWithOxc } from 'vite';
 
 const PACKAGED_SKILLS_MODULE_ID = 'virtual:flue/packaged-skills';
 const RESOLVED_PACKAGED_SKILLS_MODULE_ID = '\0virtual:flue/packaged-skills';
@@ -38,14 +38,17 @@ export function skillReferencePlugin(options: SkillReferencePluginOptions): Skil
 	return {
 		name: 'flue-skill-reference',
 		enforce: 'pre',
-		transform(code, id) {
+		async transform(code, id) {
 			if (!/\.[cm]?[jt]sx?(?:\?|$)/i.test(id)) return null;
-			const ast = this.parse(code) as unknown as ModuleAst;
+			const importerPath = id.split('?')[0] ?? id;
+			const parseableCode = /\.[cm]?tsx?(?:\?|$)/i.test(id)
+				? (await transformWithOxc(code, importerPath, {})).code
+				: code;
+			const ast = this.parse(parseableCode) as unknown as ModuleAst;
 			assertNoDynamicSkillImports(ast);
 			const declarations = collectAttributedSkillReferences(ast);
 			if (declarations.length === 0) return null;
-			const importerPath = id.split('?')[0] ?? id;
-			let transformed = code;
+			let transformed = parseableCode;
 			for (const declaration of declarations.sort((a, b) => b.start - a.start)) {
 				const authoredPath = path.resolve(path.dirname(importerPath), declaration.specifier);
 				assertPackagedSkillPath(authoredPath, projectRoot);

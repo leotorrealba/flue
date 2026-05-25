@@ -37,7 +37,8 @@ export interface BuildResult {
  *
  * Build output lands in `options.output` (defaults to `<root>/dist`).
  *
- * AGENTS.md and .agents/skills/ are NOT bundled — discovered at runtime from session cwd.
+ * AGENTS.md and workspace .agents/skills/ are discovered at runtime from session cwd.
+ * Statically imported SKILL.md directories are packaged through the shared Vite graph.
  */
 export async function build(options: BuildOptions): Promise<BuildResult> {
 	const root = path.resolve(options.root);
@@ -93,7 +94,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
 		);
 	}
 	console.log(
-		`[flue] AGENTS.md and .agents/skills/ will be discovered at runtime from session cwd`,
+		`[flue] AGENTS.md and workspace .agents/skills/ will be discovered at runtime; imported SKILL.md directories are packaged by Vite`,
 	);
 
 	fs.mkdirSync(output, { recursive: true });

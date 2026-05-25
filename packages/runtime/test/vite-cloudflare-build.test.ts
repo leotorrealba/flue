@@ -18,7 +18,7 @@ describe('Cloudflare Vite production Worker', () => {
 		expect(deployRedirect.configPath).not.toContain('wrangler.jsonc');
 	}, 90000);
 
-	it('serves a deterministic generated workflow through workerd in Vite development', async () => {
+	it('serves workflows and activates packaged skills through workerd in Vite development', async () => {
 		const { root } = await createGeneratedFixture('development');
 		const entryPath = path.join(cloudflareViteInputDir(root), '_entry.ts');
 		const viteConfig = createCloudflareViteConfig(root, cloudflareViteConfigPath(root), [entryPath], { persistState: false });
@@ -41,6 +41,9 @@ describe('Cloudflare Vite production Worker', () => {
 					hasFiles: false,
 				},
 			});
+			const skillResponse = await fetch(new URL('/workflows/use-skill?wait=result', localUrl), { method: 'POST' });
+			expect(skillResponse.status).toBe(200);
+			expect(await skillResponse.json()).toMatchObject({ result: { text: 'License terms.\n' } });
 		} finally {
 			await server.close();
 		}
@@ -51,7 +54,9 @@ async function createGeneratedFixture(mode: 'build' | 'development'): Promise<{ 
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flue-vite-cloudflare-'));
 	const output = path.join(root, 'generated');
 	fs.mkdirSync(path.join(root, 'node_modules', '@flue'), { recursive: true });
+	fs.mkdirSync(path.join(root, 'node_modules', '@earendil-works'), { recursive: true });
 	fs.symlinkSync(process.cwd(), path.join(root, 'node_modules', '@flue', 'runtime'), 'dir');
+	fs.symlinkSync(path.resolve(process.cwd(), 'node_modules/@earendil-works/pi-ai'), path.join(root, 'node_modules', '@earendil-works', 'pi-ai'), 'dir');
 	fs.symlinkSync(
 		path.resolve(process.cwd(), '../../examples/cloudflare-websocket/node_modules/agents'),
 		path.join(root, 'node_modules', 'agents'),
@@ -61,11 +66,12 @@ async function createGeneratedFixture(mode: 'build' | 'development'): Promise<{ 
 	fs.mkdirSync(path.join(root, 'agents'));
 	fs.mkdirSync(path.join(root, 'workflows'));
 	fs.mkdirSync(path.join(root, 'skills', 'review'), { recursive: true });
-	fs.writeFileSync(path.join(root, 'wrangler.jsonc'), JSON.stringify({ name: 'vite-cloudflare-spike', compatibility_date: '2026-04-01', compatibility_flags: ['nodejs_compat'] }));
+	fs.writeFileSync(path.join(root, 'wrangler.jsonc'), JSON.stringify({ name: 'vite-cloudflare-integration', compatibility_date: '2026-04-01', compatibility_flags: ['nodejs_compat'] }));
 	fs.writeFileSync(path.join(root, 'skills', 'review', 'SKILL.md'), `---\nname: review\ndescription: Reviews requested work.\n---\nReview it.\n`);
 	fs.writeFileSync(path.join(root, 'skills', 'review', 'LICENSE.txt'), 'License terms.\n');
-	fs.writeFileSync(path.join(root, 'agents', 'assistant.ts'), `import { createAgent } from '@flue/runtime';\nimport review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport default createAgent(() => ({ model: false, skills: [review] }));\n`);
+	fs.writeFileSync(path.join(root, 'agents', 'assistant.ts'), `import { createAgent } from '@flue/runtime';\nimport review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport default createAgent(() => ({ model: 'fixture/reader', skills: [review] }));\n`);
 	fs.writeFileSync(path.join(root, 'workflows', 'smoke.ts'), `import { http } from '@flue/runtime';\nimport review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport const channels = [http()];\nexport async function run() { return { ok: true, reference: review, hasBody: 'body' in review, hasFiles: 'files' in review }; }\n`);
+	fs.writeFileSync(path.join(root, 'workflows', 'use-skill.ts'), `import { fauxAssistantMessage, fauxText, fauxToolCall, registerFauxProvider } from '@earendil-works/pi-ai';\nimport { createAgent, http, type FlueContext } from '@flue/runtime';\nimport { registerProvider } from '@flue/runtime/app';\nimport review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport const channels = [http()];\nconst agent = createAgent(() => ({ model: 'fixture/reader' }));\nexport async function run({ init }: FlueContext) { const faux = registerFauxProvider({ api: 'fixture-skill-api', provider: 'fixture' }); registerProvider('fixture', { api: faux.api, baseUrl: 'https://fixture.invalid' }); faux.setResponses([fauxAssistantMessage(fauxToolCall('read', { path: '/.flue/packaged-skills/' + encodeURIComponent(review.id) + '/LICENSE.txt' }), { stopReason: 'toolUse' }), (context) => { const toolResult = context.messages[context.messages.length - 1]; const content = toolResult?.role === 'toolResult' && toolResult.content[0]?.type === 'text' ? toolResult.content[0].text : 'missing packaged content'; return fauxAssistantMessage(fauxText(content)); }]); const harness = await init(agent); const session = await harness.session(); const result = await session.skill(review); faux.unregister(); return { text: result.text }; }\n`);
 	await build({ root, output, target: 'cloudflare', mode });
 	return { root, output };
 }

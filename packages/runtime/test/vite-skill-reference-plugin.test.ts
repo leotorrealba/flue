@@ -66,6 +66,21 @@ describe('Vite skill-reference plugin', () => {
 		expect(plugin.getTrackedSkillFiles()).toContainEqual(expect.stringMatching(/\/skills\/review\/LICENSE\.txt$/));
 	});
 
+	it('handles attributed imports in authored TypeScript modules', async () => {
+		const root = createFixtureRoot();
+		writeSkill(root, 'review');
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import type { PackagedSkillDirectory } from '@flue/runtime';\nimport review from '../skills/review/SKILL.md' with { type: 'skill' };\nimport { getPackagedSkills } from 'virtual:flue/packaged-skills';\nexport { review };\nexport const marker: string = 'typescript';\nexport function packaged(): Record<string, PackagedSkillDirectory> { return getPackagedSkills(); }\n`,
+		);
+		const module = await importBuiltFixture(await buildFixture(root, createFixturePlugin(root)));
+
+		expect(module.review.name).toBe('review');
+		expect(module.marker).toBe('typescript');
+		expect(module.packaged()[module.review.id]).toBeDefined();
+	});
+
 	it('accepts attributed barrel re-exports of skill references', async () => {
 		const root = createFixtureRoot();
 		writeSkill(root, 'review');
