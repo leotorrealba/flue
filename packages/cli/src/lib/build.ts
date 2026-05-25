@@ -443,7 +443,7 @@ function collectNodePaths(root: string): Set<string> {
 	// install location as resolved from the project. The latter is what
 	// surfaces the runtime deps (`@hono/node-server`, `hono`, `pi-ai`,
 	// etc.) that the generated `server.mjs` imports — `@flue/runtime` is the
-	// package that lists them, so esbuild has to be able to reach its
+	// package that lists them, so the Vite build must be able to reach its
 	// `node_modules/` subtree.
 	const seeds = [root, getCLIDir()];
 	const runtimeDir = resolveRuntimeDir(root);

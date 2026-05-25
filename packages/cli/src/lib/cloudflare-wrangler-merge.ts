@@ -515,11 +515,11 @@ export function detectSandboxBindings(userConfig: Record<string, unknown>): stri
 /**
  * When the user has declared one or more `Sandbox`-named DO bindings, verify
  * that `@cloudflare/sandbox` is declared in the nearest package.json. Surfaces
- * a friendly, actionable error at build time rather than letting esbuild emit
- * a confusing module-resolution failure.
+ * a friendly, actionable error at build time rather than letting the bundler
+ * emit a confusing module-resolution failure.
  *
  * The check is lenient: if no package.json can be located or parsed, we skip
- * silently and let esbuild's own error path take over. This avoids false
+ * silently and let the bundler's own error path take over. This avoids false
  * positives in unusual project layouts.
  */
 export function assertSandboxPackageInstalled(
@@ -545,7 +545,7 @@ export function assertSandboxPackageInstalled(
 				// is a nested package and the dep is declared higher up (e.g.
 				// pnpm workspace root).
 			} catch {
-				return; // unparseable package.json — give up, let esbuild speak
+				return; // unparseable package.json — give up, let the bundler report it
 			}
 		}
 		current = path.dirname(current);

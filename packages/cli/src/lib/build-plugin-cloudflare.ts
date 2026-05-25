@@ -906,7 +906,7 @@ export default {
 		};
 
 		// Detect user-declared Sandbox bindings and verify the @cloudflare/sandbox
-		// package is available before esbuild tries to resolve it. Log each
+		// package is available before the Vite build tries to resolve it. Log each
 		// binding we've auto-wired so users can see what Flue did on their behalf.
 		const sandboxClassNames = detectSandboxBindings(userConfig);
 		if (sandboxClassNames.length > 0) {
