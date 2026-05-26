@@ -1195,7 +1195,7 @@ export class Session implements FlueSession {
 		inheritedThinkingLevel: ThinkingLevel | undefined,
 		signal?: AbortSignal,
 	): Promise<AgentToolResult<TaskToolResultDetails>> {
-		const result = await this.runTask(
+		const result = await this.executeTask(
 			params.prompt,
 			{
 				agent: params.agent,
@@ -1235,7 +1235,7 @@ export class Session implements FlueSession {
 			const startedAt = Date.now();
 			this.emit({ type: 'operation_start', operationId, operationKind: 'task' });
 			try {
-				const result = await this.runTaskExclusive(text, options, signal);
+				const result = await this.executeTask(text, options, signal);
 				this.emit({
 					type: 'operation',
 					operationId,
@@ -1264,7 +1264,7 @@ export class Session implements FlueSession {
 		});
 	}
 
-	private async runTaskExclusive<S extends v.GenericSchema | undefined>(
+	private async executeTask<S extends v.GenericSchema | undefined>(
 		text: string,
 		options: InternalTaskOptions<S> | undefined,
 		signal: AbortSignal | undefined,
