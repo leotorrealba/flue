@@ -70,16 +70,33 @@ export function resolveAgentProfile(options: AgentRuntimeConfig | undefined): Ag
 		description: hasOwn(options, 'description') ? options?.description : profile?.description,
 		model: hasOwn(options, 'model') ? options?.model : profile?.model,
 		instructions: hasOwn(options, 'instructions') ? options?.instructions : profile?.instructions,
-		skills: hasOwn(options, 'skills') ? options?.skills : profile?.skills,
-		tools: hasOwn(options, 'tools') ? options?.tools : profile?.tools,
-		subagents: hasOwn(options, 'subagents') ? options?.subagents : profile?.subagents,
+		skills: mergeArrays(profile?.skills, options?.skills),
+		tools: mergeArrays(profile?.tools, options?.tools),
+		subagents: mergeArrays(profile?.subagents, options?.subagents),
 		thinkingLevel: hasOwn(options, 'thinkingLevel') ? options?.thinkingLevel : profile?.thinkingLevel,
 		compaction: hasOwn(options, 'compaction') ? options?.compaction : profile?.compaction,
 	};
 }
 
+export function extendAgentProfile(
+	profile: AgentProfile,
+	extensions: Pick<AgentProfile, 'skills' | 'tools' | 'subagents'>,
+): AgentProfile {
+	return {
+		...profile,
+		skills: mergeArrays(profile.skills, extensions.skills),
+		tools: mergeArrays(profile.tools, extensions.tools),
+		subagents: mergeArrays(profile.subagents, extensions.subagents),
+	};
+}
+
 function hasOwn<T extends object, K extends PropertyKey>(value: T | undefined, key: K): value is T & Record<K, unknown> {
 	return Boolean(value && Object.hasOwn(value, key));
+}
+
+function mergeArrays<T>(base: T[] | undefined, additions: T[] | undefined): T[] | undefined {
+	if (base === undefined && additions === undefined) return undefined;
+	return [...(base ?? []), ...(additions ?? [])];
 }
 
 function assertAgentRuntimeConfig(value: AgentRuntimeConfig | undefined): void {

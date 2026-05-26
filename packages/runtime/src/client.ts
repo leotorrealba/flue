@@ -1,4 +1,4 @@
-import { assertResolvedAgentProfile, resolveAgentProfile } from './agent-definition.ts';
+import { assertResolvedAgentProfile, extendAgentProfile, resolveAgentProfile } from './agent-definition.ts';
 import { discoverSessionContext } from './context.ts';
 import { Harness } from './harness.ts';
 import { dispatchGlobalEvent } from './runtime/events.ts';
@@ -126,7 +126,14 @@ export function createFlueContext(config: FlueContextConfig): FlueContextInterna
 				throw new Error('[flue] init() requires an agent created with createAgent(...).');
 			}
 			const resolvedOptions = await agent.initialize({ id: config.id, env: config.env, payload });
-			const definition = assertResolvedAgentProfile(resolveAgentProfile(resolvedOptions), 'createAgent()');
+			const definition = assertResolvedAgentProfile(
+				extendAgentProfile(resolveAgentProfile(resolvedOptions), {
+					tools: options?.tools,
+					skills: options?.skills,
+					subagents: options?.subagents,
+				}),
+				'createAgent() and init()',
+			);
 			if (!hasInitModel(resolvedOptions)) {
 				throw new Error(
 					'[flue] createAgent() requires a model. Return { model: "provider/model-id" }, { model: false }, or a profile with a model.',

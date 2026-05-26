@@ -93,27 +93,35 @@ describe('defineAgentProfile', () => {
 });
 
 describe('resolveAgentProfile', () => {
-	it('inherits definition fields and lets own init fields replace them', () => {
-		const inheritedSkills = [{ name: 'base', description: 'Base skill.' }];
-		const overrideSkills = [{ name: 'override', description: 'Override skill.' }];
+	it('inherits scalar fields and appends created-agent capabilities to its profile', () => {
+		const inheritedSkill = { name: 'base', description: 'Base skill.' };
+		const runtimeSkill = { name: 'runtime', description: 'Runtime skill.' };
+		const inheritedTool = defineTool({ name: 'base_tool', description: 'Base tool.', parameters: {}, execute: async () => 'base' });
+		const runtimeTool = defineTool({ name: 'runtime_tool', description: 'Runtime tool.', parameters: {}, execute: async () => 'runtime' });
+		const inheritedSubagent = { name: 'base_agent', model: false as const };
+		const runtimeSubagent = { name: 'runtime_agent', model: false as const };
 		expect(
 			resolveAgentProfile({
 				profile: {
 					model: 'anthropic/claude-sonnet-4-6',
 					instructions: 'Inherited instructions.',
-					skills: inheritedSkills,
+					skills: [inheritedSkill],
+					tools: [inheritedTool],
+					subagents: [inheritedSubagent],
 				},
 				instructions: undefined,
-				skills: overrideSkills,
+				skills: [runtimeSkill],
+				tools: [runtimeTool],
+				subagents: [runtimeSubagent],
 			}),
 		).toEqual({
 			name: undefined,
 			description: undefined,
 			model: 'anthropic/claude-sonnet-4-6',
 			instructions: undefined,
-			skills: overrideSkills,
-			tools: undefined,
-			subagents: undefined,
+			skills: [inheritedSkill, runtimeSkill],
+			tools: [inheritedTool, runtimeTool],
+			subagents: [inheritedSubagent, runtimeSubagent],
 			thinkingLevel: undefined,
 			compaction: undefined,
 		});

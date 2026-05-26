@@ -217,8 +217,9 @@ export type Skill =
 export type ToolParameters = TSchema | Record<string, unknown>;
 
 /**
- * Custom tool passed to init(), prompt(), skill(), or task(). init() tools are
- * available to every session call; prompt/skill/task tools are scoped to that call.
+ * Custom tool passed to createAgent(), init(), prompt(), skill(), or task().
+ * Agent and init tools are available to every session call; prompt/skill/task
+ * tools are scoped to that call.
  * Parameters are JSON Schema-compatible. Use `Type` from `@flue/runtime` for
  * hand-written tools, or pass schemas discovered from adapters such as MCP.
  */
@@ -469,6 +470,9 @@ export interface AgentRuntimeConfig {
 
 export interface AgentHarnessOptions {
 	name?: string;
+	tools?: ToolDefinition[];
+	skills?: Skill[];
+	subagents?: AgentProfile[];
 }
 
 export interface CreatedAgent<TPayload = unknown, TEnv = any> {

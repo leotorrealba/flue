@@ -2,7 +2,9 @@ import type { AgentToolResult } from '@earendil-works/pi-agent-core';
 import { Type } from '@earendil-works/pi-ai';
 import { describe, expect, it } from 'vitest';
 import { createTools } from '../src/agent.ts';
+import { createAgent } from '../src/agent-definition.ts';
 import { Harness } from '../src/harness.ts';
+import { createFlueContext } from '../src/internal.ts';
 import { InMemorySessionStore } from '../src/session.ts';
 import { defineTool } from '../src/tool.ts';
 import type { AgentConfig, FlueEvent, SessionEnv } from '../src/types.ts';
@@ -51,6 +53,48 @@ describe('defineTool', () => {
 		[{ name: 'tool', description: 'Desc', parameters: {}, execute: null }, 'execute'],
 	])('rejects invalid definitions %#', (value, message) => {
 		expect(() => defineTool(value as never)).toThrow(String(message));
+	});
+});
+
+describe('init capability extensions', () => {
+	it('adds harness-wide tools, skills, and subagents', async () => {
+		const initTool = defineTool({ name: 'init_tool', description: 'Init.', parameters: {}, execute: async () => 'init' });
+		const ctx = createFlueContext({
+			id: 'init-extensions',
+			runId: undefined,
+			payload: {},
+			env: {},
+			agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+			createDefaultEnv: async () => createEnv(),
+			defaultStore: new InMemorySessionStore(),
+		});
+		const harness = await ctx.init(createAgent(() => ({ model: false })), {
+			tools: [initTool],
+			skills: [{ name: 'init_skill', description: 'Init skill.' }],
+			subagents: [{ name: 'init_agent', model: false }],
+		});
+		const session = await harness.session();
+		const config = Reflect.get(session, 'config') as AgentConfig;
+		const state = Reflect.get(session, 'harness') as { state: { tools: Array<{ name: string }> } };
+
+		expect(config.systemPrompt).toContain('init_skill');
+		expect(config.subagents).toHaveProperty('init_agent');
+		expect(state.state.tools.map((tool) => tool.name)).toContain('init_tool');
+	});
+
+	it('rejects duplicate capability names added through init', async () => {
+		const tool = defineTool({ name: 'lookup', description: 'Lookup.', parameters: {}, execute: async () => 'ok' });
+		const ctx = createFlueContext({
+			id: 'init-duplicate',
+			runId: undefined,
+			payload: {},
+			env: {},
+			agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+			createDefaultEnv: async () => createEnv(),
+			defaultStore: new InMemorySessionStore(),
+		});
+
+		await expect(ctx.init(createAgent(() => ({ model: false, tools: [tool] })), { tools: [tool] })).rejects.toThrow('duplicate tool name "lookup"');
 	});
 });
 
