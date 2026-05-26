@@ -1,6 +1,6 @@
 # Flue
 
-Agent framework where agents are directories compiled into deployable server artifacts.
+Framework where projects containing agents and workflows are compiled into deployable server artifacts.
 
 ## Terminology
 
