@@ -1,7 +1,12 @@
-export interface DocsNavItem {
-	title: string;
-	slug: string;
-}
+export type DocsNavItem =
+	| {
+			title: string;
+			slug: string;
+	  }
+	| {
+			title: string;
+			href: string;
+	  };
 
 export interface DocsNavGroup {
 	title: string;
@@ -28,6 +33,7 @@ export const docsSections: DocsSection[] = [
 					{ title: 'Agents', slug: 'concepts/agents' },
 					{ title: 'Workflows', slug: 'guide/workflows' },
 					{ title: 'Why Flue?', slug: 'introduction/why-flue' },
+					{ title: 'Changelog', href: 'https://github.com/withastro/flue/blob/main/CHANGELOG.md' },
 				],
 			},
 			{
@@ -177,6 +183,6 @@ export function docsHref(slug: string) {
 }
 
 export function getDocsSection(slug: string) {
-	return docsSections.find((section) => section.groups.some((group) => group.items.some((item) => item.slug === slug))) ?? docsSections[0];
+	return docsSections.find((section) => section.groups.some((group) => group.items.some((item) => 'slug' in item && item.slug === slug))) ?? docsSections[0];
 }
 
