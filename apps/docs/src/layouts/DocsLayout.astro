@@ -109,8 +109,8 @@ const formattedReviewedDate = lastReviewedAt?.toLocaleDateString('en-US', {
 				{showTableOfContents && <DocsTableOfContents headings={tableOfContents} />}
 			</aside>
 		</div>
-		<script>
-			for (const heading of document.querySelectorAll<HTMLHeadingElement>('.docs-content :is(h2, h3, h4, h5, h6)[id]')) {
+		<script is:inline>
+			for (const heading of document.querySelectorAll('.docs-content :is(h2, h3, h4, h5, h6)[id]')) {
 				if (!heading.id) continue;
 
 				const anchor = document.createElement('a');
@@ -121,7 +121,7 @@ const formattedReviewedDate = lastReviewedAt?.toLocaleDateString('en-US', {
 				heading.append(anchor);
 			}
 
-			for (const time of document.querySelectorAll<HTMLTimeElement>('[data-review-date]')) {
+			for (const time of document.querySelectorAll('[data-review-date]')) {
 				if (!time.dateTime) continue;
 
 				const reviewedAt = new Date(`${time.dateTime}T00:00:00Z`);
