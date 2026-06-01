@@ -2,17 +2,16 @@
  * Merge Flue's Cloudflare additions into the user's wrangler config.
  *
  * Philosophy: the user's wrangler config is the source of truth. Flue contributes
- * the pieces it owns (the Worker entrypoint, its per-agent Durable Object
- * bindings, the Sandbox DO, the migration tag) and leaves everything else
- * untouched. The merged result is written as the official Vite plugin's
- * input configuration so its output Worker sees both.
+ * the pieces it owns (the Worker entrypoint and its generated Durable Object
+ * bindings) and leaves everything else untouched. The merged result is written
+ * as the official Vite plugin's input configuration so its output Worker sees
+ * both.
  *
  * We delegate configuration parsing and validation to Wrangler, while retaining
  * environment blocks in the generated input configuration for the Vite plugin.
- *
- * Flue still owns merge semantics (DO binding de-dup by `name`, migration
- * append-if-tag-absent) and Flue-specific validation (compat date floor,
- * required compat flags) — wrangler doesn't know about those.
+ * Flue owns Durable Object binding de-duplication and Flue-specific validation
+ * (compat date floor, required compat flags), but migration history remains
+ * entirely user-authored.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -28,56 +27,27 @@ const REQUIRED_COMPAT_FLAG = 'nodejs_compat';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-/** A Flue-owned DO binding for an agent instance (or the Sandbox class). */
+/** A Flue-owned generated DO binding. */
 interface DoBinding {
 	class_name: string;
 	name: string;
 }
 
 /**
- * A Cloudflare Durable Object migration entry.
- *
- * Models the union of all five migration shapes Cloudflare supports
- * (create / create-kv / delete / rename / transfer). Flue itself only ever
- * emits `new_sqlite_classes`; the other shapes are accepted in user-authored
- * migrations and passed through untouched.
- *
- * See: https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/
- */
-export interface Migration {
-	tag: string;
-	new_sqlite_classes?: string[];
-	new_classes?: string[];
-	deleted_classes?: string[];
-	renamed_classes?: Array<{ from: string; to: string }>;
-	transferred_classes?: Array<{ from: string; from_script: string; to: string }>;
-}
-
-/**
  * Everything Flue contributes to the wrangler config.
  *
- * Flue contributes only the per-agent DO bindings (one per deployed agent) and
- * a per-class migration entry for each net-new agent. Everything else — user
- * Durable Object bindings (e.g. Sandbox), container entries, migrations for
- * user DO classes, manual rename/delete migrations — belongs to the user's own
- * wrangler.jsonc and is passed through untouched during merge.
+ * Flue contributes generated Durable Object bindings. Everything else — user
+ * Durable Object bindings (e.g. Sandbox), container entries, and the complete
+ * Durable Object migration history — belongs to the user's own wrangler.jsonc
+ * and is passed through untouched during merge.
  */
 export interface FlueAdditions {
 	/** Fallback name if the user didn't set one in their wrangler config. */
 	defaultName: string;
 	/** Always written; Flue owns the generated Worker source entry. */
 	main: string;
-	/** Flue's per-agent DO bindings. Merged into durable_objects.bindings by `name`. */
+	/** Flue's generated DO bindings. Merged into durable_objects.bindings by `name`. */
 	doBindings: DoBinding[];
-	/**
-	 * Migrations Flue wants to add for net-new agent classes. Each entry is
-	 * appended to the merged migrations array iff a migration with the same
-	 * `tag` is not already present. Order is preserved.
-	 *
-	 * Computed by {@link computeFlueMigrations} from the current set of agent
-	 * class names + the user's existing migrations.
-	 */
-	migrations: Migration[];
 }
 
 // ─── Reading user config ────────────────────────────────────────────────────
@@ -185,101 +155,6 @@ export function validateUserWranglerConfig(config: Record<string, unknown>): voi
 	}
 }
 
-// ─── Migration planning ────────────────────────────────────────────────────
-
-/**
- * Compute Flue's migration contributions for a build.
- *
- * Algorithm:
- *
- * 1. Walk every existing migration entry in the user's config and union the
- *    SQLite-backed classes it declares — across `new_sqlite_classes` and
- *    the `to` side of `renamed_classes` / `transferred_classes`. The
- *    resulting set is "already-declared": every SQLite-backed class
- *    Cloudflare's runtime currently knows about for this Worker.
- *    `deleted_classes` and the `from` side of renames are subtracted, since
- *    they've been explicitly removed.
- *
- *    KV-backed classes (`new_classes`) are deliberately NOT added to the
- *    "declared" set. Flue agents always need a SQLite-backed class for
- *    session storage; if a user happens to have a KV-backed DO with the
- *    same name as a Flue agent, we still need to emit our SQLite migration.
- *    The deploy itself will then surface a clear "class already defined"
- *    error from Cloudflare rather than silently shipping a broken worker
- *    where the agent has no working session store.
- * 2. For each class in `currentClasses` that isn't already-declared, emit a
- *    deterministic per-class migration: one tag, one class. Per-class tags
- *    are essential because Cloudflare migration tags are immutable once
- *    deployed — packing all classes under a single shared tag (the original
- *    bug in issue #15) means new classes added on a redeploy are silently
- *    ignored. With per-class tags, every redeploy is a no-op except for
- *    the truly net-new classes.
- *
- * Renames and deletes are not auto-detected. If an agent file disappears,
- * Flue silently emits no migration for it — Cloudflare's runtime keeps the
- * orphaned class data alive but unbound, and the user can clean up (or
- * rename to recover) by adding a manual `renamed_classes` / `deleted_classes`
- * migration to their own wrangler.jsonc. Auto-emitting `deleted_classes`
- * would destroy stored DO data on every accidental file removal, which is
- * never the right default.
- *
- * Returned in alphabetical order so a regenerated Vite input config is
- * byte-identical across machines and CI runs.
- *
- * Pure function: takes the current class list + existing migrations for one
- * emitted configuration scope and returns the migrations to append. Doesn't
- * read or write any files.
- */
-export function computeFlueMigrations(
-	currentClasses: string[],
-	userMigrations: unknown,
-): Migration[] {
-	const migrationsArray = Array.isArray(userMigrations) ? userMigrations : [];
-
-	const declared = new Set<string>();
-
-	for (const raw of migrationsArray) {
-		if (typeof raw !== 'object' || raw === null) continue;
-		const m = raw as Record<string, unknown>;
-
-		const collectClassList = (key: string): string[] => {
-			const v = m[key];
-			return Array.isArray(v) ? v.filter((c): c is string => typeof c === 'string') : [];
-		};
-
-		// `new_classes` (KV-backed) is intentionally not unioned in — see
-		// algorithm note in the docstring.
-		for (const c of collectClassList('new_sqlite_classes')) declared.add(c);
-		for (const c of collectClassList('deleted_classes')) declared.delete(c);
-
-		// Renames: subtract `from`, add `to`.
-		const renamed = Array.isArray(m.renamed_classes) ? m.renamed_classes : [];
-		for (const r of renamed) {
-			if (typeof r !== 'object' || r === null) continue;
-			const obj = r as Record<string, unknown>;
-			if (typeof obj.from === 'string') declared.delete(obj.from);
-			if (typeof obj.to === 'string') declared.add(obj.to);
-		}
-
-		// Transfers: add `to` (the source class lives in a different Worker,
-		// so subtracting `from` here would be wrong).
-		const transferred = Array.isArray(m.transferred_classes) ? m.transferred_classes : [];
-		for (const t of transferred) {
-			if (typeof t !== 'object' || t === null) continue;
-			const obj = t as Record<string, unknown>;
-			if (typeof obj.to === 'string') declared.add(obj.to);
-		}
-	}
-
-	const additions: Migration[] = [];
-	for (const c of [...currentClasses].sort()) {
-		if (!declared.has(c)) {
-			additions.push({ tag: `flue-class-${c}`, new_sqlite_classes: [c] });
-		}
-	}
-	return additions;
-}
-
 // ─── Merging ────────────────────────────────────────────────────────────────
 
 /**
@@ -376,71 +251,11 @@ export function mergeFlueAdditions(
 		merged.env = environments;
 	}
 
-	const flueClasses = additions.migrations.flatMap((migration) => migration.new_sqlite_classes ?? []);
-	const mergeMigrations = (config: Record<string, unknown>): void => {
-		const existingMigrations = Array.isArray(config.migrations)
-			? (config.migrations as unknown[])
-			: [];
-		config.migrations = [
-			...existingMigrations,
-			...computeFlueMigrations(flueClasses, existingMigrations),
-		];
-	};
-
-	mergeMigrations(merged);
-	if (typeof merged.env === 'object' && merged.env !== null) {
-		for (const value of Object.values(merged.env as Record<string, unknown>)) {
-			if (typeof value !== 'object' || value === null || !('migrations' in value)) continue;
-			mergeMigrations(value as Record<string, unknown>);
-		}
-	}
-
 	// containers: user owns the `containers` array entirely. Flue contributes
 	// nothing here — any entries the user declared pass through untouched via
 	// the shallow `{ ...userConfig }` clone above. Nothing to merge.
 
 	return merged;
-}
-
-/**
- * Strip Wrangler-normalizer defaults that cause spurious warnings when Wrangler
- * re-parses our generated Vite input config.
- *
- * Background: `unstable_readConfig` returns a fully-normalized `Unstable_Config`
- * with every section populated to a default — including `unsafe: {}`. Wrangler's
- * own validator then emits a `"unsafe" fields are experimental` warning whenever
- * the field is *present*, regardless of whether it's empty. So our merged file,
- * which inherits the empty default, would trip the warning at every dev start
- * and every deploy.
- *
- * We delete `unsafe` only when it's an empty object (the exact shape wrangler's
- * normalizer produces). If a user has actually written `unsafe: {...}` in their
- * own wrangler.jsonc, the value will be non-empty and we leave it alone — the
- * warning in that case is wrangler's intended diagnostic, not noise.
- *
- * Other normalizer-defaulted-empty fields (`vars: {}`, `kv_namespaces: []`,
- * `python_modules: { exclude: ['**\/*.pyc'] }`, etc.) are left in place. They're
- * harmless: Wrangler doesn't warn about them, the generated Vite input config
- * is an internal build artifact, and stripping them only saves bytes. Only `unsafe`
- * has a user-visible side effect we need to fix.
- *
- * If wrangler adds another field to its `experimental()` warning list in a
- * future version (today there are only two: `unsafe` and `secrets`), this
- * function is the place to extend.
- *
- * Mutates `merged` in place to match the shallow-clone pattern in
- * `mergeFlueAdditions`.
- */
-export function stripNoisyWranglerDefaults(merged: Record<string, unknown>): void {
-	if (
-		'unsafe' in merged &&
-		typeof merged.unsafe === 'object' &&
-		merged.unsafe !== null &&
-		!Array.isArray(merged.unsafe) &&
-		Object.keys(merged.unsafe as Record<string, unknown>).length === 0
-	) {
-		delete merged.unsafe;
-	}
 }
 
 // ─── Sandbox binding detection ──────────────────────────────────────────────

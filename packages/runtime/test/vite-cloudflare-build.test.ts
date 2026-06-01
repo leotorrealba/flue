@@ -5,14 +5,23 @@ import { createServer } from 'vite';
 import { describe, expect, it } from 'vitest';
 import { build, cloudflareViteConfigPath, cloudflareViteInputDir, createCloudflareViteConfig } from '../../cli/src/lib/build.ts';
 
+const AUTHORED_MIGRATIONS = [{
+	tag: 'v1',
+	new_sqlite_classes: ['Assistant', 'SmokeWorkflow', 'UseSkillWorkflow', 'UseNamedSkillWorkflow', 'FlueRegistry'],
+}];
+
 describe('Cloudflare Vite production Worker', () => {
 	it('builds deployable official-plugin output from the production Cloudflare target', async () => {
 		const { root, output } = await createGeneratedFixture('build');
-		const inputConfig = JSON.parse(fs.readFileSync(cloudflareViteConfigPath(root), 'utf8')) as { main?: string; durable_objects?: { bindings?: Array<{ class_name: string }> } };
+		const inputConfig = JSON.parse(fs.readFileSync(cloudflareViteConfigPath(root), 'utf8')) as { main?: string; migrations?: unknown; durable_objects?: { bindings?: Array<{ class_name: string }> } };
 		expect(inputConfig.main).toBe('.flue-vite/_entry.ts');
 		expect(inputConfig.durable_objects?.bindings?.map((binding) => binding.class_name)).toEqual(expect.arrayContaining(['Assistant', 'SmokeWorkflow', 'FlueRegistry']));
+		expect(inputConfig.migrations).toEqual(AUTHORED_MIGRATIONS);
 		const outputConfigs = fs.readdirSync(output, { recursive: true }).filter((entry) => String(entry).endsWith('wrangler.json'));
 		expect(outputConfigs).not.toHaveLength(0);
+		const outputConfig = JSON.parse(fs.readFileSync(path.join(output, String(outputConfigs[0])), 'utf8')) as { migrations?: unknown };
+		expect(outputConfig.migrations).toEqual(AUTHORED_MIGRATIONS);
+		expect(JSON.stringify(outputConfig.migrations)).not.toContain('flue-class-');
 		const deployRedirect = JSON.parse(fs.readFileSync(path.join(root, '.wrangler', 'deploy', 'config.json'), 'utf8')) as { configPath?: string };
 		expect(deployRedirect.configPath).toContain('wrangler.json');
 		expect(deployRedirect.configPath).not.toContain('wrangler.jsonc');
@@ -37,6 +46,7 @@ describe('Cloudflare Vite production Worker', () => {
 			name: 'support-seal-flue',
 			compatibility_date: '2026-04-01',
 			compatibility_flags: ['nodejs_compat'],
+			migrations: AUTHORED_MIGRATIONS,
 			env: { staging: { name: 'support-seal-flue-staging' } },
 		};
 		try {
@@ -46,13 +56,17 @@ describe('Cloudflare Vite production Worker', () => {
 			expect(fs.existsSync(path.join(production.output, 'support_seal_flue_staging'))).toBe(false);
 
 			const staging = await createGeneratedFixture('build', { wranglerConfig, cloudflareEnv: 'staging' });
-			const inputConfig = JSON.parse(fs.readFileSync(cloudflareViteConfigPath(staging.root), 'utf8')) as { name: string; env: { staging: { name: string; main: string; durable_objects: { bindings: Array<{ class_name: string }> } } } };
+			const inputConfig = JSON.parse(fs.readFileSync(cloudflareViteConfigPath(staging.root), 'utf8')) as { name: string; migrations: unknown; env: { staging: { name: string; main: string; migrations?: unknown; durable_objects: { bindings: Array<{ class_name: string }> } } } };
 			expect(inputConfig.name).toBe('support-seal-flue');
+			expect(inputConfig.migrations).toEqual(AUTHORED_MIGRATIONS);
 			expect(inputConfig.env.staging.name).toBe('support-seal-flue-staging');
 			expect(inputConfig.env.staging.main).toBe('.flue-vite/_entry.ts');
+			expect(inputConfig.env.staging).not.toHaveProperty('migrations');
 			expect(inputConfig.env.staging.durable_objects.bindings.map((binding) => binding.class_name)).toEqual(expect.arrayContaining(['Assistant', 'SmokeWorkflow', 'FlueRegistry']));
 			const stagingConfigPath = path.join(staging.output, 'support_seal_flue', 'wrangler.json');
-			expect(JSON.parse(fs.readFileSync(stagingConfigPath, 'utf8')).name).toBe('support-seal-flue-staging');
+			const stagingConfig = JSON.parse(fs.readFileSync(stagingConfigPath, 'utf8')) as { name: string; migrations?: unknown };
+			expect(stagingConfig.name).toBe('support-seal-flue-staging');
+			expect(stagingConfig.migrations).toEqual(AUTHORED_MIGRATIONS);
 			expect(fs.existsSync(path.join(staging.output, 'support_seal_flue_staging'))).toBe(false);
 		} finally {
 			if (previous === undefined) delete process.env.CLOUDFLARE_ENV;
@@ -113,7 +127,7 @@ async function createGeneratedFixture(
 	fs.mkdirSync(path.join(root, 'src', 'workflows'), { recursive: true });
 	fs.mkdirSync(path.join(root, 'src', 'skills', 'review'), { recursive: true });
 	fs.mkdirSync(path.join(root, 'src', 'instructions'), { recursive: true });
-	fs.writeFileSync(path.join(root, 'wrangler.jsonc'), JSON.stringify(options.wranglerConfig ?? { name: 'vite-cloudflare-integration', compatibility_date: '2026-04-01', compatibility_flags: ['nodejs_compat'] }));
+	fs.writeFileSync(path.join(root, 'wrangler.jsonc'), JSON.stringify(options.wranglerConfig ?? { name: 'vite-cloudflare-integration', compatibility_date: '2026-04-01', compatibility_flags: ['nodejs_compat'], migrations: AUTHORED_MIGRATIONS }));
 	if (options.cloudflareEnv !== null) {
 		fs.writeFileSync(path.join(root, mode === 'development' ? '.env.development' : '.env.production'), `CLOUDFLARE_ENV=${options.cloudflareEnv ?? 'fixture-env'}\n`);
 	}

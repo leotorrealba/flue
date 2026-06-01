@@ -87,10 +87,14 @@ The short version, for your reference:
      "durable_objects": {
        "bindings": [{ "class_name": "Sandbox", "name": "Sandbox" }]
      },
-     "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Sandbox"] }],
+     "migrations": [{ "tag": "v2", "new_sqlite_classes": ["Sandbox"] }],
      "containers": [{ "class_name": "Sandbox", "image": "./Dockerfile" }]
    }
    ```
+
+   Preserve the user's existing top-level migration history and append a new
+   uniquely tagged entry. Do not replace deployed agent, workflow, or
+   `FlueRegistry` migrations.
 
 3. Add a `Dockerfile` at the project root pinned to the matching
    `@cloudflare/sandbox` version:

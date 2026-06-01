@@ -1,44 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-	computeFlueMigrations,
-	mergeFlueAdditions,
-} from '../../cli/src/lib/cloudflare-wrangler-merge.ts';
-
-describe('computeFlueMigrations', () => {
-	it('emits flue-class-FlueRegistry on a fresh project alongside agent migrations', () => {
-		const migrations = computeFlueMigrations(['FlueRegistry', 'Hello', 'WithSandbox'], []);
-		expect(migrations).toEqual([
-			{ tag: 'flue-class-FlueRegistry', new_sqlite_classes: ['FlueRegistry'] },
-			{ tag: 'flue-class-Hello', new_sqlite_classes: ['Hello'] },
-			{ tag: 'flue-class-WithSandbox', new_sqlite_classes: ['WithSandbox'] },
-		]);
-	});
-
-	it('does not re-emit when the registry tag already exists', () => {
-		const existing = [
-			{ tag: 'flue-class-Hello', new_sqlite_classes: ['Hello'] },
-			{ tag: 'flue-class-WithSandbox', new_sqlite_classes: ['WithSandbox'] },
-		];
-		const migrations = computeFlueMigrations(['FlueRegistry', 'Hello', 'WithSandbox'], existing);
-		expect(migrations).toEqual([
-			{ tag: 'flue-class-FlueRegistry', new_sqlite_classes: ['FlueRegistry'] },
-		]);
-	});
-
-	it('treats a registry class declared via renamed_classes as already present', () => {
-		const existing = [
-			{ tag: 'custom-rename', renamed_classes: [{ from: 'OldRegistry', to: 'FlueRegistry' }] },
-		];
-		const migrations = computeFlueMigrations(['FlueRegistry'], existing);
-		expect(migrations).toEqual([]);
-	});
-
-	it('is idempotent across consecutive builds of the same deploy', () => {
-		const firstPass = computeFlueMigrations(['FlueRegistry', 'Hello'], []);
-		const secondPass = computeFlueMigrations(['FlueRegistry', 'Hello'], firstPass);
-		expect(secondPass).toEqual([]);
-	});
-});
+import { mergeFlueAdditions } from '../../cli/src/lib/cloudflare-wrangler-merge.ts';
 
 describe('mergeFlueAdditions', () => {
 	it('appends FLUE_REGISTRY binding without disturbing user bindings', () => {
@@ -60,7 +21,6 @@ describe('mergeFlueAdditions', () => {
 				{ class_name: 'Hello', name: 'Hello' },
 				{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' },
 			],
-			migrations: [{ tag: 'flue-class-FlueRegistry', new_sqlite_classes: ['FlueRegistry'] }],
 		};
 		const merged = mergeFlueAdditions(userConfig, additions) as {
 			durable_objects: { bindings: Array<{ name: string; class_name: string }> };
@@ -87,7 +47,6 @@ describe('mergeFlueAdditions', () => {
 			defaultName: 'x',
 			main: '_entry.ts',
 			doBindings: [{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' }],
-			migrations: [],
 		};
 		const merged = mergeFlueAdditions(userConfig, additions) as {
 			durable_objects: { bindings: unknown[] };
@@ -96,10 +55,6 @@ describe('mergeFlueAdditions', () => {
 	});
 
 	it('appends per-workflow DO bindings alongside agent bindings', () => {
-		// Workflows generate one DO binding/class per workflow definition
-		// (e.g. "draft" → FLUE_WORKFLOW_DRAFT / DraftWorkflow), matching the
-		// agent binding shape. The wrangler merge treats them like any other
-		// Flue DO binding — appended verbatim, deduped by name on rebuilds.
 		const additions = {
 			defaultName: 'x',
 			main: '_entry.ts',
@@ -107,7 +62,6 @@ describe('mergeFlueAdditions', () => {
 				{ class_name: 'DraftWorkflow', name: 'FLUE_WORKFLOW_DRAFT' },
 				{ class_name: 'DailyReportWorkflow', name: 'FLUE_WORKFLOW_DAILY_REPORT' },
 			],
-			migrations: [],
 		};
 		const merged = mergeFlueAdditions({}, additions) as {
 			durable_objects: { bindings: Array<{ name: string; class_name: string }> };
@@ -128,43 +82,44 @@ describe('mergeFlueAdditions', () => {
 			defaultName: 'x',
 			main: '_entry.ts',
 			doBindings: [{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' }],
-			migrations: [],
 		};
 
 		expect(() => mergeFlueAdditions(userConfig, additions)).toThrow(/FLUE_REGISTRY/);
 	});
 
-	it('appends the registry migration tag without re-declaring existing tags', () => {
-		const userConfig = {
-			migrations: [{ tag: 'flue-class-Hello', new_sqlite_classes: ['Hello'] }],
-		};
-		const additions = {
+	it('preserves authored migrations without adding generated entries', () => {
+		const migrations = [
+			{ tag: 'v1', new_sqlite_classes: ['Hello', 'FlueRegistry'] },
+			{ tag: 'v2', renamed_classes: [{ from: 'Hello', to: 'Support' }] },
+		];
+		const merged = mergeFlueAdditions({ migrations }, {
 			defaultName: 'x',
 			main: '_entry.ts',
-			doBindings: [],
-			migrations: [
-				{ tag: 'flue-class-Hello', new_sqlite_classes: ['Hello'] },
-				{ tag: 'flue-class-FlueRegistry', new_sqlite_classes: ['FlueRegistry'] },
-			],
-		};
-		const merged = mergeFlueAdditions(userConfig, additions) as {
-			migrations: Array<{ tag: string }>;
-		};
-		expect(merged.migrations.map((m) => m.tag)).toEqual([
-			'flue-class-Hello',
-			'flue-class-FlueRegistry',
-		]);
+			doBindings: [{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' }],
+		});
+
+		expect(merged.migrations).toBe(migrations);
 	});
 
-	it('preserves named environments and injects Flue resources into them', () => {
+	it('does not create migrations when the user omitted them', () => {
+		const merged = mergeFlueAdditions({}, {
+			defaultName: 'x',
+			main: '_entry.ts',
+			doBindings: [{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' }],
+		});
+
+		expect(merged).not.toHaveProperty('migrations');
+	});
+
+	it('preserves named environments and their authored migrations', () => {
+		const migrations = [{ tag: 'user-existing' }];
 		const merged = mergeFlueAdditions({
 			name: 'support-seal-flue',
-			env: { staging: { name: 'support-seal-flue-staging', migrations: [{ tag: 'user-existing' }] } },
+			env: { staging: { name: 'support-seal-flue-staging', migrations } },
 		}, {
 			defaultName: 'x',
 			main: '_entry.ts',
 			doBindings: [{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' }],
-			migrations: [{ tag: 'flue-class-FlueRegistry', new_sqlite_classes: ['FlueRegistry'] }],
 		}) as {
 			name: string;
 			env: { staging: { name: string; main: string; durable_objects: { bindings: Array<{ name: string }> }; migrations: Array<{ tag: string }> } };
@@ -174,6 +129,6 @@ describe('mergeFlueAdditions', () => {
 		expect(merged.env.staging.name).toBe('support-seal-flue-staging');
 		expect(merged.env.staging.main).toBe('_entry.ts');
 		expect(merged.env.staging.durable_objects.bindings.map((binding) => binding.name)).toContain('FLUE_REGISTRY');
-		expect(merged.env.staging.migrations.map((migration) => migration.tag)).toEqual(['user-existing', 'flue-class-FlueRegistry']);
+		expect(merged.env.staging.migrations).toBe(migrations);
 	});
 });

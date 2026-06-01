@@ -2,5 +2,19 @@
 	"$schema": "https://workers.cloudflare.com/schema/wrangler.json",
 	"name": "imported-skill-example",
 	"compatibility_date": "2026-04-01",
-	"compatibility_flags": ["nodejs_compat"]
+	"compatibility_flags": ["nodejs_compat"],
+	"migrations": [
+		{
+			"tag": "flue-class-FlueRegistry",
+			"new_sqlite_classes": ["FlueRegistry"]
+		},
+		{
+			"tag": "flue-class-WithCustomBashWorkflow",
+			"new_sqlite_classes": ["WithCustomBashWorkflow"]
+		},
+		{
+			"tag": "flue-class-WithImportedSkillWorkflow",
+			"new_sqlite_classes": ["WithImportedSkillWorkflow"]
+		}
+	]
 }

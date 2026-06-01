@@ -2,5 +2,15 @@
 	"$schema": "https://workers.cloudflare.com/schema/wrangler.json",
 	"name": "chat-sdk-example",
 	"compatibility_date": "2026-04-01",
-	"compatibility_flags": ["nodejs_compat"]
+	"compatibility_flags": ["nodejs_compat"],
+	"migrations": [
+		{
+			"tag": "flue-class-Assistant",
+			"new_sqlite_classes": ["Assistant"]
+		},
+		{
+			"tag": "flue-class-FlueRegistry",
+			"new_sqlite_classes": ["FlueRegistry"]
+		}
+	]
 }

@@ -2,12 +2,10 @@
 import * as path from 'node:path';
 import {
 	assertSandboxPackageInstalled,
-	computeFlueMigrations,
 	detectSandboxBindings,
 	type FlueAdditions,
 	mergeFlueAdditions,
 	readUserWranglerConfig,
-	stripNoisyWranglerDefaults,
 	validateUserWranglerConfig,
 } from './cloudflare-wrangler-merge.ts';
 import { generateBuiltModuleNormalizationSource } from './generated-entry-normalization.ts';
@@ -844,7 +842,6 @@ export default {
 
 		const FLUE_REGISTRY_BINDING = { name: 'FLUE_REGISTRY', class_name: 'FlueRegistry' };
 		flueBindings.push(FLUE_REGISTRY_BINDING);
-		const flueSqliteClasses = flueBindings.map((b) => b.class_name);
 
 		// Read and validate the user's wrangler config (if any). User's file
 		// lives at the project root and is never modified; the composed Vite
@@ -858,8 +855,6 @@ export default {
 		}
 		validateUserWranglerConfig(effectiveConfig);
 
-		const flueMigrations = computeFlueMigrations(flueSqliteClasses, []);
-
 		// Flue's contributions to the wrangler config. Everything else in the
 		// user's wrangler.jsonc passes through untouched during merge.
 		// `path.basename` rather than `split('/').pop()` so this works on
@@ -868,7 +863,6 @@ export default {
 			defaultName: path.basename(ctx.root) || 'flue-agents',
 			main: '.flue-vite/_entry.ts',
 			doBindings: flueBindings,
-			migrations: flueMigrations,
 		};
 
 		// Detect user-declared Sandbox bindings and verify the @cloudflare/sandbox
@@ -885,11 +879,6 @@ export default {
 		}
 
 		const merged = mergeFlueAdditions(userConfig, additions);
-
-		// Strip wrangler-normalizer defaults that cause spurious warnings when
-		// wrangler re-parses the file (notably `unsafe: {}`). See the function
-		// doc for the full rationale. Mutates `merged` in place.
-		stripNoisyWranglerDefaults(merged);
 
 		// Always include the wrangler JSON schema reference if absent so the
 		// generated file gets editor validation if someone opens it directly.

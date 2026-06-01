@@ -61,7 +61,29 @@ A few things to note:
 - **`createAgent(...)` + `init(agent)`** — Created agents declare model and sandbox configuration; workflows initialize them only when needed. `init(agent)` fails unless its created agent config provides a model, sets `model: false`, or supplies a profile with a model. By default, Flue gives every agent a virtual sandbox powered by [just-bash](https://github.com/vercel-labs/just-bash). No container needed.
 - **Schemas** — The [Valibot](https://valibot.dev) schema defines the expected output shape. Flue parses the agent's response and returns it on `response.data`, fully typed.
 
-### 3. Build and deploy
+### 3. Configure Durable Object migrations
+
+Cloudflare requires an explicit migration whenever a Worker adds a Durable Object class. Flue generates the classes and bindings for discovered agents and workflows, but your project owns the ordered migration history in `wrangler.jsonc`.
+
+`wrangler.jsonc`:
+
+```jsonc
+{
+  "$schema": "https://workers.cloudflare.com/schema/wrangler.json",
+  "name": "my-flue-worker",
+  "compatibility_date": "2026-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["FlueRegistry", "TranslateWorkflow"] }
+  ]
+}
+```
+
+Every Cloudflare target includes `FlueRegistry`. Workflow classes use the PascalCase filename plus `Workflow`, so `.flue/workflows/translate.ts` becomes `TranslateWorkflow`. Agent classes use the PascalCase filename directly, so `.flue/agents/support-chat.ts` becomes `SupportChat`.
+
+Keep deployed migration entries in order. When you add an agent or workflow later, append a uniquely tagged migration for its new class. Use Cloudflare's explicit rename or delete migrations when changing a deployed class lifecycle.
+
+### 4. Build and deploy
 
 ```bash
 npx flue build --target cloudflare
@@ -70,7 +92,7 @@ npx wrangler deploy
 
 `flue build --target cloudflare` compiles your project into a `./dist` directory containing a Cloudflare Workers-compatible artifact. `wrangler deploy` pushes it live.
 
-### 4. Add your API key
+### 5. Add your API key
 
 For local Cloudflare development, put provider API keys in `.dev.vars` beside your Wrangler configuration:
 
@@ -94,7 +116,7 @@ npx wrangler deploy
 
 For CI or a managed deployment pipeline, `wrangler deploy --secrets-file <path>` is also available when your pipeline provides a protected secrets file.
 
-### 5. Try it locally
+### 6. Try it locally
 
 For local development, use `flue dev --target cloudflare`. It builds your project root, then starts a Cloudflare Workers development server through the official Vite integration on port 3583 and watches for changes:
 
@@ -231,7 +253,7 @@ You own the container config. That means three things:
 2. Declare the Durable Object binding, migration, and container image in your `wrangler.jsonc` at the project root.
 3. Commit a `Dockerfile` at the path your `containers[].image` points to.
 
-Flue automates one piece: **any DO binding whose `class_name` ends with `Sandbox` is automatically wired up as `@cloudflare/sandbox`'s `Sandbox` class in the generated Worker bundle.** Pick any name you want (`Sandbox`, `PyBoxSandbox`, `SupportSandbox`, …) and Flue handles the re-export.
+Flue automates one piece: **any DO binding whose `class_name` ends with `Sandbox` is automatically wired up as `@cloudflare/sandbox`'s `Sandbox` class in the generated Worker bundle.** Pick any name you want (`Sandbox`, `PyBoxSandbox`, `SupportSandbox`, …) and Flue handles the re-export. Append its migration to the same top-level history you use for generated Flue classes; do not replace migrations that have already been deployed.
 
 ### Example
 
@@ -246,7 +268,10 @@ Flue automates one piece: **any DO binding whose `class_name` ends with `Sandbox
   "durable_objects": {
     "bindings": [{ "class_name": "Sandbox", "name": "Sandbox" }]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Sandbox"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["FlueRegistry", "Assistant"] },
+    { "tag": "v2", "new_sqlite_classes": ["Sandbox"] }
+  ],
   "containers": [{ "class_name": "Sandbox", "image": "./Dockerfile" }]
 }
 ```
@@ -275,7 +300,7 @@ export default createAgent(({ id, env }) => ({
 
 ### Multiple sandboxes
 
-Different agents can use different container images. Declare a separate binding for each (each `class_name` must contain `Sandbox`), and give each its own container entry:
+Different agents can use different container images. Declare a separate binding for each (each `class_name` must end with `Sandbox`), and give each its own container entry:
 
 ```jsonc
 {
@@ -286,7 +311,8 @@ Different agents can use different container images. Declare a separate binding 
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["PyBoxSandbox", "NodeSandbox"] }
+    { "tag": "v1", "new_sqlite_classes": ["FlueRegistry", "Assistant"] },
+    { "tag": "v2", "new_sqlite_classes": ["PyBoxSandbox", "NodeSandbox"] }
   ],
   "containers": [
     { "class_name": "PyBoxSandbox", "image": "./docker/python.Dockerfile" },

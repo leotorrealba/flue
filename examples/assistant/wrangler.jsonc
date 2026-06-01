@@ -22,6 +22,14 @@
 		{
 			"tag": "v1",
 			"new_sqlite_classes": ["Sandbox"]
+		},
+		{
+			"tag": "flue-class-Assistant",
+			"new_sqlite_classes": ["Assistant"]
+		},
+		{
+			"tag": "flue-class-FlueRegistry",
+			"new_sqlite_classes": ["FlueRegistry"]
 		}
 	],
 	"containers": [

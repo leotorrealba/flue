@@ -107,13 +107,18 @@ function createPackedExample(name: string, keepCustomBash: boolean): string {
 	};
 	packageJson.dependencies['@flue/runtime'] = `file:${runtimeTarball}`;
 	packageJson.devDependencies['@flue/cli'] = `file:${cliTarball}`;
+	const wranglerPath = path.join(root, 'wrangler.jsonc');
+	const wranglerConfig = JSON.parse(fs.readFileSync(wranglerPath, 'utf8')) as { migrations: unknown[] };
 	if (keepCustomBash) {
 		fs.rmSync(path.join(root, 'src', 'workflows', 'with-imported-skill.ts'));
+		wranglerConfig.migrations.push({ tag: 'fixture-delete-WithImportedSkillWorkflow', deleted_classes: ['WithImportedSkillWorkflow'] });
 	} else {
 		delete packageJson.dependencies['just-bash'];
 		fs.rmSync(path.join(root, 'src', 'workflows', 'with-custom-bash.ts'));
+		wranglerConfig.migrations.push({ tag: 'fixture-delete-WithCustomBashWorkflow', deleted_classes: ['WithCustomBashWorkflow'] });
 	}
 	fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, '\t')}\n`);
+	fs.writeFileSync(wranglerPath, `${JSON.stringify(wranglerConfig, null, '\t')}\n`);
 	fs.writeFileSync(
 		path.join(root, 'pnpm-workspace.yaml'),
 		`packages: []\noverrides:\n  '@flue/runtime': 'file:${runtimeTarball}'\nallowBuilds:\n  '@google/genai': false\n  '@mongodb-js/zstd': false\n  core-js-pure: false\n  esbuild: false\n  node-liblzma: false\n  protobufjs: false\n  sharp: false\n  workerd: false\n`,

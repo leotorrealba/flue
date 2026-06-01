@@ -6,6 +6,24 @@
 	"name": "cloudflare",
 	"compatibility_date": "2026-04-01",
 	"compatibility_flags": ["nodejs_compat"],
+	"migrations": [
+		{
+			"tag": "flue-class-FlueRegistry",
+			"new_sqlite_classes": ["FlueRegistry"]
+		},
+		{
+			"tag": "flue-class-SkillsFromGitWorkflow",
+			"new_sqlite_classes": ["SkillsFromGitWorkflow"]
+		},
+		{
+			"tag": "flue-class-SkillsFromR2Workflow",
+			"new_sqlite_classes": ["SkillsFromR2Workflow"]
+		},
+		{
+			"tag": "flue-class-WithCloudflareBinding",
+			"new_sqlite_classes": ["WithCloudflareBinding"]
+		}
+	],
 	"ai": {
 		"binding": "AI",
 	},
