@@ -18,7 +18,9 @@ interface Env {
 }
 
 function isMarkdownRequest(request: Request, url: URL) {
-	return (request.method === 'GET' || request.method === 'HEAD') && url.pathname.endsWith('/index.md');
+	return (
+		(request.method === 'GET' || request.method === 'HEAD') && url.pathname.endsWith('/index.md')
+	);
 }
 
 const legacySdkMarkdownPaths = new Set([
@@ -76,7 +78,10 @@ export default {
 			},
 			{
 				conversionOptions: {
-					html: { hostname: url.origin, cssSelector: '[data-markdown-content], [data-markdown-navigation]' },
+					html: {
+						hostname: url.origin,
+						cssSelector: '[data-markdown-content], [data-markdown-navigation]',
+					},
 				},
 			},
 		);

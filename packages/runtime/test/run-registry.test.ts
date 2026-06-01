@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import { createAgent } from '../src/agent-definition.ts';
 import { observe } from '../src/index.ts';
-import { admin, flue } from '../src/routing.ts';
 import {
 	configureFlueRuntime,
 	createFlueContext,
@@ -15,6 +14,7 @@ import {
 	type RunRecord,
 	type RunStore,
 } from '../src/internal.ts';
+import { admin, flue } from '../src/routing.ts';
 import type { FlueEvent } from '../src/types.ts';
 
 describe('workflow run ids', () => {
@@ -39,18 +39,45 @@ describe('InMemoryRunRegistry', () => {
 	it('records start, lookup, and end for one workflow run', async () => {
 		const registry = new InMemoryRunRegistry();
 		const runId = 'workflow:hello:a';
-		await registry.recordRunStart({ runId, owner: workflowOwner('hello', runId), startedAt: '2026-01-01T00:00:00.000Z' });
-		expect(await registry.lookupRun(runId)).toMatchObject({ runId, owner: workflowOwner('hello', runId), status: 'active' });
+		await registry.recordRunStart({
+			runId,
+			owner: workflowOwner('hello', runId),
+			startedAt: '2026-01-01T00:00:00.000Z',
+		});
+		expect(await registry.lookupRun(runId)).toMatchObject({
+			runId,
+			owner: workflowOwner('hello', runId),
+			status: 'active',
+		});
 		expect(await registry.lookupRun('workflow:hello:missing')).toBeNull();
-		await registry.recordRunEnd({ runId, endedAt: '2026-01-01T00:00:05.000Z', durationMs: 5000, isError: false });
-		expect(await registry.lookupRun(runId)).toMatchObject({ status: 'completed', endedAt: '2026-01-01T00:00:05.000Z', durationMs: 5000, isError: false });
+		await registry.recordRunEnd({
+			runId,
+			endedAt: '2026-01-01T00:00:05.000Z',
+			durationMs: 5000,
+			isError: false,
+		});
+		expect(await registry.lookupRun(runId)).toMatchObject({
+			status: 'completed',
+			endedAt: '2026-01-01T00:00:05.000Z',
+			durationMs: 5000,
+			isError: false,
+		});
 	});
 
 	it('marks errored workflow run pointers', async () => {
 		const registry = new InMemoryRunRegistry();
 		const runId = 'workflow:hello:error';
-		await registry.recordRunStart({ runId, owner: workflowOwner('hello', runId), startedAt: '2026-01-01T00:00:00.000Z' });
-		await registry.recordRunEnd({ runId, endedAt: '2026-01-01T00:00:06.000Z', durationMs: 5000, isError: true });
+		await registry.recordRunStart({
+			runId,
+			owner: workflowOwner('hello', runId),
+			startedAt: '2026-01-01T00:00:00.000Z',
+		});
+		await registry.recordRunEnd({
+			runId,
+			endedAt: '2026-01-01T00:00:06.000Z',
+			durationMs: 5000,
+			isError: true,
+		});
 		expect(await registry.lookupRun(runId)).toMatchObject({ status: 'errored', isError: true });
 	});
 
@@ -59,10 +86,20 @@ describe('InMemoryRunRegistry', () => {
 		for (let i = 0; i < 5; i++) {
 			const name = i % 2 === 0 ? 'hello' : 'greet';
 			const runId = `workflow:${name}:${i}`;
-			await registry.recordRunStart({ runId, owner: workflowOwner(name, runId), startedAt: `2026-01-01T00:00:0${i}.000Z` });
+			await registry.recordRunStart({
+				runId,
+				owner: workflowOwner(name, runId),
+				startedAt: `2026-01-01T00:00:0${i}.000Z`,
+			});
 		}
 		const all = await registry.listRuns();
-		expect(all.runs.map((run) => run.runId)).toEqual(['workflow:hello:4', 'workflow:greet:3', 'workflow:hello:2', 'workflow:greet:1', 'workflow:hello:0']);
+		expect(all.runs.map((run) => run.runId)).toEqual([
+			'workflow:hello:4',
+			'workflow:greet:3',
+			'workflow:hello:2',
+			'workflow:greet:1',
+			'workflow:hello:0',
+		]);
 		const helloOnly = await registry.listRuns({ workflowName: 'hello' });
 		expect(helloOnly.runs).toHaveLength(3);
 		expect(helloOnly.runs.every((run) => run.owner.workflowName === 'hello')).toBe(true);
@@ -72,7 +109,11 @@ describe('InMemoryRunRegistry', () => {
 		const registry = new InMemoryRunRegistry();
 		for (let i = 0; i < 5; i++) {
 			const runId = `workflow:hello:${i}`;
-			await registry.recordRunStart({ runId, owner: workflowOwner('hello', runId), startedAt: `2026-01-01T00:00:0${i}.000Z` });
+			await registry.recordRunStart({
+				runId,
+				owner: workflowOwner('hello', runId),
+				startedAt: `2026-01-01T00:00:0${i}.000Z`,
+			});
 		}
 		const page1 = await registry.listRuns({ limit: 2 });
 		const page2 = await registry.listRuns({ limit: 2, cursor: page1.nextCursor });
@@ -81,19 +122,31 @@ describe('InMemoryRunRegistry', () => {
 		expect(page2.runs).toHaveLength(2);
 		expect(page3.runs).toHaveLength(1);
 		expect(page3.nextCursor).toBeUndefined();
-		expect(new Set([...page1.runs, ...page2.runs, ...page3.runs].map((run) => run.runId)).size).toBe(5);
+		expect(
+			new Set([...page1.runs, ...page2.runs, ...page3.runs].map((run) => run.runId)).size,
+		).toBe(5);
 	});
 
 	it('rejects workflow owner records whose instance id does not match the run id', async () => {
 		const registry = new InMemoryRunRegistry();
-		await expect(registry.recordRunStart({ runId: 'workflow:daily-report:01A', owner: workflowOwner('daily-report', 'workflow:daily-report:01B'), startedAt: '2026-01-01T00:00:00.000Z' })).rejects.toThrow(/same instanceId/);
+		await expect(
+			registry.recordRunStart({
+				runId: 'workflow:daily-report:01A',
+				owner: workflowOwner('daily-report', 'workflow:daily-report:01B'),
+				startedAt: '2026-01-01T00:00:00.000Z',
+			}),
+		).rejects.toThrow(/same instanceId/);
 	});
 
 	it('falls back to page 1 on a malformed cursor', async () => {
 		const registry = new InMemoryRunRegistry();
 		for (let i = 0; i < 3; i++) {
 			const runId = `workflow:hello:${i}`;
-			await registry.recordRunStart({ runId, owner: workflowOwner('hello', runId), startedAt: `2026-01-01T00:00:0${i}.000Z` });
+			await registry.recordRunStart({
+				runId,
+				owner: workflowOwner('hello', runId),
+				startedAt: `2026-01-01T00:00:0${i}.000Z`,
+			});
 		}
 		expect((await registry.listRuns({ cursor: 'not-base64-json' })).runs).toHaveLength(3);
 		expect((await registry.listRuns({ cursor: '' })).runs).toHaveLength(3);
@@ -149,17 +202,25 @@ describe('run store persistence sizing', () => {
 
 		attributes.nested.value = 'mutated after append';
 		const firstRead = await runStore.getEvents(runId);
-		expect(firstRead).toMatchObject([{
-			type: 'log',
-			attributes: { nested: { value: 'original' } },
-		}]);
-		expect((firstRead[0] as Extract<FlueEvent, { type: 'log' }>).attributes).not.toHaveProperty('omitted');
+		expect(firstRead).toMatchObject([
+			{
+				type: 'log',
+				attributes: { nested: { value: 'original' } },
+			},
+		]);
+		expect((firstRead[0] as Extract<FlueEvent, { type: 'log' }>).attributes).not.toHaveProperty(
+			'omitted',
+		);
 
-		((firstRead[0] as Extract<FlueEvent, { type: 'log' }>).attributes?.nested as { value: string }).value = 'mutated after read';
-		expect(await runStore.getEvents(runId)).toMatchObject([{
-			type: 'log',
-			attributes: { nested: { value: 'original' } },
-		}]);
+		(
+			(firstRead[0] as Extract<FlueEvent, { type: 'log' }>).attributes?.nested as { value: string }
+		).value = 'mutated after read';
+		expect(await runStore.getEvents(runId)).toMatchObject([
+			{
+				type: 'log',
+				attributes: { nested: { value: 'original' } },
+			},
+		]);
 	});
 
 	it('surfaces oversized persisted events to callers', async () => {
@@ -177,7 +238,12 @@ describe('run store persistence sizing', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
@@ -219,7 +285,12 @@ describe('run store persistence sizing', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
@@ -260,7 +331,12 @@ describe('run store persistence sizing', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
@@ -311,7 +387,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
@@ -360,7 +441,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
@@ -414,7 +500,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
@@ -466,7 +557,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
@@ -477,11 +573,13 @@ describe('POST /workflows/:name routes via flue()', () => {
 		const app = new Hono();
 		app.route('/', flue());
 		const rawBody = JSON.stringify({ event: 'created' });
-		const response = await app.fetch(new Request('http://localhost/workflows/signed?wait=result', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: rawBody,
-		}));
+		const response = await app.fetch(
+			new Request('http://localhost/workflows/signed?wait=result', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: rawBody,
+			}),
+		);
 
 		expect(response.status).toBe(200);
 		expect(verifiedBody).toBe(rawBody);
@@ -493,7 +591,11 @@ describe('POST /workflows/:name routes via flue()', () => {
 			target: 'node',
 			manifest: { agents: [], workflows: [{ name: 'explode', transports: { http: true } }] },
 			handlers: {},
-			workflowHandlers: { explode: async () => { throw new Error('boom'); } },
+			workflowHandlers: {
+				explode: async () => {
+					throw new Error('boom');
+				},
+			},
 			createContext: (id, runId, payload, req) =>
 				createFlueContext({
 					id,
@@ -501,7 +603,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
@@ -511,7 +618,9 @@ describe('POST /workflows/:name routes via flue()', () => {
 		});
 		const app = new Hono();
 		app.route('/', flue());
-		const res = await app.fetch(new Request('http://localhost/workflows/explode?wait=result', { method: 'POST' }));
+		const res = await app.fetch(
+			new Request('http://localhost/workflows/explode?wait=result', { method: 'POST' }),
+		);
 		expect(res.status).toBe(500);
 		expect(res.headers.get('x-flue-run-id')?.startsWith('workflow:explode:')).toBe(true);
 	});
@@ -529,11 +638,18 @@ describe('POST /workflows/:name routes via flue()', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
-			startWorkflowAdmission: () => { throw new Error('admission failed'); },
+			startWorkflowAdmission: () => {
+				throw new Error('admission failed');
+			},
 			runStore,
 			runRegistry: new InMemoryRunRegistry(),
 			runSubscribers: createRunSubscriberRegistry(),
@@ -541,7 +657,9 @@ describe('POST /workflows/:name routes via flue()', () => {
 		const app = new Hono();
 		app.route('/', flue());
 		let settled = false;
-		const responsePromise = Promise.resolve(app.fetch(new Request('http://localhost/workflows/explode?wait=result', { method: 'POST' }))).then((response) => {
+		const responsePromise = Promise.resolve(
+			app.fetch(new Request('http://localhost/workflows/explode?wait=result', { method: 'POST' })),
+		).then((response) => {
 			settled = true;
 			return response;
 		});
@@ -571,7 +689,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
@@ -609,7 +732,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 		configureFlueRuntime({
 			target: 'node',
 			manifest: { agents: [], workflows: [{ name: 'daily-report', transports: { http: true } }] },
-			workflowHandlers: { 'daily-report': async (ctx) => { ctx.log.info('live'); return { ok: true }; } },
+			workflowHandlers: {
+				'daily-report': async (ctx) => {
+					ctx.log.info('live');
+					return { ok: true };
+				},
+			},
 			createContext: (id, runId, payload, req) =>
 				createFlueContext({
 					id,
@@ -617,7 +745,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
@@ -627,10 +760,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 		});
 		const app = new Hono();
 		app.route('/', flue());
-		const response = await app.fetch(new Request('http://localhost/workflows/daily-report', {
-			method: 'POST',
-			headers: { accept: 'text/event-stream' },
-		}));
+		const response = await app.fetch(
+			new Request('http://localhost/workflows/daily-report', {
+				method: 'POST',
+				headers: { accept: 'text/event-stream' },
+			}),
+		);
 		const body = await response.text();
 		expect(body).toMatch(/event: log/);
 		expect(body).toMatch(/event: run_end/);
@@ -648,7 +783,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
@@ -658,10 +798,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 		});
 		const app = new Hono();
 		app.route('/', flue());
-		const response = await app.fetch(new Request('http://localhost/workflows/daily-report', {
-			method: 'POST',
-			headers: { accept: 'text/event-stream', 'last-event-id': '999' },
-		}));
+		const response = await app.fetch(
+			new Request('http://localhost/workflows/daily-report', {
+				method: 'POST',
+				headers: { accept: 'text/event-stream', 'last-event-id': '999' },
+			}),
+		);
 		const body = await response.text();
 		expect(body).toMatch(/event: run_start/);
 		expect(body).toMatch(/event: run_end/);
@@ -674,7 +816,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 			configureFlueRuntime({
 				target: 'node',
 				manifest: { agents: [], workflows: [{ name: 'durable', transports: { http: true } }] },
-				workflowHandlers: { durable: async () => { executions++; return { ok: true }; } },
+				workflowHandlers: {
+					durable: async () => {
+						executions++;
+						return { ok: true };
+					},
+				},
 				createContext: (id, runId, payload, req) =>
 					createFlueContext({
 						id,
@@ -682,18 +829,28 @@ describe('POST /workflows/:name routes via flue()', () => {
 						payload,
 						env: {},
 						req,
-						agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+						agentConfig: {
+							systemPrompt: '',
+							skills: {},
+							model: undefined,
+							resolveModel: () => undefined,
+						},
 						createDefaultEnv: async () => ({}) as never,
 						defaultStore: new InMemorySessionStore(),
 					}),
-				startWorkflowAdmission: async (_runId, run) => { admissions++; return run(); },
+				startWorkflowAdmission: async (_runId, run) => {
+					admissions++;
+					return run();
+				},
 				runStore: new FailingCreateRunStore(),
 				runRegistry: new InMemoryRunRegistry(),
 				runSubscribers: createRunSubscriberRegistry(),
 			});
 			const app = new Hono();
 			app.route('/', flue());
-			const response = await app.fetch(new Request(`http://localhost/workflows/durable${suffix}`, { method: 'POST' }));
+			const response = await app.fetch(
+				new Request(`http://localhost/workflows/durable${suffix}`, { method: 'POST' }),
+			);
 			expect(response.status).toBe(500);
 			expect(admissions).toBe(0);
 			expect(executions).toBe(0);
@@ -704,7 +861,12 @@ describe('POST /workflows/:name routes via flue()', () => {
 		configureFlueRuntime({
 			target: 'node',
 			manifest: { agents: [], workflows: [{ name: 'durable', transports: { http: true } }] },
-			workflowHandlers: { durable: async () => { executions++; return { ok: true }; } },
+			workflowHandlers: {
+				durable: async () => {
+					executions++;
+					return { ok: true };
+				},
+			},
 			createContext: (id, runId, payload, req) =>
 				createFlueContext({
 					id,
@@ -712,18 +874,31 @@ describe('POST /workflows/:name routes via flue()', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({}) as never,
 					defaultStore: new InMemorySessionStore(),
 				}),
-			startWorkflowAdmission: async (_runId, run) => { admissions++; return run(); },
+			startWorkflowAdmission: async (_runId, run) => {
+				admissions++;
+				return run();
+			},
 			runStore: new FailingCreateRunStore(),
 			runRegistry: new InMemoryRunRegistry(),
 			runSubscribers: createRunSubscriberRegistry(),
 		});
 		const app = new Hono();
 		app.route('/', flue());
-		const sse = await app.fetch(new Request('http://localhost/workflows/durable', { method: 'POST', headers: { accept: 'text/event-stream' } }));
+		const sse = await app.fetch(
+			new Request('http://localhost/workflows/durable', {
+				method: 'POST',
+				headers: { accept: 'text/event-stream' },
+			}),
+		);
 		expect(sse.status).toBe(500);
 		expect(admissions).toBe(0);
 		expect(executions).toBe(0);
@@ -753,13 +928,24 @@ describe('POST /workflows/:name routes via flue()', () => {
 					payload,
 					env: {},
 					req,
-					agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: () => undefined,
+					},
 					createDefaultEnv: async () => ({
 						exec: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
 						readFile: async () => '',
 						readFileBuffer: async () => new Uint8Array(),
 						writeFile: async () => {},
-						stat: async () => ({ isFile: false, isDirectory: false, isSymbolicLink: false, size: 0, mtime: new Date() }),
+						stat: async () => ({
+							isFile: false,
+							isDirectory: false,
+							isSymbolicLink: false,
+							size: 0,
+							mtime: new Date(),
+						}),
 						readdir: async () => [],
 						exists: async () => false,
 						mkdir: async () => {},
@@ -775,14 +961,22 @@ describe('POST /workflows/:name routes via flue()', () => {
 		});
 		const app = new Hono();
 		app.route('/', flue());
-		const skipped = await app.fetch(new Request('http://localhost/workflows/optional-agent?wait=result', {
-			method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ useAgent: false }),
-		}));
+		const skipped = await app.fetch(
+			new Request('http://localhost/workflows/optional-agent?wait=result', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ useAgent: false }),
+			}),
+		);
 		expect((await skipped.json()) as unknown).toMatchObject({ result: { initialized: false } });
 		expect(initialized).toEqual([]);
-		const used = await app.fetch(new Request('http://localhost/workflows/optional-agent?wait=result', {
-			method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ useAgent: true }),
-		}));
+		const used = await app.fetch(
+			new Request('http://localhost/workflows/optional-agent?wait=result', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ useAgent: true }),
+			}),
+		);
 		expect(used.status).toBe(200);
 		expect(initialized).toHaveLength(1);
 		expect(initialized[0]?.payload).toEqual({ useAgent: true });
@@ -799,9 +993,13 @@ describe('POST /workflows/:name routes via flue()', () => {
 		});
 		const app = new Hono();
 		app.route('/', flue());
-		const internal = await app.fetch(new Request('http://localhost/workflows/internal', { method: 'POST' }));
+		const internal = await app.fetch(
+			new Request('http://localhost/workflows/internal', { method: 'POST' }),
+		);
 		expect(internal.status).toBe(404);
-		expect(((await internal.json()) as { error?: { type: string } }).error?.type).toBe('workflow_not_http');
+		expect(((await internal.json()) as { error?: { type: string } }).error?.type).toBe(
+			'workflow_not_http',
+		);
 		const badMethod = await app.fetch(new Request('http://localhost/workflows/internal'));
 		expect(badMethod.status).toBe(405);
 	});
@@ -882,7 +1080,9 @@ describe('Bare /runs/:runId routes via flue()', () => {
 		expect(types.has('run_start')).toBe(true);
 		expect(types.has('run_end')).toBe(true);
 
-		const badLimit = await app.fetch(new Request(`http://localhost/runs/${runId}/events?limit=abc`));
+		const badLimit = await app.fetch(
+			new Request(`http://localhost/runs/${runId}/events?limit=abc`),
+		);
 		expect(badLimit.status).toBe(400);
 		expect(((await badLimit.json()) as { error?: { type: string } }).error?.type).toBe(
 			'validation_failed',
@@ -982,7 +1182,9 @@ describe('Bare /runs/:runId routes via flue()', () => {
 
 		const app = new Hono();
 		app.route('/', flue());
-		const res = await app.fetch(new Request('http://localhost/runs/run_anything', { method: 'POST' }));
+		const res = await app.fetch(
+			new Request('http://localhost/runs/run_anything', { method: 'POST' }),
+		);
 		expect(res.status).toBe(405);
 		expect(res.headers.get('allow')).toBe('GET');
 	});
@@ -1076,8 +1278,12 @@ class DelayedEndRunStore implements RunStore {
 	private inner = new InMemoryRunStore();
 	private resolveEndStarted!: () => void;
 	private resolveEnd!: () => void;
-	readonly endStarted = new Promise<void>((resolve) => { this.resolveEndStarted = resolve; });
-	private readonly endReleased = new Promise<void>((resolve) => { this.resolveEnd = resolve; });
+	readonly endStarted = new Promise<void>((resolve) => {
+		this.resolveEndStarted = resolve;
+	});
+	private readonly endReleased = new Promise<void>((resolve) => {
+		this.resolveEnd = resolve;
+	});
 
 	createRun(input: Parameters<RunStore['createRun']>[0]): Promise<void> {
 		return this.inner.createRun(input);
@@ -1242,7 +1448,9 @@ describe('admin() routes', () => {
 		);
 		expect(instanceRuns.status).toBe(404);
 
-		const runs = await app.fetch(new Request('http://localhost/admin/runs?workflowName=daily-report'));
+		const runs = await app.fetch(
+			new Request('http://localhost/admin/runs?workflowName=daily-report'),
+		);
 		expect(runs.status).toBe(200);
 		expect(((await runs.json()) as { items: { runId: string }[] }).items[0]?.runId).toBe(runId);
 
@@ -1258,7 +1466,10 @@ describe('admin() routes', () => {
 
 		const spec = await app.fetch(new Request('http://localhost/admin/openapi.json'));
 		expect(spec.status).toBe(200);
-		const specBody = (await spec.json()) as { info: { title: string; version: string }; paths: Record<string, unknown> };
+		const specBody = (await spec.json()) as {
+			info: { title: string; version: string };
+			paths: Record<string, unknown>;
+		};
 		expect(specBody.info).toMatchObject({ title: 'Flue Admin API', version: '9.9.9' });
 		expect(specBody.paths['/agents']).toBeDefined();
 		expect(specBody.paths['/runs']).toBeDefined();

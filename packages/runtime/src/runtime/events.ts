@@ -56,7 +56,8 @@ export function dispatchGlobalEvent(event: FlueEvent, ctx: FlueContext): void {
 	let serializedEvent: string | undefined;
 	try {
 		serializedEvent = JSON.stringify(event);
-		if (serializedEvent === undefined) throw new Error('Event snapshot serialization returned undefined.');
+		if (serializedEvent === undefined)
+			throw new Error('Event snapshot serialization returned undefined.');
 	} catch (error) {
 		reportSubscriberFailure(error);
 		return;
@@ -65,7 +66,9 @@ export function dispatchGlobalEvent(event: FlueEvent, ctx: FlueContext): void {
 	// themselves mid-dispatch don't perturb the iteration.
 	for (const subscriber of [...subscribers]) {
 		try {
-			Promise.resolve(subscriber(JSON.parse(serializedEvent) as FlueEvent, ctx)).catch(reportSubscriberFailure);
+			Promise.resolve(subscriber(JSON.parse(serializedEvent) as FlueEvent, ctx)).catch(
+				reportSubscriberFailure,
+			);
 		} catch (error) {
 			reportSubscriberFailure(error);
 		}

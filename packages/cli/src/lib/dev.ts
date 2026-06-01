@@ -12,10 +12,15 @@
  * Node path treats every non-ignored change as a rebuild trigger; the
  * Cloudflare path filters to "structural" changes only.
  */
-import { spawn, type ChildProcess } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { build, cloudflareViteConfigPath, cloudflareViteInputDir, createCloudflareViteConfig } from './build.ts';
+import {
+	build,
+	cloudflareViteConfigPath,
+	cloudflareViteInputDir,
+	createCloudflareViteConfig,
+} from './build.ts';
 import { createEnvLoader, type EnvLoader, selectEnvFile } from './env.ts';
 import type { BuildOptions } from './types.ts';
 
@@ -134,9 +139,10 @@ export async function dev(options: DevOptions): Promise<void> {
 
 	// ─── Watch loop ──────────────────────────────────────────────────────────
 
-	const rebuild = options.target === 'cloudflare'
-		? () => envLoader.withApplied(() => build(buildOptions))
-		: () => build(buildOptions);
+	const rebuild =
+		options.target === 'cloudflare'
+			? () => envLoader.withApplied(() => build(buildOptions))
+			: () => build(buildOptions);
 	const rebuilder = createRebuilder(buildOptions, reloader, rebuild);
 	const watcher = createWatcher({
 		root,
@@ -150,7 +156,9 @@ export async function dev(options: DevOptions): Promise<void> {
 				try {
 					envLoader.apply();
 				} catch (err) {
-					console.error(`[flue] Environment reload failed: ${err instanceof Error ? err.message : String(err)}`);
+					console.error(
+						`[flue] Environment reload failed: ${err instanceof Error ? err.message : String(err)}`,
+					);
 					return;
 				}
 			}
@@ -236,9 +244,7 @@ function createRebuilder(
 		} catch (err) {
 			// Don't exit the dev loop on a rebuild error — the user is editing
 			// code, they'll fix it and trigger another rebuild.
-			console.error(
-				`[flue] Rebuild failed: ${err instanceof Error ? err.message : String(err)}\n`,
-			);
+			console.error(`[flue] Rebuild failed: ${err instanceof Error ? err.message : String(err)}\n`);
 		} finally {
 			running = false;
 			if (queued) {
@@ -313,10 +319,7 @@ function createWatcher(options: WatcherOptions): WatcherHandle {
 	// checks. If output lives outside root, the recursive watcher
 	// won't see writes there at all — but we still ignore any path that
 	// resolves into it, just to be safe across platforms.
-	const outputRelToRoot = path
-		.relative(root, output)
-		.split(path.sep)
-		.join('/');
+	const outputRelToRoot = path.relative(root, output).split(path.sep).join('/');
 
 	const isIgnoredPath = (relPath: string): boolean => {
 		const normalized = relPath.replace(/\\/g, '/');
@@ -367,8 +370,7 @@ function createWatcher(options: WatcherOptions): WatcherHandle {
 			if (filename?.toString() === envBasename) onChange(envFile);
 		});
 		watchers.push(w);
-	} catch {
-	}
+	} catch {}
 
 	return {
 		close() {
@@ -392,11 +394,7 @@ class NodeReloader implements DevReloader {
 	private readonly port: number;
 	url: string;
 
-	constructor(opts: {
-		root: string;
-		output: string;
-		port: number;
-	}) {
+	constructor(opts: { root: string; output: string; port: number }) {
 		this.root = opts.root;
 		this.port = opts.port;
 		this.serverPath = path.join(opts.output, 'server.mjs');
@@ -553,12 +551,18 @@ class CloudflareReloader implements DevReloader {
 			server: { host: '127.0.0.1', port: this.port, strictPort: true },
 		});
 		await this.server.listen();
-		this.url = this.server.resolvedUrls?.local[0]?.replace(/\/$/, '') ?? `http://127.0.0.1:${this.port}`;
+		this.url =
+			this.server.resolvedUrls?.local[0]?.replace(/\/$/, '') ?? `http://127.0.0.1:${this.port}`;
 	}
 
 	shouldRebuildOn(relPath: string): boolean {
 		const normalized = relPath.replace(/\\/g, '/');
-		if (normalized === 'wrangler.jsonc' || normalized === 'wrangler.json' || normalized === 'wrangler.toml') return true;
+		if (
+			normalized === 'wrangler.jsonc' ||
+			normalized === 'wrangler.json' ||
+			normalized === 'wrangler.toml'
+		)
+			return true;
 		return isSourceStructurePath(this.root, this.sourceRoot, normalized);
 	}
 

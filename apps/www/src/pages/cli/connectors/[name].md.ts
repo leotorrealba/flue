@@ -32,7 +32,9 @@ interface ConnectorEntry {
 }
 
 async function listConnectorEntries(): Promise<ConnectorEntry[]> {
-	const files = (await readdir(connectorsDir)).filter((f) => f.endsWith('.md') && f !== 'README.md');
+	const files = (await readdir(connectorsDir)).filter(
+		(f) => f.endsWith('.md') && f !== 'README.md',
+	);
 	const entries: ConnectorEntry[] = [];
 	for (const file of files) {
 		const stem = file.slice(0, -'.md'.length);

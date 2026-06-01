@@ -42,9 +42,29 @@ describe('defineAgentProfile', () => {
 		[{ skills: [{ name: ' ', description: 'Blank name.' }] }, 'skills[0].name'],
 		[{ skills: [{ name: 'triage' }] }, 'skills[0].description'],
 		[{ tools: [{ name: 123 }] }, 'tools[0].name'],
-		[{ tools: [{ name: ' ', description: 'Desc', parameters: {}, execute: async (): Promise<string> => 'ok' }] }, 'tools[0].name'],
-		[{ tools: [{ name: 'tool', parameters: {}, execute: async (): Promise<string> => 'ok' }] }, 'tools[0].description'],
-		[{ tools: [{ name: 'tool', description: 'Desc', execute: async (): Promise<string> => 'ok' }] }, 'tools[0].parameters'],
+		[
+			{
+				tools: [
+					{
+						name: ' ',
+						description: 'Desc',
+						parameters: {},
+						execute: async (): Promise<string> => 'ok',
+					},
+				],
+			},
+			'tools[0].name',
+		],
+		[
+			{ tools: [{ name: 'tool', parameters: {}, execute: async (): Promise<string> => 'ok' }] },
+			'tools[0].description',
+		],
+		[
+			{
+				tools: [{ name: 'tool', description: 'Desc', execute: async (): Promise<string> => 'ok' }],
+			},
+			'tools[0].parameters',
+		],
 		[{ tools: [{ name: 'tool', description: 'Desc', parameters: {} }] }, 'tools[0].execute'],
 		[{ subagents: [{ model: 123 }] }, 'subagents[0].name'],
 		[{ subagents: [{ name: '1bad', model: false }] }, 'must start with a letter'],
@@ -60,7 +80,9 @@ describe('defineAgentProfile', () => {
 			execute: async () => 'ok',
 		};
 
-		expect(() => defineAgentProfile({ tools: [tool, tool] })).toThrow('duplicate tool name "lookup"');
+		expect(() => defineAgentProfile({ tools: [tool, tool] })).toThrow(
+			'duplicate tool name "lookup"',
+		);
 	});
 
 	it('rejects duplicate skill names', () => {
@@ -82,13 +104,20 @@ describe('defineAgentProfile', () => {
 	});
 
 	it('creates an opaque runtime-initializable agent', async () => {
-		const agent = createAgent(({ id, payload }) => ({ model: false, instructions: `${id}:${String(payload)}` }));
+		const agent = createAgent(({ id, payload }) => ({
+			model: false,
+			instructions: `${id}:${String(payload)}`,
+		}));
 		expect(agent.__flueCreatedAgent).toBe(true);
-		expect(await agent.initialize({ id: 'instance', env: {}, payload: undefined })).toMatchObject({ model: false });
+		expect(await agent.initialize({ id: 'instance', env: {}, payload: undefined })).toMatchObject({
+			model: false,
+		});
 	});
 
 	it('rejects unknown created-agent runtime config fields during resolution', () => {
-		expect(() => resolveAgentProfile({ model: false, typo: true } as never)).toThrow('unknown runtime config field "typo"');
+		expect(() => resolveAgentProfile({ model: false, typo: true } as never)).toThrow(
+			'unknown runtime config field "typo"',
+		);
 	});
 });
 
@@ -96,8 +125,18 @@ describe('resolveAgentProfile', () => {
 	it('inherits scalar fields and appends created-agent capabilities to its profile', () => {
 		const inheritedSkill = { name: 'base', description: 'Base skill.' };
 		const runtimeSkill = { name: 'runtime', description: 'Runtime skill.' };
-		const inheritedTool = defineTool({ name: 'base_tool', description: 'Base tool.', parameters: {}, execute: async () => 'base' });
-		const runtimeTool = defineTool({ name: 'runtime_tool', description: 'Runtime tool.', parameters: {}, execute: async () => 'runtime' });
+		const inheritedTool = defineTool({
+			name: 'base_tool',
+			description: 'Base tool.',
+			parameters: {},
+			execute: async () => 'base',
+		});
+		const runtimeTool = defineTool({
+			name: 'runtime_tool',
+			description: 'Runtime tool.',
+			parameters: {},
+			execute: async () => 'runtime',
+		});
 		const inheritedSubagent = { name: 'base_agent', model: false as const };
 		const runtimeSubagent = { name: 'runtime_agent', model: false as const };
 		expect(

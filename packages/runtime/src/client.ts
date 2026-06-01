@@ -1,15 +1,19 @@
-import { assertResolvedAgentProfile, extendAgentProfile, resolveAgentProfile } from './agent-definition.ts';
+import {
+	assertResolvedAgentProfile,
+	extendAgentProfile,
+	resolveAgentProfile,
+} from './agent-definition.ts';
 import { discoverSessionContext } from './context.ts';
 import { Harness } from './harness.ts';
 import { dispatchGlobalEvent } from './runtime/events.ts';
 import { bashFactoryToSessionEnv, createCwdSessionEnv, isBashLike } from './sandbox.ts';
 import type {
 	AgentConfig,
+	AgentHarnessOptions,
 	AgentProfile,
 	AgentRuntimeConfig,
-	AgentHarnessOptions,
-	CreatedAgent,
 	BashFactory,
+	CreatedAgent,
 	FlueContext,
 	FlueEvent,
 	FlueEventCallback,
@@ -46,7 +50,11 @@ export interface FlueContextConfig {
 /** Extends FlueContext with server-only methods. Agent handlers only see FlueContext. */
 export interface FlueContextInternal extends FlueContext {
 	readonly runId: string | undefined;
-	initializeCreatedAgent(agent: CreatedAgent, payload: unknown, options?: AgentHarnessOptions): Promise<FlueHarness>;
+	initializeCreatedAgent(
+		agent: CreatedAgent,
+		payload: unknown,
+		options?: AgentHarnessOptions,
+	): Promise<FlueHarness>;
 	emitEvent(event: FlueEvent): FlueEvent;
 	subscribeEvent(callback: FlueEventCallback): () => void;
 	setEventCallback(callback: FlueEventCallback | undefined): void;
@@ -107,13 +115,28 @@ export function createFlueContext(config: FlueContextConfig): FlueContextInterna
 
 		log: {
 			info(message, attributes) {
-				emitEvent({ type: 'log', level: 'info', message, attributes: normalizeLogAttributes(attributes) });
+				emitEvent({
+					type: 'log',
+					level: 'info',
+					message,
+					attributes: normalizeLogAttributes(attributes),
+				});
 			},
 			warn(message, attributes) {
-				emitEvent({ type: 'log', level: 'warn', message, attributes: normalizeLogAttributes(attributes) });
+				emitEvent({
+					type: 'log',
+					level: 'warn',
+					message,
+					attributes: normalizeLogAttributes(attributes),
+				});
 			},
 			error(message, attributes) {
-				emitEvent({ type: 'log', level: 'error', message, attributes: normalizeLogAttributes(attributes) });
+				emitEvent({
+					type: 'log',
+					level: 'error',
+					message,
+					attributes: normalizeLogAttributes(attributes),
+				});
 			},
 		},
 
@@ -121,7 +144,11 @@ export function createFlueContext(config: FlueContextConfig): FlueContextInterna
 			return ctx.initializeCreatedAgent(agent, config.payload, options);
 		},
 
-		async initializeCreatedAgent(agent: CreatedAgent, payload: unknown, options?: AgentHarnessOptions): Promise<FlueHarness> {
+		async initializeCreatedAgent(
+			agent: CreatedAgent,
+			payload: unknown,
+			options?: AgentHarnessOptions,
+		): Promise<FlueHarness> {
 			if (!agent || agent.__flueCreatedAgent !== true || typeof agent.initialize !== 'function') {
 				throw new Error('[flue] init() requires an agent created with createAgent(...).');
 			}
@@ -145,7 +172,9 @@ export function createFlueContext(config: FlueContextConfig): FlueContextInterna
 
 			const name = options?.name ?? 'default';
 			if (initializedHarnessNames.has(name)) {
-				throw new Error(`[flue] init() has already been called with name "${name}" in this request.`);
+				throw new Error(
+					`[flue] init() has already been called with name "${name}" in this request.`,
+				);
 			}
 			initializedHarnessNames.add(name);
 
@@ -165,7 +194,11 @@ export function createFlueContext(config: FlueContextConfig): FlueContextInterna
 					? createCwdSessionEnv(baseEnv, baseEnv.resolvePath(resolvedOptions.cwd))
 					: baseEnv;
 				const store: SessionStore = resolvedOptions.persist ?? config.defaultStore;
-				const localContext = await discoverSessionContext(env, definition.instructions, definition.skills);
+				const localContext = await discoverSessionContext(
+					env,
+					definition.instructions,
+					definition.skills,
+				);
 
 				// Harness-level model override. Per-call `model` on prompt()/skill() still wins
 				// because resolveModelForCall() applies it on top of this default.
@@ -243,7 +276,9 @@ function serializeLogError(error: Error): Record<string, unknown> {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function hasInitModel(options: AgentRuntimeConfig | undefined): boolean {
-	return Boolean(options && ('model' in options || (options.profile && 'model' in options.profile)));
+	return Boolean(
+		options && ('model' in options || (options.profile && 'model' in options.profile)),
+	);
 }
 
 function isBashFactory(value: unknown): value is BashFactory {
@@ -282,9 +317,9 @@ async function resolveSessionEnv(
 	if ((sandbox as unknown) === 'local') {
 		throw new Error(
 			"[flue] `sandbox: 'local'` is no longer supported. " +
-				"Use the `local()` factory instead: " +
+				'Use the `local()` factory instead: ' +
 				"`import { local } from '@flue/runtime/node'; createAgent(() => ({ sandbox: local(), model: false }))`. " +
-				"The factory accepts an `env` option for opting host env vars into the sandbox.",
+				'The factory accepts an `env` option for opting host env vars into the sandbox.',
 		);
 	}
 	if (isBashFactory(sandbox)) {

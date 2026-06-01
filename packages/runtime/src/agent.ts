@@ -74,7 +74,8 @@ export function createPackagedSkillReadTool(
 		async execute(_toolCallId: string, params: Static<typeof ReadParams>, signal?: AbortSignal) {
 			throwIfAborted(signal);
 			const content = readPackagedSkillFile(packagedSkills, params.path);
-			if (content === undefined) throw new Error(`[flue] Packaged skill file not found: ${params.path}`);
+			if (content === undefined)
+				throw new Error(`[flue] Packaged skill file not found: ${params.path}`);
 			return formatReadContent(params.path, content, params.offset, params.limit);
 		},
 	};
@@ -282,7 +283,9 @@ const TaskParams = Type.Object({
 		Type.String({ description: 'Short human-readable label for the delegated work' }),
 	),
 	prompt: Type.String({ description: 'Focused instructions for the child agent' }),
-	agent: Type.Optional(Type.String({ description: 'Declared subagent to use for the child agent' })),
+	agent: Type.Optional(
+		Type.String({ description: 'Declared subagent to use for the child agent' }),
+	),
 	cwd: Type.Optional(
 		Type.String({
 			description:
@@ -333,7 +336,10 @@ export function formatBashResult(
 		content: [
 			{
 				type: 'text',
-				text: result.exitCode === 0 ? output || '(no output)' : `${output || '(no output)'}\n\n${exitLine}`,
+				text:
+					result.exitCode === 0
+						? output || '(no output)'
+						: `${output || '(no output)'}\n\n${exitLine}`,
 			},
 		],
 		details: { command, exitCode: result.exitCode },
@@ -444,13 +450,18 @@ function throwIfAborted(signal?: AbortSignal): void {
 	if (signal?.aborted) throw new Error('Operation aborted');
 }
 
-function readPackagedSkillFile(skills: Record<string, PackagedSkillDirectory>, path: string): string | undefined {
+function readPackagedSkillFile(
+	skills: Record<string, PackagedSkillDirectory>,
+	path: string,
+): string | undefined {
 	for (const skill of Object.values(skills)) {
 		for (const [filePath, file] of Object.entries(skill.files)) {
 			if (path !== packagedSkillReadPath(skill.id, filePath)) continue;
 			return file.kind === 'binary'
 				? wrapBase64ForReading(file.content)
-				: new TextDecoder().decode(Uint8Array.from(atob(file.content), (character) => character.charCodeAt(0)));
+				: new TextDecoder().decode(
+						Uint8Array.from(atob(file.content), (character) => character.charCodeAt(0)),
+					);
 		}
 	}
 	return undefined;

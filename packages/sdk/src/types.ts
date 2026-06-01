@@ -256,7 +256,7 @@ export type FlueEvent = (
 			startedAt: string;
 			restartedFromRunId?: string;
 			payload: unknown;
-		}
+	  }
 	| {
 			type: 'run_resume';
 			runId: string;
@@ -264,34 +264,119 @@ export type FlueEvent = (
 			instanceId: string;
 			workflowName: string;
 			startedAt: string;
-		}
+	  }
 	| { type: 'agent_start' }
 	| { type: 'agent_end'; messages: unknown[] }
 	| { type: 'turn_start'; turnId: string; purpose: LlmTurnPurpose }
-	| { type: 'turn_request'; turnId: string; purpose: LlmTurnPurpose; model: string; provider: string; api: string; input: { systemPrompt?: string; messages: LlmMessage[]; tools?: LlmTool[] }; reasoning?: string }
-	| { type: 'turn_end'; turnId: string; purpose: LlmTurnPurpose; message: unknown; toolResults: unknown[] }
+	| {
+			type: 'turn_request';
+			turnId: string;
+			purpose: LlmTurnPurpose;
+			model: string;
+			provider: string;
+			api: string;
+			input: { systemPrompt?: string; messages: LlmMessage[]; tools?: LlmTool[] };
+			reasoning?: string;
+	  }
+	| {
+			type: 'turn_end';
+			turnId: string;
+			purpose: LlmTurnPurpose;
+			message: unknown;
+			toolResults: unknown[];
+	  }
 	| { type: 'message_start'; message: unknown }
 	| { type: 'message_update'; message: unknown; assistantMessageEvent: unknown }
 	| { type: 'message_end'; message: unknown }
 	| { type: 'tool_execution_start'; toolCallId: string; toolName: string; args: unknown }
-	| { type: 'tool_execution_update'; toolCallId: string; toolName: string; args: unknown; partialResult: unknown }
-	| { type: 'tool_execution_end'; toolCallId: string; toolName: string; result: unknown; isError: boolean }
+	| {
+			type: 'tool_execution_update';
+			toolCallId: string;
+			toolName: string;
+			args: unknown;
+			partialResult: unknown;
+	  }
+	| {
+			type: 'tool_execution_end';
+			toolCallId: string;
+			toolName: string;
+			result: unknown;
+			isError: boolean;
+	  }
 	| { type: 'text_delta'; text: string }
 	| { type: 'thinking_start' }
 	| { type: 'thinking_delta'; delta: string }
 	| { type: 'thinking_end'; content: string }
 	| { type: 'tool_start'; toolName: string; toolCallId: string; args?: unknown }
-	| { type: 'tool_call'; toolName: string; toolCallId: string; isError: boolean; result?: unknown; durationMs: number }
-	| { type: 'turn'; turnId: string; purpose: LlmTurnPurpose; durationMs: number; model?: string; provider?: string; api?: string; output?: LlmAssistantMessage; usage?: PromptUsage; stopReason?: string; isError: boolean; error?: unknown }
+	| {
+			type: 'tool_call';
+			toolName: string;
+			toolCallId: string;
+			isError: boolean;
+			result?: unknown;
+			durationMs: number;
+	  }
+	| {
+			type: 'turn';
+			turnId: string;
+			purpose: LlmTurnPurpose;
+			durationMs: number;
+			model?: string;
+			provider?: string;
+			api?: string;
+			output?: LlmAssistantMessage;
+			usage?: PromptUsage;
+			stopReason?: string;
+			isError: boolean;
+			error?: unknown;
+	  }
 	| { type: 'task_start'; taskId: string; prompt: string; agent?: string; cwd?: string }
-	| { type: 'task'; taskId: string; agent?: string; isError: boolean; result?: unknown; durationMs: number }
-	| { type: 'compaction_start'; reason: 'threshold' | 'overflow' | 'manual'; estimatedTokens: number }
-	| { type: 'compaction'; messagesBefore: number; messagesAfter: number; durationMs: number; usage?: PromptUsage }
+	| {
+			type: 'task';
+			taskId: string;
+			agent?: string;
+			isError: boolean;
+			result?: unknown;
+			durationMs: number;
+	  }
+	| {
+			type: 'compaction_start';
+			reason: 'threshold' | 'overflow' | 'manual';
+			estimatedTokens: number;
+	  }
+	| {
+			type: 'compaction';
+			messagesBefore: number;
+			messagesAfter: number;
+			durationMs: number;
+			usage?: PromptUsage;
+	  }
 	| { type: 'operation_start'; operationId: string; operationKind: OperationKind }
-	| { type: 'operation'; operationId: string; operationKind: OperationKind; durationMs: number; isError: boolean; error?: unknown; result?: unknown; usage?: PromptUsage }
-	| { type: 'log'; level: 'info' | 'warn' | 'error'; message: string; attributes?: Record<string, unknown> }
+	| {
+			type: 'operation';
+			operationId: string;
+			operationKind: OperationKind;
+			durationMs: number;
+			isError: boolean;
+			error?: unknown;
+			result?: unknown;
+			usage?: PromptUsage;
+	  }
+	| {
+			type: 'log';
+			level: 'info' | 'warn' | 'error';
+			message: string;
+			attributes?: Record<string, unknown>;
+	  }
 	| { type: 'idle' }
-	| { type: 'run_end'; runId: string; result?: unknown; isError: boolean; error?: unknown; durationMs: number }
+	| {
+			type: 'run_end';
+			runId: string;
+			result?: unknown;
+			isError: boolean;
+			error?: unknown;
+			durationMs: number;
+	  }
 ) & {
 	runId?: string;
 	instanceId?: string;
@@ -307,7 +392,10 @@ export type FlueEvent = (
 };
 
 /** Direct-agent event attached to an agent instance rather than a workflow run. */
-export type AttachedAgentEvent = Exclude<FlueEvent, { type: 'run_start' } | { type: 'run_resume' } | { type: 'run_end' }> & {
+export type AttachedAgentEvent = Exclude<
+	FlueEvent,
+	{ type: 'run_start' } | { type: 'run_resume' } | { type: 'run_end' }
+> & {
 	runId?: never;
 	instanceId: string;
 };

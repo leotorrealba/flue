@@ -14,12 +14,12 @@ pnpm exec flue add modal
 
 ## Requirements
 
-| Requirement | Value |
-| --- | --- |
-| Provider package | `modal` |
-| Runtime | Node.js 22 or later for the connector recipe's Modal SDK use |
-| Credentials | `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` |
-| Image behavior | Choose an image with the shell/system utilities needed by your agent work |
+| Requirement      | Value                                                                     |
+| ---------------- | ------------------------------------------------------------------------- |
+| Provider package | `modal`                                                                   |
+| Runtime          | Node.js 22 or later for the connector recipe's Modal SDK use              |
+| Credentials      | `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET`                                 |
+| Image behavior   | Choose an image with the shell/system utilities needed by your agent work |
 
 ## Choose this connector when
 

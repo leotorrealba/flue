@@ -9,7 +9,7 @@ export function getVirtualSandbox(bucket: unknown, options?: VirtualSandboxOptio
 export function getVirtualSandbox(bucket?: unknown, _options?: VirtualSandboxOptions): never {
 	if (bucket === undefined) {
 		throw new Error(
-			'[flue] getVirtualSandbox() has been removed. Flue\'s default in-memory sandbox is already ' +
+			"[flue] getVirtualSandbox() has been removed. Flue's default in-memory sandbox is already " +
 				'what you wanted — omit the `sandbox` field from createAgent(...) (or pass `false`) and you get it.',
 		);
 	}

@@ -100,7 +100,9 @@
 }
 
 .docs-cover-shader {
-	filter: drop-shadow(0 10px 15px rgb(var(--shadow-rgb) / 0.05)) drop-shadow(0 4px 6px rgb(var(--shadow-rgb) / 0.1)) drop-shadow(0 2px 3px rgb(var(--shadow-rgb) / 0.15));
+	filter: drop-shadow(0 10px 15px rgb(var(--shadow-rgb) / 0.05))
+		drop-shadow(0 4px 6px rgb(var(--shadow-rgb) / 0.1))
+		drop-shadow(0 2px 3px rgb(var(--shadow-rgb) / 0.15));
 }
 
 .docs-content > :first-child {
@@ -139,7 +141,9 @@
 	opacity: 0;
 	user-select: none;
 	-webkit-user-select: none;
-	transition: color 150ms ease, opacity 150ms ease;
+	transition:
+		color 150ms ease,
+		opacity 150ms ease;
 }
 
 [data-docs-heading]:hover > .docs-heading-anchor,
@@ -328,7 +332,6 @@
 		overflow-x: auto;
 		white-space: nowrap;
 	}
-
 }
 
 @media (prefers-reduced-motion: reduce) {

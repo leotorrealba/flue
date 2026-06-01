@@ -218,12 +218,10 @@ export function mergeFlueAdditions(
 		for (const binding of additions.doBindings) {
 			if (binding.name !== 'FLUE_REGISTRY') continue;
 			if (!existingBindingNames.has(binding.name)) continue;
-			const existing = existingBindings.find(
-				(b): b is Record<string, unknown> => {
-					if (typeof b !== 'object' || b === null) return false;
-					return (b as Record<string, unknown>).name === binding.name;
-				},
-			);
+			const existing = existingBindings.find((b): b is Record<string, unknown> => {
+				if (typeof b !== 'object' || b === null) return false;
+				return (b as Record<string, unknown>).name === binding.name;
+			});
 			if (existing?.class_name !== binding.class_name) {
 				throw new Error(
 					`[flue] wrangler.jsonc durable object binding "${binding.name}" is reserved by Flue. ` +
@@ -314,10 +312,7 @@ export function detectSandboxBindings(userConfig: Record<string, unknown>): stri
  * silently and let the bundler's own error path take over. This avoids false
  * positives in unusual project layouts.
  */
-export function assertSandboxPackageInstalled(
-	sandboxClassNames: string[],
-	root: string,
-): void {
+export function assertSandboxPackageInstalled(sandboxClassNames: string[], root: string): void {
 	if (sandboxClassNames.length === 0) return;
 
 	let current = root;

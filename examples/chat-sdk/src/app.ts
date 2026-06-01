@@ -13,15 +13,17 @@ registerChatHandlers(assistant);
 const app = new Hono();
 const outboundComments: Array<{ issueNumber: number; body: string }> = [];
 
-app.post('/webhooks/github', (c) => bot.webhooks.github(c.req.raw, {
-	waitUntil: (task) => {
-		try {
-			c.executionCtx.waitUntil(task);
-		} catch {
-			void task;
-		}
-	},
-}));
+app.post('/webhooks/github', (c) =>
+	bot.webhooks.github(c.req.raw, {
+		waitUntil: (task) => {
+			try {
+				c.executionCtx.waitUntil(task);
+			} catch {
+				void task;
+			}
+		},
+	}),
+);
 
 app.post('/api/github/repos/:owner/:repo/issues/:issueNumber/comments', async (c) => {
 	const issueNumber = Number(c.req.param('issueNumber'));

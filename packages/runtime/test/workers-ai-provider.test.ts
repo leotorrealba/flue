@@ -1,7 +1,7 @@
 import { completeSimple, registerApiProvider } from '@earendil-works/pi-ai';
 import { describe, expect, it } from 'vitest';
-import { registerProvider } from '../src/index.ts';
 import { getCloudflareAIBindingApiProvider } from '../src/cloudflare/workers-ai-provider.ts';
+import { registerProvider } from '../src/index.ts';
 import { resolveModel } from '../src/internal.ts';
 
 describe('Workers AI binding reasoning effort', () => {
@@ -14,7 +14,9 @@ describe('Workers AI binding reasoning effort', () => {
 			binding: {
 				run: async (_model, inputs) => {
 					payloads.push(inputs);
-					return new Response('data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: {"choices":[{"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+					return new Response(
+						'data: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: {"choices":[{"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+					);
 				},
 			},
 		});

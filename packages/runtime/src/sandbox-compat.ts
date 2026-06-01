@@ -4,7 +4,7 @@ throw new Error(
 		'See the changelog: https://github.com/withastro/flue/blob/main/CHANGELOG.md#unreleased',
 );
 
+export { createSandboxSessionEnv, type SandboxApi } from './sandbox.ts';
 // Preserve the old type surface for one release so TypeScript users get the
 // runtime migration error instead of a less helpful "module has no export".
-export type { SandboxFactory, SessionEnv, FileStat } from './types.ts';
-export { createSandboxSessionEnv, type SandboxApi } from './sandbox.ts';
+export type { FileStat, SandboxFactory, SessionEnv } from './types.ts';

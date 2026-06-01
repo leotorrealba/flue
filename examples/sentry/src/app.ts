@@ -69,7 +69,7 @@
  *   SENTRY_RELEASE      e.g. a git SHA. Optional.
  */
 
-import { observe, type FlueEvent } from '@flue/runtime';
+import { type FlueEvent, observe } from '@flue/runtime';
 import { flue } from '@flue/runtime/routing';
 import * as Sentry from '@sentry/node';
 import { Hono } from 'hono';
@@ -132,12 +132,12 @@ observe((event) => {
 		Sentry.withScope((scope) => {
 			scope.setTags(tags);
 			scope.setLevel('error');
-				scope.setContext('flue.run', {
-					durationMs: event.durationMs,
-					agentName: tags['flue.agent'],
-					workflowName: tags['flue.workflow'],
-					instanceId: tags['flue.instance_id'],
-				});
+			scope.setContext('flue.run', {
+				durationMs: event.durationMs,
+				agentName: tags['flue.agent'],
+				workflowName: tags['flue.workflow'],
+				instanceId: tags['flue.instance_id'],
+			});
 			Sentry.captureException(reconstructError(event.error));
 		});
 		return;
@@ -229,8 +229,7 @@ function reconstructError(raw: unknown): Error {
 	if (raw instanceof Error) return raw;
 	if (raw && typeof raw === 'object') {
 		const o = raw as { name?: unknown; message?: unknown; stack?: unknown };
-		const message =
-			typeof o.message === 'string' ? o.message : safeStringify(raw);
+		const message = typeof o.message === 'string' ? o.message : safeStringify(raw);
 		const err = new Error(message);
 		if (typeof o.name === 'string') err.name = o.name;
 		if (typeof o.stack === 'string') err.stack = o.stack;

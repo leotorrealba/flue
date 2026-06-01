@@ -116,7 +116,8 @@ app.post('/webhooks/github', async (c) => {
   const event = await verifyAndParseGitHubWebhook(c.req.raw);
   const repository = event.payload.repository?.full_name;
   const issue = event.payload.issue?.number;
-  if (typeof repository !== 'string' || typeof issue !== 'number') return c.json({ accepted: false }, 202);
+  if (typeof repository !== 'string' || typeof issue !== 'number')
+    return c.json({ accepted: false }, 202);
 
   const receipt = await dispatch(triage, {
     id: `repo:${repository}`,
@@ -220,6 +221,7 @@ app.post('/webhooks/discord', async (c) => {
 The case/session model is application logic. For example, a moderation agent may choose `session = case:<caseId>` so evidence from multiple provider integrations routes into the same session.
 
 ## Current Limitations
+
 - There is no universal reply/thread abstraction yet.
 - Provider retries may produce duplicate events; preserve provider ids in your input if idempotency matters.
 - WebSocket clients should use the published SDK/protocol surface. Configure SDK `websocketBasePath` for custom-mounted socket routes and `websocketUrl` for URL-carried or signed handshake authentication.

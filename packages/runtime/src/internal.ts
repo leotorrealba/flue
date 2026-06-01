@@ -9,16 +9,14 @@
  * User agent code should never import from here.
  */
 import { type Api, getModel, type KnownProvider, type Model } from '@earendil-works/pi-ai';
+
 export { Bash, InMemoryFs } from 'just-bash';
-import {
-	getProviderConfiguration,
-	resolveRegisteredModel,
-} from './runtime/providers.ts';
+
+import { getProviderConfiguration, resolveRegisteredModel } from './runtime/providers.ts';
 import type { ModelConfig, ProviderConfiguration } from './types.ts';
 
 export type { FlueContextConfig, FlueContextInternal } from './client.ts';
 export { createFlueContext } from './client.ts';
-export { parseSkillMarkdown } from './skill-frontmatter.ts';
 // `FlueRegistry` (Durable Object class) and `createCloudflareRunRegistry`
 // (registry client) live in the `@flue/runtime/cloudflare` subpath because
 // they pull in `cloudflare:workers`, a virtual module Node can't resolve.
@@ -26,7 +24,8 @@ export { parseSkillMarkdown } from './skill-frontmatter.ts';
 export { createDurableRunStore } from './cloudflare/run-store.ts';
 export { InMemoryRunRegistry } from './node/run-registry.ts';
 export { InMemoryRunStore } from './node/run-store.ts';
-export type { DispatchReceipt } from './types.ts';
+export type { DispatchInput, DispatchProcessor, DispatchQueue } from './runtime/dispatch-queue.ts';
+export { assertCurrentDispatchInput, InMemoryDispatchQueue } from './runtime/dispatch-queue.ts';
 export type { ExposedTransport, FlueRuntime } from './runtime/flue-app.ts';
 export {
 	configureFlueRuntime,
@@ -35,21 +34,19 @@ export {
 	registeredAgentsForTransport,
 	registeredWorkflowsForTransport,
 } from './runtime/flue-app.ts';
-export type { DispatchInput, DispatchProcessor, DispatchQueue } from './runtime/dispatch-queue.ts';
-export { assertCurrentDispatchInput, InMemoryDispatchQueue } from './runtime/dispatch-queue.ts';
 export type {
 	AgentHandler,
 	AgentSessionTarget,
-	WorkflowAttachedInvocationResult,
-	DirectAttachedOptions,
-	CreatedAgentHandler,
 	CreateContextFn,
+	CreatedAgentHandler,
+	DirectAttachedOptions,
+	FailRecoveredRunOptions,
 	HandleAgentOptions,
 	HandleWorkflowOptions,
-	FailRecoveredRunOptions,
 	InvokeWorkflowAttachedOptions,
 	RunHandlerFn,
 	StartWorkflowAdmissionFn,
+	WorkflowAttachedInvocationResult,
 	WorkflowHandler,
 } from './runtime/handle-agent.ts';
 // Runtime modules consumed by the generated server entries.
@@ -71,21 +68,21 @@ export type {
 //
 // The user-facing `flue()` itself is re-exported from `@flue/runtime/routing`, not here.
 export {
-	validateAgentDispatchAdmission,
 	createAgentDispatchProcessor,
-	createDispatchAgentHandler,
 	createDirectAgentHandler,
+	createDispatchAgentHandler,
 	failRecoveredRun,
 	handleAgentRequest,
 	handleWorkflowRequest,
-	invokeWorkflowAttached,
 	invokeDirectAttached,
+	invokeWorkflowAttached,
 	reserveDispatchAgentSession,
+	validateAgentDispatchAdmission,
 } from './runtime/handle-agent.ts';
-export { generateWorkflowRunId, parseWorkflowRunId } from './runtime/ids.ts';
-export { createWebSocketErrorMessage, parseAgentWebSocketMessage, parseWorkflowWebSocketMessage } from './runtime/websocket-protocol.ts';
 export type { HandleRunRouteOptions } from './runtime/handle-run-routes.ts';
 export { handleRunRouteRequest } from './runtime/handle-run-routes.ts';
+export { generateWorkflowRunId, parseWorkflowRunId } from './runtime/ids.ts';
+export { hasRegisteredProvider } from './runtime/providers.ts';
 export type {
 	ListRunsOpts,
 	ListRunsResponse,
@@ -98,9 +95,15 @@ export type {
 export type { RunRecord, RunStatus, RunStore } from './runtime/run-store.ts';
 export type { RunSubscriberListener, RunSubscriberRegistry } from './runtime/run-subscribers.ts';
 export { createRunSubscriberRegistry } from './runtime/run-subscribers.ts';
+export {
+	createWebSocketErrorMessage,
+	parseAgentWebSocketMessage,
+	parseWorkflowWebSocketMessage,
+} from './runtime/websocket-protocol.ts';
 export { bashFactoryToSessionEnv } from './sandbox.ts';
-export { hasRegisteredProvider } from './runtime/providers.ts';
 export { InMemorySessionStore } from './session.ts';
+export { parseSkillMarkdown } from './skill-frontmatter.ts';
+export type { DispatchReceipt } from './types.ts';
 
 /**
  * Resolve a `provider-id/model-id` model specifier to a pi-ai Model.

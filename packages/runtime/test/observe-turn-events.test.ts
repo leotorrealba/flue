@@ -1,8 +1,15 @@
-import { fauxAssistantMessage, fauxText, fauxThinking, fauxToolCall, registerFauxProvider, Type } from '@earendil-works/pi-ai';
+import {
+	fauxAssistantMessage,
+	fauxText,
+	fauxThinking,
+	fauxToolCall,
+	registerFauxProvider,
+	Type,
+} from '@earendil-works/pi-ai';
 import { describe, expect, it, vi } from 'vitest';
 import { createAgent } from '../src/agent-definition.ts';
 import { observe } from '../src/index.ts';
-import { createFlueContext, InMemorySessionStore, type DispatchInput } from '../src/internal.ts';
+import { createFlueContext, type DispatchInput, InMemorySessionStore } from '../src/internal.ts';
 import type { FlueEvent, FlueSession, SessionEnv } from '../src/types.ts';
 
 function createEnv(): SessionEnv {
@@ -13,7 +20,13 @@ function createEnv(): SessionEnv {
 		readFile: async () => '',
 		readFileBuffer: async () => new Uint8Array(),
 		writeFile: async () => {},
-		stat: async () => ({ isFile: false, isDirectory: false, isSymbolicLink: false, size: 0, mtime: new Date(0) }),
+		stat: async () => ({
+			isFile: false,
+			isDirectory: false,
+			isSymbolicLink: false,
+			size: 0,
+			mtime: new Date(0),
+		}),
 		readdir: async () => [],
 		exists: async () => false,
 		mkdir: async () => {},
@@ -35,7 +48,12 @@ describe('observe model-turn telemetry', () => {
 			runId: undefined,
 			payload: {},
 			env: {},
-			agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+			agentConfig: {
+				systemPrompt: '',
+				skills: {},
+				model: undefined,
+				resolveModel: () => undefined,
+			},
 			createDefaultEnv: async () => createEnv(),
 			defaultStore: new InMemorySessionStore(),
 		});
@@ -68,18 +86,25 @@ describe('observe model-turn telemetry', () => {
 			runId: undefined,
 			payload: {},
 			env: {},
-			agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+			agentConfig: {
+				systemPrompt: '',
+				skills: {},
+				model: undefined,
+				resolveModel: () => undefined,
+			},
 			createDefaultEnv: async () => createEnv(),
 			defaultStore: new InMemorySessionStore(),
 		});
 
 		try {
 			ctx.log.info('original', { nested: { value: 'original' } });
-			expect(seen).toMatchObject([{
-				type: 'log',
-				message: 'original',
-				attributes: { nested: { value: 'original' } },
-			}]);
+			expect(seen).toMatchObject([
+				{
+					type: 'log',
+					message: 'original',
+					attributes: { nested: { value: 'original' } },
+				},
+			]);
 		} finally {
 			stopMutating();
 			stopRecording();
@@ -105,7 +130,12 @@ describe('observe model-turn telemetry', () => {
 			runId: undefined,
 			payload: {},
 			env: {},
-			agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+			agentConfig: {
+				systemPrompt: '',
+				skills: {},
+				model: undefined,
+				resolveModel: () => undefined,
+			},
 			createDefaultEnv: async () => createEnv(),
 			defaultStore: new InMemorySessionStore(),
 		});
@@ -134,7 +164,12 @@ describe('observe model-turn telemetry', () => {
 			runId: undefined,
 			payload: {},
 			env: {},
-			agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+			agentConfig: {
+				systemPrompt: '',
+				skills: {},
+				model: undefined,
+				resolveModel: () => undefined,
+			},
 			createDefaultEnv: async () => createEnv(),
 			defaultStore: new InMemorySessionStore(),
 		});
@@ -142,7 +177,10 @@ describe('observe model-turn telemetry', () => {
 		try {
 			ctx.log.info('not serializable', { total: 1n });
 			expect(seen).toEqual([]);
-			expect(failure).toHaveBeenCalledWith('[flue:observe] subscriber failed:', expect.any(TypeError));
+			expect(failure).toHaveBeenCalledWith(
+				'[flue:observe] subscriber failed:',
+				expect.any(TypeError),
+			);
 		} finally {
 			stopRecording();
 			failure.mockRestore();
@@ -175,7 +213,8 @@ describe('observe model-turn telemetry', () => {
 					systemPrompt: '',
 					skills: {},
 					model: undefined,
-					resolveModel: (model) => model === modelSpecifier ? registration.getModel(modelId) : undefined,
+					resolveModel: (model) =>
+						model === modelSpecifier ? registration.getModel(modelId) : undefined,
 				},
 				createDefaultEnv: async () => createEnv(),
 				defaultStore: new InMemorySessionStore(),
@@ -183,12 +222,14 @@ describe('observe model-turn telemetry', () => {
 			const agent = createAgent(() => ({
 				model: modelSpecifier,
 				thinkingLevel: 'high',
-				tools: [{
-					name: 'lookup',
-					description: 'Look up a record.',
-					parameters: Type.Object({ query: Type.String() }),
-					execute: async () => 'not used',
-				}],
+				tools: [
+					{
+						name: 'lookup',
+						description: 'Look up a record.',
+						parameters: Type.Object({ query: Type.String() }),
+						execute: async () => 'not used',
+					},
+				],
 			}));
 			const harness = await ctx.init(agent);
 			const session = await harness.session();
@@ -196,9 +237,16 @@ describe('observe model-turn telemetry', () => {
 			const response = await session.prompt('What reaches the model?');
 
 			expect(response.model).toEqual({ provider, id: modelId });
-			const turnStart = events.find((event): event is Extract<FlueEvent, { type: 'turn_start' }> => event.type === 'turn_start');
-			const turnRequest = events.find((event): event is Extract<FlueEvent, { type: 'turn_request' }> => event.type === 'turn_request');
-			const turn = events.find((event): event is Extract<FlueEvent, { type: 'turn' }> => event.type === 'turn');
+			const turnStart = events.find(
+				(event): event is Extract<FlueEvent, { type: 'turn_start' }> => event.type === 'turn_start',
+			);
+			const turnRequest = events.find(
+				(event): event is Extract<FlueEvent, { type: 'turn_request' }> =>
+					event.type === 'turn_request',
+			);
+			const turn = events.find(
+				(event): event is Extract<FlueEvent, { type: 'turn' }> => event.type === 'turn',
+			);
 			expect(turnStart?.turnId).toMatch(/^turn_/);
 			expect(turnRequest?.turnId).toBe(turnStart?.turnId);
 			expect(turn?.turnId).toBe(turnStart?.turnId);
@@ -222,11 +270,20 @@ describe('observe model-turn telemetry', () => {
 			});
 			expect(turn).toMatchObject({ provider, model: modelId, output: { role: 'assistant' } });
 			expect(turn?.output?.content).toEqual([
-				{ type: 'thinking', thinking: 'reasoned', thinkingSignature: undefined, redacted: undefined },
+				{
+					type: 'thinking',
+					thinking: 'reasoned',
+					thinkingSignature: undefined,
+					redacted: undefined,
+				},
 				{ type: 'text', text: 'captured', textSignature: undefined },
 			]);
-			expect(events.findIndex((event) => event.type === 'turn_start')).toBeLessThan(events.findIndex((event) => event.type === 'turn_request'));
-			expect(events.findIndex((event) => event.type === 'turn_request')).toBeLessThan(events.findIndex((event) => event.type === 'turn'));
+			expect(events.findIndex((event) => event.type === 'turn_start')).toBeLessThan(
+				events.findIndex((event) => event.type === 'turn_request'),
+			);
+			expect(events.findIndex((event) => event.type === 'turn_request')).toBeLessThan(
+				events.findIndex((event) => event.type === 'turn'),
+			);
 		} finally {
 			stopObserving();
 			registration.unregister();
@@ -240,14 +297,21 @@ describe('observe model-turn telemetry', () => {
 			runId: undefined,
 			payload: {},
 			env: {},
-			agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+			agentConfig: {
+				systemPrompt: '',
+				skills: {},
+				model: undefined,
+				resolveModel: () => undefined,
+			},
 			createDefaultEnv: async () => ({
 				...createEnv(),
 				exec: async () => ({ stdout: 'prepared', stderr: '', exitCode: 0 }),
 			}),
 			defaultStore: new InMemorySessionStore(),
 		});
-		ctx.subscribeEvent((event) => { events.push(event); });
+		ctx.subscribeEvent((event) => {
+			events.push(event);
+		});
 		const harness = await ctx.init(createAgent(() => ({ model: false })));
 
 		await harness.shell('prepare workspace', { env: { TOKEN: 'secret' }, cwd: '/work' });
@@ -284,33 +348,56 @@ describe('observe model-turn telemetry', () => {
 				runId: undefined,
 				payload: {},
 				env: {},
-				agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: (model) => model === modelSpecifier ? registration.getModel(modelId) : undefined },
+				agentConfig: {
+					systemPrompt: '',
+					skills: {},
+					model: undefined,
+					resolveModel: (model) =>
+						model === modelSpecifier ? registration.getModel(modelId) : undefined,
+				},
 				createDefaultEnv: async () => createEnv(),
 				defaultStore: new InMemorySessionStore(),
 			});
 			ctx.subscribeEvent((event) => {
 				events.push(event);
 			});
-			const harness = await ctx.init(createAgent(() => ({
-				model: modelSpecifier,
-				compaction: { keepRecentTokens: 0 },
-			})));
+			const harness = await ctx.init(
+				createAgent(() => ({
+					model: modelSpecifier,
+					compaction: { keepRecentTokens: 0 },
+				})),
+			);
 			const session = await harness.session();
 
 			await session.prompt('first input');
 			await session.prompt('second input');
 			await session.compact();
 
-			const compactionRequests = events.filter((event): event is Extract<FlueEvent, { type: 'turn_request' }> => event.type === 'turn_request' && (event.purpose === 'compaction' || event.purpose === 'compaction_prefix'));
-			const compactionTurns = events.filter((event): event is Extract<FlueEvent, { type: 'turn' }> => event.type === 'turn' && (event.purpose === 'compaction' || event.purpose === 'compaction_prefix'));
-			expect(compactionRequests.map((event) => event.purpose).sort()).toEqual(['compaction', 'compaction_prefix']);
-			expect(compactionTurns.map((event) => event.turnId).sort()).toEqual(compactionRequests.map((event) => event.turnId).sort());
+			const compactionRequests = events.filter(
+				(event): event is Extract<FlueEvent, { type: 'turn_request' }> =>
+					event.type === 'turn_request' &&
+					(event.purpose === 'compaction' || event.purpose === 'compaction_prefix'),
+			);
+			const compactionTurns = events.filter(
+				(event): event is Extract<FlueEvent, { type: 'turn' }> =>
+					event.type === 'turn' &&
+					(event.purpose === 'compaction' || event.purpose === 'compaction_prefix'),
+			);
+			expect(compactionRequests.map((event) => event.purpose).sort()).toEqual([
+				'compaction',
+				'compaction_prefix',
+			]);
+			expect(compactionTurns.map((event) => event.turnId).sort()).toEqual(
+				compactionRequests.map((event) => event.turnId).sort(),
+			);
 			const compactionRequest = compactionRequests.find((event) => event.purpose === 'compaction');
 			const compactionTurn = compactionTurns.find((event) => event.purpose === 'compaction');
 			expect(compactionRequest?.turnId).toMatch(/^turn_/);
 			expect(compactionRequest?.input.systemPrompt).toContain('summariz');
 			expect(compactionTurn?.turnId).toBe(compactionRequest?.turnId);
-			expect(compactionTurn?.output?.content).toEqual([{ type: 'text', text: 'summary text', textSignature: undefined }]);
+			expect(compactionTurn?.output?.content).toEqual([
+				{ type: 'text', text: 'summary text', textSignature: undefined },
+			]);
 			expect(events.some((event) => event.type === 'compaction_start')).toBe(true);
 			expect(events.some((event) => event.type === 'compaction')).toBe(true);
 		} finally {
@@ -329,28 +416,43 @@ describe('observe model-turn telemetry', () => {
 		]);
 
 		try {
-			const createContext = (dispatchId?: string) => createFlueContext({
-				id: 'persistent-instance',
-				runId: undefined,
-				dispatchId,
-				payload: {},
-				env: {},
-				agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: (model) => model === modelSpecifier ? registration.getModel(modelId) : undefined },
-				createDefaultEnv: async () => createEnv(),
-				defaultStore: new InMemorySessionStore(),
-			});
+			const createContext = (dispatchId?: string) =>
+				createFlueContext({
+					id: 'persistent-instance',
+					runId: undefined,
+					dispatchId,
+					payload: {},
+					env: {},
+					agentConfig: {
+						systemPrompt: '',
+						skills: {},
+						model: undefined,
+						resolveModel: (model) =>
+							model === modelSpecifier ? registration.getModel(modelId) : undefined,
+					},
+					createDefaultEnv: async () => createEnv(),
+					defaultStore: new InMemorySessionStore(),
+				});
 			const agent = createAgent(() => ({ model: modelSpecifier }));
 
 			const directEvents: FlueEvent[] = [];
 			const directCtx = createContext();
-			directCtx.subscribeEvent((event) => { directEvents.push(event); });
-			const directSession = await (await directCtx.init(agent)).session() as FlueSession & { processDirectInput(input: { message: string }): PromiseLike<unknown> };
+			directCtx.subscribeEvent((event) => {
+				directEvents.push(event);
+			});
+			const directSession = (await (await directCtx.init(agent)).session()) as FlueSession & {
+				processDirectInput(input: { message: string }): PromiseLike<unknown>;
+			};
 			await directSession.processDirectInput({ message: 'direct input' });
 
 			const dispatchEvents: FlueEvent[] = [];
 			const dispatchCtx = createContext('dispatch-1');
-			dispatchCtx.subscribeEvent((event) => { dispatchEvents.push(event); });
-			const dispatchSession = await (await dispatchCtx.init(agent)).session() as FlueSession & { processDispatchInput(input: DispatchInput): PromiseLike<unknown> };
+			dispatchCtx.subscribeEvent((event) => {
+				dispatchEvents.push(event);
+			});
+			const dispatchSession = (await (await dispatchCtx.init(agent)).session()) as FlueSession & {
+				processDispatchInput(input: DispatchInput): PromiseLike<unknown>;
+			};
 			await dispatchSession.processDispatchInput({
 				dispatchId: 'dispatch-1',
 				agent: 'assistant',
@@ -366,8 +468,12 @@ describe('observe model-turn telemetry', () => {
 				expect(events.some((event) => event.type === 'idle')).toBe(true);
 				expect(events.every((event) => event.runId === undefined)).toBe(true);
 			}
-			expect(directEvents.find((event) => event.type === 'turn_request')?.instanceId).toBe('persistent-instance');
-			expect(dispatchEvents.find((event) => event.type === 'turn_request')?.dispatchId).toBe('dispatch-1');
+			expect(directEvents.find((event) => event.type === 'turn_request')?.instanceId).toBe(
+				'persistent-instance',
+			);
+			expect(dispatchEvents.find((event) => event.type === 'turn_request')?.dispatchId).toBe(
+				'dispatch-1',
+			);
 		} finally {
 			registration.unregister();
 		}
@@ -379,11 +485,15 @@ describe('observe model-turn telemetry', () => {
 		const modelSpecifier = `${provider}/${modelId}`;
 		const registration = registerFauxProvider({ provider, models: [{ id: modelId }] });
 		registration.setResponses([
-			fauxAssistantMessage(fauxToolCall('task', { prompt: 'Research this.' }), { stopReason: 'toolUse' }),
+			fauxAssistantMessage(fauxToolCall('task', { prompt: 'Research this.' }), {
+				stopReason: 'toolUse',
+			}),
 			fauxAssistantMessage(fauxText('child answer')),
 			(context) => {
 				const toolResult = context.messages.findLast((message) => message.role === 'toolResult');
-				return fauxAssistantMessage(fauxText(toolResult?.role === 'toolResult' ? 'used child answer' : 'missing task result'));
+				return fauxAssistantMessage(
+					fauxText(toolResult?.role === 'toolResult' ? 'used child answer' : 'missing task result'),
+				);
 			},
 		]);
 		const events: FlueEvent[] = [];
@@ -394,18 +504,33 @@ describe('observe model-turn telemetry', () => {
 				runId: undefined,
 				payload: {},
 				env: {},
-				agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: (model) => model === modelSpecifier ? registration.getModel(modelId) : undefined },
+				agentConfig: {
+					systemPrompt: '',
+					skills: {},
+					model: undefined,
+					resolveModel: (model) =>
+						model === modelSpecifier ? registration.getModel(modelId) : undefined,
+				},
 				createDefaultEnv: async () => createEnv(),
 				defaultStore: new InMemorySessionStore(),
 			});
-			ctx.subscribeEvent((event) => { events.push(event); });
-			const session = await (await ctx.init(createAgent(() => ({ model: modelSpecifier })))).session();
+			ctx.subscribeEvent((event) => {
+				events.push(event);
+			});
+			const session = await (
+				await ctx.init(createAgent(() => ({ model: modelSpecifier })))
+			).session();
 
 			const result = await session.prompt('Use a task.');
 
 			expect(result.text).toBe('used child answer');
-			expect(events.find((event) => event.type === 'task_start')).toMatchObject({ prompt: 'Research this.' });
-			expect(events.find((event) => event.type === 'task')).toMatchObject({ isError: false, result: 'child answer' });
+			expect(events.find((event) => event.type === 'task_start')).toMatchObject({
+				prompt: 'Research this.',
+			});
+			expect(events.find((event) => event.type === 'task')).toMatchObject({
+				isError: false,
+				result: 'child answer',
+			});
 			const operations = events.filter((event) => event.type === 'operation_start');
 			expect(operations.some((event) => event.operationKind === 'task')).toBe(false);
 			expect(operations.filter((event) => event.session === 'default')).toEqual([
@@ -425,7 +550,9 @@ describe('observe model-turn telemetry', () => {
 			fauxAssistantMessage(fauxToolCall('lookup', { query: 'record' }), { stopReason: 'toolUse' }),
 			(context) => {
 				const toolResult = context.messages.findLast((message) => message.role === 'toolResult');
-				return fauxAssistantMessage(fauxText(toolResult?.role === 'toolResult' ? 'done' : 'missing'));
+				return fauxAssistantMessage(
+					fauxText(toolResult?.role === 'toolResult' ? 'done' : 'missing'),
+				);
 			},
 		]);
 		const events: FlueEvent[] = [];
@@ -436,34 +563,51 @@ describe('observe model-turn telemetry', () => {
 				runId: undefined,
 				payload: {},
 				env: {},
-				agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: (model) => model === modelSpecifier ? registration.getModel(modelId) : undefined },
+				agentConfig: {
+					systemPrompt: '',
+					skills: {},
+					model: undefined,
+					resolveModel: (model) =>
+						model === modelSpecifier ? registration.getModel(modelId) : undefined,
+				},
 				createDefaultEnv: async () => createEnv(),
 				defaultStore: new InMemorySessionStore(),
 			});
 			ctx.subscribeEvent((event) => {
 				events.push(event);
 			});
-			const harness = await ctx.init(createAgent(() => ({
-				model: modelSpecifier,
-				tools: [{
-					name: 'lookup',
-					description: 'Look up a record.',
-					parameters: Type.Object({ query: Type.String() }),
-					execute: async () => 'record found',
-				}],
-			})));
+			const harness = await ctx.init(
+				createAgent(() => ({
+					model: modelSpecifier,
+					tools: [
+						{
+							name: 'lookup',
+							description: 'Look up a record.',
+							parameters: Type.Object({ query: Type.String() }),
+							execute: async () => 'record found',
+						},
+					],
+				})),
+			);
 			const session = await harness.session();
 
 			await session.prompt('Use a tool.');
 
-			const requests = events.filter((event): event is Extract<FlueEvent, { type: 'turn_request' }> => event.type === 'turn_request');
-			const turns = events.filter((event): event is Extract<FlueEvent, { type: 'turn' }> => event.type === 'turn');
+			const requests = events.filter(
+				(event): event is Extract<FlueEvent, { type: 'turn_request' }> =>
+					event.type === 'turn_request',
+			);
+			const turns = events.filter(
+				(event): event is Extract<FlueEvent, { type: 'turn' }> => event.type === 'turn',
+			);
 			expect(requests).toHaveLength(2);
 			expect(turns).toHaveLength(2);
 			expect(new Set(requests.map((event) => event.turnId)).size).toBe(2);
 			expect(turns.map((event) => event.turnId)).toEqual(requests.map((event) => event.turnId));
 			expect(new Set(requests.map((event) => event.operationId)).size).toBe(1);
-			expect(requests[1]?.input.messages.some((message) => message.role === 'toolResult')).toBe(true);
+			expect(requests[1]?.input.messages.some((message) => message.role === 'toolResult')).toBe(
+				true,
+			);
 			const toolEvent = events.find((event) => event.type === 'tool_call');
 			expect(toolEvent?.turnId).toBe(requests[0]?.turnId);
 		} finally {

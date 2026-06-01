@@ -19,13 +19,13 @@ import { getDefaultWorkspace, getShellSandbox } from '../connectors/cloudflare-s
 
 ## Requirements
 
-| Requirement | Value |
-| --- | --- |
-| Target | Cloudflare |
-| Provider packages | `@cloudflare/shell` and `@cloudflare/codemode` |
-| Platform configuration | A `worker_loaders` binding such as `LOADER` |
-| Model-facing capability | `code` tool operating on Workspace state |
-| Ordinary shell | Not provided by this connector |
+| Requirement             | Value                                          |
+| ----------------------- | ---------------------------------------------- |
+| Target                  | Cloudflare                                     |
+| Provider packages       | `@cloudflare/shell` and `@cloudflare/codemode` |
+| Platform configuration  | A `worker_loaders` binding such as `LOADER`    |
+| Model-facing capability | `code` tool operating on Workspace state       |
+| Ordinary shell          | Not provided by this connector                 |
 
 ## Choose this connector when
 

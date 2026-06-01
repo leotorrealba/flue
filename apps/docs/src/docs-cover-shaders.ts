@@ -1,13 +1,13 @@
 import {
+	type DitheringShape,
 	DitheringShapes,
+	type DitheringType,
 	DitheringTypes,
-	ShaderFitOptions,
-	ShaderMount,
 	defaultPatternSizing,
 	ditheringFragmentShader,
 	getShaderColorFromString,
-	type DitheringShape,
-	type DitheringType,
+	ShaderFitOptions,
+	ShaderMount,
 } from '@paper-design/shaders';
 
 type DitheringConfig = {
@@ -33,7 +33,8 @@ export function setupDocsCoverShaders() {
 	const smallViewport = window.matchMedia('(max-width: 767px)');
 	const performanceNavigator = navigator as PerformanceNavigator;
 	const constrainedDevice =
-		(performanceNavigator.hardwareConcurrency > 0 && performanceNavigator.hardwareConcurrency <= 4) ||
+		(performanceNavigator.hardwareConcurrency > 0 &&
+			performanceNavigator.hardwareConcurrency <= 4) ||
 		(performanceNavigator.deviceMemory !== undefined && performanceNavigator.deviceMemory <= 4) ||
 		performanceNavigator.connection?.saveData === true;
 	const shouldAnimate = () => !reducedMotion.matches && !constrainedDevice;

@@ -12,9 +12,9 @@ agent does the file-writing.
 
 Flue currently supports **one** connector category:
 
-| Category  | Status     | Notes                                                  |
-| --------- | ---------- | ------------------------------------------------------ |
-| `sandbox` | Supported  | For remote sandbox providers (Daytona, E2B, Modal, etc.). |
+| Category  | Status    | Notes                                                     |
+| --------- | --------- | --------------------------------------------------------- |
+| `sandbox` | Supported | For remote sandbox providers (Daytona, E2B, Modal, etc.). |
 
 > **Please don't open PRs introducing new categories.** Adding a category
 > requires CLI/runtime changes and a long-term maintenance commitment from
@@ -63,10 +63,7 @@ For category roots:
 
 ```markdown
 ---
-{
-  "category": "sandbox",
-  "root": true
-}
+{ 'category': 'sandbox', 'root': true }
 ---
 ```
 
@@ -74,21 +71,18 @@ For named connectors:
 
 ```markdown
 ---
-{
-  "category": "sandbox",
-  "website": "https://daytona.io"
-}
+{ 'category': 'sandbox', 'website': 'https://daytona.io' }
 ---
 ```
 
 Fields:
 
-| Field      | Type     | Required when           | Description                                   |
-| ---------- | -------- | ----------------------- | --------------------------------------------- |
-| `category` | string   | always                  | Connector category. Must be one of the supported categories listed above. |
-| `website`  | string   | named connectors only   | Provider's homepage. Shown in `flue add` listing |
-| `aliases`  | string[] | optional                | Additional names users can pass to `flue add`. See "Aliases" below |
-| `root`     | boolean  | category roots only     | Must be `true`. Marks file as the category root |
+| Field      | Type     | Required when         | Description                                                               |
+| ---------- | -------- | --------------------- | ------------------------------------------------------------------------- |
+| `category` | string   | always                | Connector category. Must be one of the supported categories listed above. |
+| `website`  | string   | named connectors only | Provider's homepage. Shown in `flue add` listing                          |
+| `aliases`  | string[] | optional              | Additional names users can pass to `flue add`. See "Aliases" below        |
+| `root`     | boolean  | category roots only   | Must be `true`. Marks file as the category root                           |
 
 The website strips frontmatter when serving the markdown — agents and humans
 see clean content.

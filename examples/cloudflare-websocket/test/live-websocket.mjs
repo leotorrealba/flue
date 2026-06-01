@@ -21,16 +21,27 @@ await assertWorkflow();
 async function assertRejected(pathname) {
 	const socket = new WebSocket(new URL(pathname, baseUrl));
 	await new Promise((resolve, reject) => {
-		const timeout = setTimeout(() => reject(new Error(`Expected ${pathname} to reject the socket upgrade.`)), 10000);
-		socket.addEventListener('open', () => {
-			clearTimeout(timeout);
-			socket.close();
-			reject(new Error(`Expected ${pathname} to reject the socket upgrade.`));
-		}, { once: true });
-		socket.addEventListener('error', () => {
-			clearTimeout(timeout);
-			resolve();
-		}, { once: true });
+		const timeout = setTimeout(
+			() => reject(new Error(`Expected ${pathname} to reject the socket upgrade.`)),
+			10000,
+		);
+		socket.addEventListener(
+			'open',
+			() => {
+				clearTimeout(timeout);
+				socket.close();
+				reject(new Error(`Expected ${pathname} to reject the socket upgrade.`));
+			},
+			{ once: true },
+		);
+		socket.addEventListener(
+			'error',
+			() => {
+				clearTimeout(timeout);
+				resolve();
+			},
+			{ once: true },
+		);
 	});
 }
 
@@ -62,7 +73,10 @@ async function assertWorkflow() {
 
 function withTimeout(promise) {
 	return new Promise((resolve, reject) => {
-		const timeout = setTimeout(() => reject(new Error('Timed out waiting for WebSocket response.')), 1000);
+		const timeout = setTimeout(
+			() => reject(new Error('Timed out waiting for WebSocket response.')),
+			1000,
+		);
 		promise.then(
 			(value) => {
 				clearTimeout(timeout);

@@ -74,16 +74,16 @@ const client = createFlueClient({
 
 ### `CreateFlueClientOptions`
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `baseUrl` | `string` | — | Origin serving deployed Flue application routes. HTTP routes resolve from its root path. |
-| `fetch` | `typeof fetch` | global `fetch` | Custom HTTP implementation. |
-| `headers` | `RequestHeaders` | — | Headers merged into each HTTP request. |
-| `token` | `string` | — | Bearer token added to HTTP requests. |
-| `adminBasePath` | `string` | `'/admin'` | Mount path for read-only admin routes. |
-| `websocket` | `WebSocketFactory` | global `WebSocket` constructor | Custom WebSocket implementation. |
-| `websocketBasePath` | `string` | — | Optional mount path prepended to agent and workflow WebSocket routes. |
-| `websocketUrl` | `WebSocketUrlTransform` | — | Transforms each WebSocket URL after HTTP protocol conversion, for example to add handshake authentication. |
+| Field               | Type                    | Default                        | Description                                                                                                |
+| ------------------- | ----------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `baseUrl`           | `string`                | —                              | Origin serving deployed Flue application routes. HTTP routes resolve from its root path.                   |
+| `fetch`             | `typeof fetch`          | global `fetch`                 | Custom HTTP implementation.                                                                                |
+| `headers`           | `RequestHeaders`        | —                              | Headers merged into each HTTP request.                                                                     |
+| `token`             | `string`                | —                              | Bearer token added to HTTP requests.                                                                       |
+| `adminBasePath`     | `string`                | `'/admin'`                     | Mount path for read-only admin routes.                                                                     |
+| `websocket`         | `WebSocketFactory`      | global `WebSocket` constructor | Custom WebSocket implementation.                                                                           |
+| `websocketBasePath` | `string`                | —                              | Optional mount path prepended to agent and workflow WebSocket routes.                                      |
+| `websocketUrl`      | `WebSocketUrlTransform` | —                              | Transforms each WebSocket URL after HTTP protocol conversion, for example to add handshake authentication. |
 
 ### `RequestHeaders`
 
@@ -127,10 +127,10 @@ Sends one prompt to a persistent agent instance. Use `mode: 'sync'` for the term
 
 #### `DirectAgentPayload`
 
-| Field | Type | Default | Description |
-| --- | --- | --- | --- |
-| `message` | `string` | — | Prompt sent to the agent instance. |
-| `session` | `string` | `'default'` | Session name. |
+| Field     | Type     | Default     | Description                        |
+| --------- | -------- | ----------- | ---------------------------------- |
+| `message` | `string` | —           | Prompt sent to the agent instance. |
+| `session` | `string` | `'default'` | Session name.                      |
 
 ### `client.agents.connect(...)`
 
@@ -237,12 +237,12 @@ stream(
 
 Streams workflow-run events over server-sent events until `run_end`, cancellation, or an unrecoverable error. Interrupted streams resume after the latest received event index. A stream-infrastructure `event: error` frame carries `{ error: FluePublicError }`; the SDK rejects iteration with `error.message` rather than yielding the envelope as a workflow event.
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `lastEventId` | `number` | — | Resume after this event index. |
-| `signal` | `AbortSignal` | — | Stop consuming events when aborted. |
-| `maxRetries` | `number` | `3` | Maximum reconnection attempts after an interrupted stream. |
-| `initialRetryMs` | `number` | `250` | Initial reconnection delay in milliseconds. |
+| Option           | Type          | Default | Description                                                |
+| ---------------- | ------------- | ------- | ---------------------------------------------------------- |
+| `lastEventId`    | `number`      | —       | Resume after this event index.                             |
+| `signal`         | `AbortSignal` | —       | Stop consuming events when aborted.                        |
+| `maxRetries`     | `number`      | `3`     | Maximum reconnection attempts after an interrupted stream. |
+| `initialRetryMs` | `number`      | `250`   | Initial reconnection delay in milliseconds.                |
 
 ## Admin
 
@@ -297,23 +297,23 @@ Minimal socket interface required by the client SDK.
 
 ### WebSocket configuration types
 
-| Type | Description |
-| --- | --- |
-| `WebSocketFactory` | Creates a socket for a fully resolved WebSocket URL. |
-| `WebSocketTarget` | Identifies the agent or workflow route that a WebSocket URL will connect to. |
-| `WebSocketUrlTransform` | Transforms a WebSocket URL before connection. |
+| Type                    | Description                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `WebSocketFactory`      | Creates a socket for a fully resolved WebSocket URL.                         |
+| `WebSocketTarget`       | Identifies the agent or workflow route that a WebSocket URL will connect to. |
+| `WebSocketUrlTransform` | Transforms a WebSocket URL before connection.                                |
 
 ### WebSocket listener types
 
-| Type | Description |
-| --- | --- |
-| `AgentSocketEventListener` | Receives direct-agent events and prompt correlation metadata. |
+| Type                          | Description                                                       |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `AgentSocketEventListener`    | Receives direct-agent events and prompt correlation metadata.     |
 | `WorkflowSocketEventListener` | Receives workflow-run events and invocation correlation metadata. |
-| `SocketEventListener` | Union of the agent and workflow listener types. |
-| `AgentSocketEventContext` | Contains the prompt `requestId`. |
-| `WorkflowSocketEventContext` | Contains the invocation `requestId` and workflow `runId`. |
-| `SocketEventContext` | Union of the agent and workflow event-context types. |
-| `SocketInvokeResult` | Union of the agent and workflow invocation-result types. |
+| `SocketEventListener`         | Union of the agent and workflow listener types.                   |
+| `AgentSocketEventContext`     | Contains the prompt `requestId`.                                  |
+| `WorkflowSocketEventContext`  | Contains the invocation `requestId` and workflow `runId`.         |
+| `SocketEventContext`          | Union of the agent and workflow event-context types.              |
+| `SocketInvokeResult`          | Union of the agent and workflow invocation-result types.          |
 
 ## Events and records
 
@@ -327,30 +327,30 @@ Minimal socket interface required by the client SDK.
 
 ### Run and discovery types
 
-| Type | Description |
-| --- | --- |
-| `RunOwner` | Workflow identity recorded for a run. |
-| `RunRecord` | Persisted workflow-run record, including status, timestamps, optional legacy restart linkage, payload, result, and error fields. |
-| `RunPointer` | Workflow-run summary returned by admin listing routes. |
-| `AgentManifestEntry` | Agent discovery metadata returned by the read-only admin route. |
-| `ListResponse<T>` | Cursor-paginated response with `items` and optional `nextCursor`. |
+| Type                 | Description                                                                                                                      |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `RunOwner`           | Workflow identity recorded for a run.                                                                                            |
+| `RunRecord`          | Persisted workflow-run record, including status, timestamps, optional legacy restart linkage, payload, result, and error fields. |
+| `RunPointer`         | Workflow-run summary returned by admin listing routes.                                                                           |
+| `AgentManifestEntry` | Agent discovery metadata returned by the read-only admin route.                                                                  |
+| `ListResponse<T>`    | Cursor-paginated response with `items` and optional `nextCursor`.                                                                |
 
 ### Normalized model-turn types
 
 `turn_request` and `turn` events expose normalized model data through these exported types:
 
-| Type | Description |
-| --- | --- |
-| `LlmMessage` | Union of normalized user, assistant, and tool-result messages. |
-| `LlmUserMessage` | Normalized user message. |
-| `LlmAssistantMessage` | Normalized assistant message. |
-| `LlmToolResultMessage` | Normalized tool-result message. |
-| `LlmTextContent` | Text content. |
-| `LlmThinkingContent` | Reasoning content. |
-| `LlmImageContent` | Image content. |
-| `LlmToolCall` | Tool call content. |
-| `LlmTool` | Tool definition. |
-| `LlmTurnPurpose` | Model-turn purpose: `'agent'`, `'compaction'`, or `'compaction_prefix'`. |
+| Type                   | Description                                                              |
+| ---------------------- | ------------------------------------------------------------------------ |
+| `LlmMessage`           | Union of normalized user, assistant, and tool-result messages.           |
+| `LlmUserMessage`       | Normalized user message.                                                 |
+| `LlmAssistantMessage`  | Normalized assistant message.                                            |
+| `LlmToolResultMessage` | Normalized tool-result message.                                          |
+| `LlmTextContent`       | Text content.                                                            |
+| `LlmThinkingContent`   | Reasoning content.                                                       |
+| `LlmImageContent`      | Image content.                                                           |
+| `LlmToolCall`          | Tool call content.                                                       |
+| `LlmTool`              | Tool definition.                                                         |
+| `LlmTurnPurpose`       | Model-turn purpose: `'agent'`, `'compaction'`, or `'compaction_prefix'`. |
 
 ## Errors
 
@@ -398,11 +398,11 @@ Structured error envelope received while streaming a direct agent interaction. T
 
 Most consumers should use `AgentSocket` and `WorkflowSocket`. Low-level protocol consumers can use the exported message types:
 
-| Type | Description |
-| --- | --- |
-| `AgentWebSocketClientMessage` | Messages sent over an agent WebSocket. |
-| `AgentWebSocketServerMessage` | Messages received from an agent WebSocket. |
-| `WorkflowWebSocketClientMessage` | Message sent over a workflow WebSocket. |
+| Type                             | Description                                  |
+| -------------------------------- | -------------------------------------------- |
+| `AgentWebSocketClientMessage`    | Messages sent over an agent WebSocket.       |
+| `AgentWebSocketServerMessage`    | Messages received from an agent WebSocket.   |
+| `WorkflowWebSocketClientMessage` | Message sent over a workflow WebSocket.      |
 | `WorkflowWebSocketServerMessage` | Messages received from a workflow WebSocket. |
-| `WebSocketServerMessage` | Union of agent and workflow server messages. |
-| `WebSocketErrorMessage` | Structured socket error message. |
+| `WebSocketServerMessage`         | Union of agent and workflow server messages. |
+| `WebSocketErrorMessage`          | Structured socket error message.             |

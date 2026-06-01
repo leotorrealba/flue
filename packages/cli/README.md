@@ -157,7 +157,13 @@ Install the Daytona connector with `flue add daytona | <your-agent>` (e.g. `clau
 
 ```ts
 // .flue/workflows/code.ts
-import { Type, createAgent, defineTool, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
+import {
+  Type,
+  createAgent,
+  defineTool,
+  type FlueContext,
+  type WorkflowRouteHandler,
+} from '@flue/runtime';
 import { Daytona } from '@daytona/sdk';
 import { daytona } from '../connectors/daytona';
 
@@ -208,7 +214,12 @@ MCP is available as a runtime tool adapter. Connect to a remote MCP server in tr
 
 ```ts
 // .flue/workflows/assistant.ts
-import { connectMcpServer, createAgent, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
+import {
+  connectMcpServer,
+  createAgent,
+  type FlueContext,
+  type WorkflowRouteHandler,
+} from '@flue/runtime';
 
 export const route: WorkflowRouteHandler = async (_c, next) => next();
 
@@ -295,7 +306,10 @@ Declare reusable subagent profiles with `defineAgentProfile()`, configure them i
 
 ```ts
 const researcher = defineAgentProfile({ name: 'researcher', instructions: 'Research carefully.' });
-const workflowAgent = createAgent(() => ({ model: 'anthropic/claude-sonnet-4-6', subagents: [researcher] }));
+const workflowAgent = createAgent(() => ({
+  model: 'anthropic/claude-sonnet-4-6',
+  subagents: [researcher],
+}));
 const harness = await init(workflowAgent);
 const session = await harness.session('review-thread');
 

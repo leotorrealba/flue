@@ -47,13 +47,27 @@ describe('authored source roots', () => {
 		fs.mkdirSync(path.join(root, 'src', 'workflows'), { recursive: true });
 		fs.mkdirSync(path.join(root, 'agents'));
 		fs.mkdirSync(path.join(root, 'workflows'));
-		fs.writeFileSync(path.join(root, 'src', 'agents', 'assistant.ts'), `export const arbitrary = true;\n`);
-		fs.writeFileSync(path.join(root, 'src', 'workflows', 'job.ts'), `export default 'ordinary module';\n`);
-		fs.writeFileSync(path.join(root, 'agents', 'ignored-agent.ts'), `export const arbitrary = true;\n`);
-		fs.writeFileSync(path.join(root, 'workflows', 'ignored-job.ts'), `export default 'ordinary module';\n`);
+		fs.writeFileSync(
+			path.join(root, 'src', 'agents', 'assistant.ts'),
+			`export const arbitrary = true;\n`,
+		);
+		fs.writeFileSync(
+			path.join(root, 'src', 'workflows', 'job.ts'),
+			`export default 'ordinary module';\n`,
+		);
+		fs.writeFileSync(
+			path.join(root, 'agents', 'ignored-agent.ts'),
+			`export const arbitrary = true;\n`,
+		);
+		fs.writeFileSync(
+			path.join(root, 'workflows', 'ignored-job.ts'),
+			`export default 'ordinary module';\n`,
+		);
 
 		const { flueConfig } = await resolveConfig({ cwd: root, inline: { target: 'node' } });
-		await expect(build({ root, sourceRoot: flueConfig.sourceRoot, plugin: discoveryOnlyPlugin })).resolves.toEqual({ changed: true });
+		await expect(
+			build({ root, sourceRoot: flueConfig.sourceRoot, plugin: discoveryOnlyPlugin }),
+		).resolves.toEqual({ changed: true });
 		const output = fs.readFileSync(path.join(root, 'dist', 'server.mjs'), 'utf-8');
 		expect(output).toContain('assistant');
 		expect(output).toContain('job');

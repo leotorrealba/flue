@@ -1,7 +1,7 @@
-import { Chat } from 'chat';
 import { createGitHubAdapter } from '@chat-adapter/github';
 import { createMemoryState } from '@chat-adapter/state-memory';
-import { dispatch, type CreatedAgent } from '@flue/runtime';
+import { type CreatedAgent, dispatch } from '@flue/runtime';
+import { Chat } from 'chat';
 
 const webhookSecret = 'chat-sdk-example-secret';
 const githubApiUrl = process.env.CHAT_SDK_GITHUB_API_URL ?? 'http://localhost:3585/api/github';

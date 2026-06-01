@@ -26,15 +26,15 @@ Runs are workflow-only. Direct HTTP or WebSocket agent prompts and dispatched ag
 
 ## Options
 
-| Option                            | Default                          | Description                                                  |
-| --------------------------------- | -------------------------------- | ------------------------------------------------------------ |
+| Option                            | Default                          | Description                                                                                                               |
+| --------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `--server <url>`                  | `http://127.0.0.1:3583`          | Select the running Flue server base URL beneath which `/runs/<runId>` is published. May include an authored mount prefix. |
-| `--follow`, `-f`                  | Automatic                        | Force live event streaming.                                  |
-| `--no-follow`                     | Automatic                        | Replay persisted events once and exit.                       |
-| `--since <eventIndex>`            | Beginning of history             | Resume strictly after an event index.                        |
-| `--types <a,b,c>`                 | All event types                  | Emit only the selected comma-separated event types.          |
-| `--limit <n>`                     | Replay: `100`; follow: unlimited | Limit emitted events. Replay requests accept at most `1000`. |
-| `--format <pretty\|json\|ndjson>` | `pretty`                         | Select human-readable or line-delimited JSON output.         |
+| `--follow`, `-f`                  | Automatic                        | Force live event streaming.                                                                                               |
+| `--no-follow`                     | Automatic                        | Replay persisted events once and exit.                                                                                    |
+| `--since <eventIndex>`            | Beginning of history             | Resume strictly after an event index.                                                                                     |
+| `--types <a,b,c>`                 | All event types                  | Emit only the selected comma-separated event types.                                                                       |
+| `--limit <n>`                     | Replay: `100`; follow: unlimited | Limit emitted events. Replay requests accept at most `1000`.                                                              |
+| `--format <pretty\|json\|ndjson>` | `pretty`                         | Select human-readable or line-delimited JSON output.                                                                      |
 
 When neither follow option is passed, `flue logs` follows active runs and requests one persisted-event snapshot for terminal runs. The snapshot endpoint is bounded: it returns the first `100` matching events by default and accepts a maximum `--limit` of `1000`. `flue logs` does not paginate snapshots.
 

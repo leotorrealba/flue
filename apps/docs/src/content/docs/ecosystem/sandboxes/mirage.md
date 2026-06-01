@@ -14,9 +14,9 @@ pnpm exec flue add mirage
 
 ## Requirements
 
-| Target | Runtime package | Notes |
-| --- | --- | --- |
-| Node.js | `@struktoai/mirage-node` | Can use Node-compatible Mirage resources. |
+| Target     | Runtime package             | Notes                                            |
+| ---------- | --------------------------- | ------------------------------------------------ |
+| Node.js    | `@struktoai/mirage-node`    | Can use Node-compatible Mirage resources.        |
 | Cloudflare | `@struktoai/mirage-browser` | Use browser-compatible Workspace resources only. |
 
 The generated connector uses Mirage's shared workspace contract. Some Mirage resources, such as SSH- or database-oriented Node resources, require the Node runtime and must not be imported into a Cloudflare build.

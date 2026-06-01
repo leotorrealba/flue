@@ -38,12 +38,7 @@ session and uses the returned `SessionEnv` for all shell/file operations.
 ```ts
 // <source-dir>/connectors/<provider>.ts
 import { createSandboxSessionEnv } from '@flue/runtime';
-import type {
-  SandboxApi,
-  SandboxFactory,
-  SessionEnv,
-  FileStat,
-} from '@flue/runtime';
+import type { SandboxApi, SandboxFactory, SessionEnv, FileStat } from '@flue/runtime';
 import type { Sandbox as ProviderSandbox } from '<provider-sdk>';
 
 class ProviderSandboxApi implements SandboxApi {
@@ -117,7 +112,7 @@ export interface SandboxApi {
 
 `timeout` is the **primary** cancellation contract — every connector should
 honor it by forwarding to the provider SDK's native timeout option.
-`signal` is an *optional* enhancement: connectors whose provider SDK
+`signal` is an _optional_ enhancement: connectors whose provider SDK
 supports mid-flight cancellation (e.g. accepts an `AbortSignal`) should
 forward it; others may ignore it. See "Cancellation" below.
 
@@ -208,7 +203,7 @@ this command after N seconds and let me retry." Returning a 124-shaped
 deadline expiry matches the convention used by other Flue connectors and
 the `timeout(1)` utility.
 
-If your provider's SDK *also* supports an `AbortSignal`, forward
+If your provider's SDK _also_ supports an `AbortSignal`, forward
 `options.signal` too — this gives SDK-level callers (`agent.shell(cmd,
 { signal })`) true mid-flight cancellation. Connectors whose provider
 SDK can't observe a signal should ignore `signal`: Flue's

@@ -43,9 +43,9 @@ describe('parseSkillMarkdown', () => {
 	});
 
 	it('requires names to match the owning directory', () => {
-		expect(() => parseSkillMarkdown('---\nname: other\ndescription: Useful.\n---\nBody', options)).toThrow(
-			'must match',
-		);
+		expect(() =>
+			parseSkillMarkdown('---\nname: other\ndescription: Useful.\n---\nBody', options),
+		).toThrow('must match');
 	});
 
 	it('rejects non-string metadata values', () => {

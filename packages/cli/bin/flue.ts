@@ -27,9 +27,10 @@ function loadCliEnvironment(args: ApplicationConfigArgs): EnvLoader {
 	try {
 		const cwd = process.cwd();
 		const searchFrom = args.explicitRoot ?? cwd;
-		const configPath = args.configFile !== undefined
-			? resolveConfigPath({ cwd, configFile: args.configFile })
-			: resolveConfigPath({ cwd: searchFrom, configFile: undefined });
+		const configPath =
+			args.configFile !== undefined
+				? resolveConfigPath({ cwd, configFile: args.configFile })
+				: resolveConfigPath({ cwd: searchFrom, configFile: undefined });
 		const baseDir = configPath ? path.dirname(configPath) : searchFrom;
 		const envLoader = createEnvLoader(selectEnvFile(args.envFile, baseDir));
 		if (fs.existsSync(envLoader.file)) console.error(`[flue] Loading env from: ${envLoader.file}`);
@@ -61,7 +62,9 @@ async function resolveCliConfig(args: {
 			inline,
 		});
 		if (configPath) {
-			console.error(`[flue] Loaded config: ${path.relative(process.cwd(), configPath) || configPath}`);
+			console.error(
+				`[flue] Loaded config: ${path.relative(process.cwd(), configPath) || configPath}`,
+			);
 		}
 		return flueConfig;
 	} catch (err) {
@@ -70,7 +73,9 @@ async function resolveCliConfig(args: {
 	}
 }
 
-async function resolveApplicationCommand(args: ApplicationConfigArgs): Promise<{ cfg: FlueConfig; envLoader: EnvLoader }> {
+async function resolveApplicationCommand(
+	args: ApplicationConfigArgs,
+): Promise<{ cfg: FlueConfig; envLoader: EnvLoader }> {
 	const envLoader = loadCliEnvironment(args);
 	const cfg = await resolveCliConfig(args);
 	return { cfg, envLoader };
@@ -110,7 +115,7 @@ function printUsage() {
 			'  --session <name>     (flue connect) Session name used for agent prompts. Default: default.\n' +
 			'                       Cloudflare runtime bindings still use official .dev.vars/.env and CLOUDFLARE_ENV conventions.\n' +
 			'  --category <name>    (flue add) Fetch the generic instructions for a connector category. Pair with a positional URL/path that\n' +
-			'                       points the agent at the provider\'s docs (e.g. `flue add https://e2b.dev --category sandbox`).\n' +
+			"                       points the agent at the provider's docs (e.g. `flue add https://e2b.dev --category sandbox`).\n" +
 			'  --print              (flue add) Print the raw connector markdown to stdout regardless of whether the caller is an agent.\n' +
 			'  --force              (flue init) Overwrite an existing flue.config.* in the target directory.\n' +
 			'\n' +
@@ -303,7 +308,9 @@ function parseFlags(flags: string[]): {
 				process.exit(1);
 			}
 			if (envFile !== undefined) {
-				console.error('`--env` accepts one file. Combine values into one file or provide shell overrides.');
+				console.error(
+					'`--env` accepts one file. Combine values into one file or provide shell overrides.',
+				);
 				process.exit(1);
 			}
 			envFile = value;
@@ -812,7 +819,9 @@ function logEvent(event: any) {
 			// Envelope: { type: 'error', error: { type, message, details, dev?, meta? } }
 			// `dev` is only present when the server is in local/dev mode —
 			// `flue run` always is, so we render it whenever it's present.
-			console.error(`[flue] ERROR [${event.error?.type ?? 'unknown'}]: ${event.error?.message ?? ''}`);
+			console.error(
+				`[flue] ERROR [${event.error?.type ?? 'unknown'}]: ${event.error?.message ?? ''}`,
+			);
 			if (event.error?.details) {
 				for (const line of String(event.error.details).split('\n')) {
 					if (line) console.error(`  ${line}`);
@@ -891,7 +900,10 @@ function stopLocalProcess() {
 	localProcess = undefined;
 }
 
-function waitForLocalReady(child: ChildProcess, expected: (message: LocalCliMessage) => boolean): Promise<void> {
+function waitForLocalReady(
+	child: ChildProcess,
+	expected: (message: LocalCliMessage) => boolean,
+): Promise<void> {
 	return new Promise((resolve, reject) => {
 		const timeout = setTimeout(() => {
 			cleanup();
@@ -912,7 +924,11 @@ function waitForLocalReady(child: ChildProcess, expected: (message: LocalCliMess
 		};
 		const onExit = (code: number | null) => {
 			cleanup();
-			reject(new Error(`Local execution process exited before becoming ready${code === null ? '' : ` (code ${code})`}.`));
+			reject(
+				new Error(
+					`Local execution process exited before becoming ready${code === null ? '' : ` (code ${code})`}.`,
+				),
+			);
 		};
 		const cleanup = () => {
 			clearTimeout(timeout);
@@ -933,7 +949,11 @@ function formatLocalError(message: LocalCliMessage): string {
 	return lines.join('\n');
 }
 
-function sendLocalRequest(child: ChildProcess, message: Record<string, unknown>, onStarted?: (message: LocalCliMessage) => void): Promise<any> {
+function sendLocalRequest(
+	child: ChildProcess,
+	message: Record<string, unknown>,
+	onStarted?: (message: LocalCliMessage) => void,
+): Promise<any> {
 	return new Promise((resolve, reject) => {
 		const requestId = message.requestId;
 		const onMessage = (raw: unknown) => {
@@ -961,7 +981,11 @@ function sendLocalRequest(child: ChildProcess, message: Record<string, unknown>,
 		};
 		const onExit = (code: number | null) => {
 			cleanup();
-			reject(new Error(`Local execution process exited before returning a result${code === null ? '' : ` (code ${code})`}.`));
+			reject(
+				new Error(
+					`Local execution process exited before returning a result${code === null ? '' : ` (code ${code})`}.`,
+				),
+			);
 		};
 		const cleanup = () => {
 			child.off('message', onMessage);
@@ -972,7 +996,6 @@ function sendLocalRequest(child: ChildProcess, message: Record<string, unknown>,
 		child.send?.(message);
 	});
 }
-
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
@@ -1011,11 +1034,21 @@ async function devCommand(args: DevArgs) {
 	}
 }
 
-async function buildLocalTarget(args: Pick<RunArgs | ConnectArgs, 'target' | 'explicitRoot' | 'explicitOutput' | 'configFile' | 'envFile'>) {
+async function buildLocalTarget(
+	args: Pick<
+		RunArgs | ConnectArgs,
+		'target' | 'explicitRoot' | 'explicitOutput' | 'configFile' | 'envFile'
+	>,
+) {
 	const { cfg } = await resolveApplicationCommand(args);
 	if (cfg.target === 'cloudflare') return { cfg, serverPath: undefined };
 	try {
-		await build({ root: cfg.root, sourceRoot: cfg.sourceRoot, output: cfg.output, target: cfg.target });
+		await build({
+			root: cfg.root,
+			sourceRoot: cfg.sourceRoot,
+			output: cfg.output,
+			target: cfg.target,
+		});
 	} catch (err) {
 		console.error(`[flue] Build failed:`, err instanceof Error ? err.message : String(err));
 		process.exit(1);
@@ -1026,14 +1059,29 @@ async function buildLocalTarget(args: Pick<RunArgs | ConnectArgs, 'target' | 'ex
 async function run(args: RunArgs) {
 	const built = await buildLocalTarget(args);
 	if (built.cfg.target === 'cloudflare') printCloudflareRunUnsupported(args.workflow, args.payload);
-	if (!built.serverPath) throw new Error('[flue] Node local workflow build did not produce an executable artifact.');
-	const child = startLocalProcess(built.serverPath, 'workflow', args.workflow, undefined, built.cfg.root);
+	if (!built.serverPath)
+		throw new Error('[flue] Node local workflow build did not produce an executable artifact.');
+	const child = startLocalProcess(
+		built.serverPath,
+		'workflow',
+		args.workflow,
+		undefined,
+		built.cfg.root,
+	);
 	console.error(`[flue] Running workflow: ${args.workflow}`);
 	try {
-		await waitForLocalReady(child, (message) => message.target === 'workflow' && message.name === args.workflow);
+		await waitForLocalReady(
+			child,
+			(message) => message.target === 'workflow' && message.name === args.workflow,
+		);
 		const result = await sendLocalRequest(
 			child,
-			{ version: 1, type: 'invoke', requestId: `req_${crypto.randomUUID()}`, payload: JSON.parse(args.payload) },
+			{
+				version: 1,
+				type: 'invoke',
+				requestId: `req_${crypto.randomUUID()}`,
+				payload: JSON.parse(args.payload),
+			},
 			(message) => console.error(`[flue] Run ID: ${message.runId}`),
 		);
 		if (result !== undefined && result !== null) console.log(JSON.stringify(result, null, 2));
@@ -1049,22 +1097,39 @@ async function run(args: RunArgs) {
 async function connectCommand(args: ConnectArgs) {
 	const built = await buildLocalTarget(args);
 	if (built.cfg.target === 'cloudflare') printCloudflareConnectUnsupported();
-	if (!built.serverPath) throw new Error('[flue] Node local agent build did not produce an executable artifact.');
-	const child = startLocalProcess(built.serverPath, 'agent', args.agent, args.instanceId, built.cfg.root);
+	if (!built.serverPath)
+		throw new Error('[flue] Node local agent build did not produce an executable artifact.');
+	const child = startLocalProcess(
+		built.serverPath,
+		'agent',
+		args.agent,
+		args.instanceId,
+		built.cfg.root,
+	);
 	try {
-		await waitForLocalReady(child, (message) => message.target === 'agent' && message.name === args.agent && message.instanceId === args.instanceId);
+		await waitForLocalReady(
+			child,
+			(message) =>
+				message.target === 'agent' &&
+				message.name === args.agent &&
+				message.instanceId === args.instanceId,
+		);
 	} catch (err) {
 		console.error(`[flue] Connection error: ${err instanceof Error ? err.message : String(err)}`);
 		stopLocalProcess();
 		process.exit(1);
 	}
-	console.error(`[flue] Connected to ${args.agent}/${args.instanceId}. Enter a prompt per line; Ctrl-D to exit.`);
+	console.error(
+		`[flue] Connected to ${args.agent}/${args.instanceId}. Enter a prompt per line; Ctrl-D to exit.`,
+	);
 	const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
 	let closing = false;
 	child.once('exit', (code) => {
 		if (closing) return;
 		input.close();
-		console.error(`[flue] Agent connection ended unexpectedly${code === null ? '.' : ` (code ${code}).`}`);
+		console.error(
+			`[flue] Agent connection ended unexpectedly${code === null ? '.' : ` (code ${code}).`}`,
+		);
 		process.exitCode = 1;
 	});
 	for await (const line of input) {
@@ -1108,7 +1173,9 @@ async function fetchJsonOrExit<T>(url: string): Promise<T> {
 	try {
 		res = await fetch(url);
 	} catch (err) {
-		console.error(`[flue] Failed to reach Flue server at ${url}: ${err instanceof Error ? err.message : String(err)}`);
+		console.error(
+			`[flue] Failed to reach Flue server at ${url}: ${err instanceof Error ? err.message : String(err)}`,
+		);
 		process.exit(1);
 	}
 	const rawBody = await res.text();
@@ -1262,7 +1329,9 @@ async function logsCommand(args: LogsArgs): Promise<void> {
 	try {
 		res = await fetch(streamUrl, { headers });
 	} catch (err) {
-		console.error(`[flue] Failed to reach Flue server: ${err instanceof Error ? err.message : String(err)}`);
+		console.error(
+			`[flue] Failed to reach Flue server: ${err instanceof Error ? err.message : String(err)}`,
+		);
 		process.exit(1);
 	}
 
@@ -1297,8 +1366,7 @@ async function logsCommand(args: LogsArgs): Promise<void> {
 			if (!event || typeof event !== 'object') continue;
 
 			const passesFilter =
-				!args.types ||
-				(typeof event.type === 'string' && args.types.has(event.type));
+				!args.types || (typeof event.type === 'string' && args.types.has(event.type));
 
 			if (passesFilter) {
 				if (args.format === 'json' || args.format === 'ndjson') {
@@ -1316,7 +1384,9 @@ async function logsCommand(args: LogsArgs): Promise<void> {
 		if (ac.signal.aborted) {
 			exitCode = 130;
 		} else {
-			console.error(`[flue] Stream interrupted: ${err instanceof Error ? err.message : String(err)}`);
+			console.error(
+				`[flue] Stream interrupted: ${err instanceof Error ? err.message : String(err)}`,
+			);
 			exitCode = 1;
 		}
 	} finally {
@@ -1362,8 +1432,7 @@ function initCommand(args: InitArgs) {
 	if (existing && !args.force) {
 		const rel = path.relative(process.cwd(), existing) || existing;
 		console.error(
-			`[flue] A Flue config already exists at ${rel}.\n` +
-				`  Re-run with --force to overwrite.`,
+			`[flue] A Flue config already exists at ${rel}.\n` + `  Re-run with --force to overwrite.`,
 		);
 		process.exit(1);
 	}
@@ -1374,7 +1443,9 @@ function initCommand(args: InitArgs) {
 	try {
 		fs.writeFileSync(outPath, content);
 	} catch (err) {
-		console.error(`[flue] Failed to write ${outPath}: ${err instanceof Error ? err.message : String(err)}`);
+		console.error(
+			`[flue] Failed to write ${outPath}: ${err instanceof Error ? err.message : String(err)}`,
+		);
 		process.exit(1);
 	}
 
@@ -1433,7 +1504,9 @@ function resolveConnector(name: string): (typeof CONNECTORS)[number] | undefined
  * Render a 3-column table aligned by the longest entry. Simple and
  * intentionally unfussy — connector listings are always small.
  */
-function renderConnectorTable(rows: { command: string; category: string; website: string }[]): string {
+function renderConnectorTable(
+	rows: { command: string; category: string; website: string }[],
+): string {
 	if (rows.length === 0) return '  (none)';
 	const cmdW = Math.max(...rows.map((r) => r.command.length));
 	const catW = Math.max(...rows.map((r) => r.category.length));
@@ -1451,15 +1524,9 @@ function categoryRootHint(): string {
 	for (const root of CATEGORY_ROOTS) {
 		lines.push('');
 		lines.push(`  flue add <url> --category ${root.category}`);
-		lines.push(
-			`    Build a ${root.category} connector from scratch. Pass a URL pointing at the`,
-		);
-		lines.push(
-			`    provider's docs (homepage, SDK reference, GitHub repo, anything useful) as`,
-		);
-		lines.push(
-			`    the agent's starting point. Pipe to your coding agent.`,
-		);
+		lines.push(`    Build a ${root.category} connector from scratch. Pass a URL pointing at the`);
+		lines.push(`    provider's docs (homepage, SDK reference, GitHub repo, anything useful) as`);
+		lines.push(`    the agent's starting point. Pipe to your coding agent.`);
 	}
 	return lines.join('\n');
 }
@@ -1496,7 +1563,9 @@ function printUnknownConnector(name: string, stream: NodeJS.WriteStream) {
 	}
 }
 
-async function fetchConnectorMarkdown(slug: string): Promise<{ body: string } | { notFound: true }> {
+async function fetchConnectorMarkdown(
+	slug: string,
+): Promise<{ body: string } | { notFound: true }> {
 	const url = registryUrlFor(slug);
 	let res: Response;
 	try {

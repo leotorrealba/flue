@@ -93,7 +93,7 @@ import type { FluePublicError } from './types.ts';
  *           type: 'agent_error',
  *           message,
  *           details: 'Available: "x", "y", "z"',             // ✗ leaks names
-	 *           dev: '',                                         // ✗ wasted field
+ *           dev: '',                                         // ✗ wasted field
  *           status: 500,                                     // ✗ wrong status
  *         });
  *       }
@@ -355,7 +355,9 @@ export class RunStoreUnavailableError extends FlueHttpError {
 
 export class RunEventTooLargeError extends Error {
 	constructor() {
-		super('[flue:run-store] event payload exceeds the 1 MB persistence limit and will not be persisted.');
+		super(
+			'[flue:run-store] event payload exceeds the 1 MB persistence limit and will not be persisted.',
+		);
 		this.name = 'RunEventTooLargeError';
 	}
 }
@@ -385,7 +387,6 @@ export class InvalidRequestError extends FlueHttpError {
 		});
 	}
 }
-
 
 export class ValidationError extends FlueHttpError {
 	constructor({ details, issues }: { details: string; issues: unknown }) {
@@ -566,7 +567,6 @@ export function toHttpResponse(err: unknown): Response {
 		headers: { 'content-type': 'application/json' },
 	});
 }
-
 
 // These are HTTP-layer helpers that throw the concrete error subclasses defined
 // above. They live here (rather than with the error classes) because they're

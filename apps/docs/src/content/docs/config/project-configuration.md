@@ -21,11 +21,11 @@ Relative paths resolve against the directory containing the configuration file. 
 
 ## Supported options
 
-| Option | Purpose | Example |
-| --- | --- | --- |
-| `target` | Select the deployment/runtime target. | `'node'` |
-| `root` | Choose the Flue project root. | `'./examples/hello-world'` |
-| `output` | Write deployable artifacts elsewhere. | `'./dist'` |
+| Option   | Purpose                               | Example                    |
+| -------- | ------------------------------------- | -------------------------- |
+| `target` | Select the deployment/runtime target. | `'node'`                   |
+| `root`   | Choose the Flue project root.         | `'./examples/hello-world'` |
+| `output` | Write deployable artifacts elsewhere. | `'./dist'`                 |
 
 ## Next steps
 

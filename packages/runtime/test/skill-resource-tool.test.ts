@@ -4,7 +4,12 @@ import { createTools } from '../src/agent.ts';
 import { Harness } from '../src/harness.ts';
 import { buildPackagedSkillPrompt } from '../src/result.ts';
 import { InMemorySessionStore } from '../src/session.ts';
-import type { AgentConfig, PackagedSkillDirectory, SessionEnv, SkillReference } from '../src/types.ts';
+import type {
+	AgentConfig,
+	PackagedSkillDirectory,
+	SessionEnv,
+	SkillReference,
+} from '../src/types.ts';
 
 const packagedReference: SkillReference = {
 	__flueSkillReference: true,
@@ -18,12 +23,38 @@ const packagedDirectory: PackagedSkillDirectory = {
 	name: packagedReference.name,
 	description: packagedReference.description,
 	files: {
-		'SKILL.md': { encoding: 'base64', kind: 'text', content: Buffer.from('---\nname: review\ndescription: Review work.\n---\nReview.').toString('base64') },
-		'LICENSE.txt': { encoding: 'base64', kind: 'text', content: Buffer.from('License terms.').toString('base64') },
-		'references/checklist.md': { encoding: 'base64', kind: 'text', content: Buffer.from('Check everything.').toString('base64') },
-		'assets/icon.bin': { encoding: 'base64', kind: 'binary', content: Buffer.from([0xff, 0x00, 0x80]).toString('base64') },
-		'payload.bin': { encoding: 'base64', kind: 'binary', content: Buffer.from([0x00, 0xfe, 0x41]).toString('base64') },
-		'assets/large.bin': { encoding: 'base64', kind: 'binary', content: Buffer.alloc(60 * 1024, 0xa5).toString('base64') },
+		'SKILL.md': {
+			encoding: 'base64',
+			kind: 'text',
+			content: Buffer.from('---\nname: review\ndescription: Review work.\n---\nReview.').toString(
+				'base64',
+			),
+		},
+		'LICENSE.txt': {
+			encoding: 'base64',
+			kind: 'text',
+			content: Buffer.from('License terms.').toString('base64'),
+		},
+		'references/checklist.md': {
+			encoding: 'base64',
+			kind: 'text',
+			content: Buffer.from('Check everything.').toString('base64'),
+		},
+		'assets/icon.bin': {
+			encoding: 'base64',
+			kind: 'binary',
+			content: Buffer.from([0xff, 0x00, 0x80]).toString('base64'),
+		},
+		'payload.bin': {
+			encoding: 'base64',
+			kind: 'binary',
+			content: Buffer.from([0x00, 0xfe, 0x41]).toString('base64'),
+		},
+		'assets/large.bin': {
+			encoding: 'base64',
+			kind: 'binary',
+			content: Buffer.alloc(60 * 1024, 0xa5).toString('base64'),
+		},
 	},
 };
 
@@ -35,7 +66,13 @@ function createEnv(): SessionEnv {
 		readFile: async () => '',
 		readFileBuffer: async () => new Uint8Array(),
 		writeFile: async () => {},
-		stat: async () => ({ isFile: true, isDirectory: false, isSymbolicLink: false, size: 0, mtime: new Date(0) }),
+		stat: async () => ({
+			isFile: true,
+			isDirectory: false,
+			isSymbolicLink: false,
+			size: 0,
+			mtime: new Date(0),
+		}),
 		readdir: async () => [],
 		exists: async () => false,
 		mkdir: async () => {},
@@ -58,7 +95,14 @@ function assistantMessage(text: string): AgentMessage {
 	return {
 		role: 'assistant',
 		content: [{ type: 'text', text }],
-		usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+		usage: {
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			totalTokens: 0,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+		},
 		timestamp: Date.now(),
 	} as AgentMessage;
 }
@@ -73,18 +117,37 @@ describe('packaged skill activation prompt', () => {
 	});
 
 	it('lets the standard read tool read arbitrary packaged skill files and preserve binary content regardless of directory', async () => {
-		const tools = createTools(createEnv(), { packagedSkills: { [packagedReference.id]: packagedDirectory } });
+		const tools = createTools(createEnv(), {
+			packagedSkills: { [packagedReference.id]: packagedDirectory },
+		});
 		const read = tools.find((tool) => tool.name === 'read');
 		if (!read) throw new Error('read tool missing');
-		const result = await read.execute('tool', { path: '/.flue/packaged-skills/skill%3Areview%3Afixture/LICENSE.txt' });
-		const binary = await read.execute('tool', { path: '/.flue/packaged-skills/skill%3Areview%3Afixture/assets/icon.bin' });
-		const rootBinary = await read.execute('tool', { path: '/.flue/packaged-skills/skill%3Areview%3Afixture/payload.bin' });
-		const largeFirst = await read.execute('tool', { path: '/.flue/packaged-skills/skill%3Areview%3Afixture/assets/large.bin' });
+		const result = await read.execute('tool', {
+			path: '/.flue/packaged-skills/skill%3Areview%3Afixture/LICENSE.txt',
+		});
+		const binary = await read.execute('tool', {
+			path: '/.flue/packaged-skills/skill%3Areview%3Afixture/assets/icon.bin',
+		});
+		const rootBinary = await read.execute('tool', {
+			path: '/.flue/packaged-skills/skill%3Areview%3Afixture/payload.bin',
+		});
+		const largeFirst = await read.execute('tool', {
+			path: '/.flue/packaged-skills/skill%3Areview%3Afixture/assets/large.bin',
+		});
 		const largeFirstText = largeFirst.content[0]?.type === 'text' ? largeFirst.content[0].text : '';
 		const nextOffset = Number(/Use offset=(\d+) to continue/.exec(largeFirstText)?.[1]);
-		const largeSecond = await read.execute('tool', { path: '/.flue/packaged-skills/skill%3Areview%3Afixture/assets/large.bin', offset: nextOffset });
-		const largeSecondText = largeSecond.content[0]?.type === 'text' ? largeSecond.content[0].text : '';
-		const decodedLarge = Buffer.from(`${largeFirstText}\n${largeSecondText}`.replace(/\n\n\[Showing[\s\S]*?continue\.\]/g, '').replace(/\n/g, ''), 'base64');
+		const largeSecond = await read.execute('tool', {
+			path: '/.flue/packaged-skills/skill%3Areview%3Afixture/assets/large.bin',
+			offset: nextOffset,
+		});
+		const largeSecondText =
+			largeSecond.content[0]?.type === 'text' ? largeSecond.content[0].text : '';
+		const decodedLarge = Buffer.from(
+			`${largeFirstText}\n${largeSecondText}`
+				.replace(/\n\n\[Showing[\s\S]*?continue\.\]/g, '')
+				.replace(/\n/g, ''),
+			'base64',
+		);
 		expect(result.content[0]).toMatchObject({ text: 'License terms.' });
 		expect(binary.content[0]).toMatchObject({ text: '/wCA' });
 		expect(rootBinary.content[0]).toMatchObject({ text: 'AP5B' });
@@ -93,14 +156,28 @@ describe('packaged skill activation prompt', () => {
 	});
 
 	it('rejects activation when a reference has no packaged directory', () => {
-		expect(() => buildPackagedSkillPrompt(packagedReference, { ...packagedDirectory, files: {} })).toThrow('missing SKILL.md');
+		expect(() =>
+			buildPackagedSkillPrompt(packagedReference, { ...packagedDirectory, files: {} }),
+		).toThrow('missing SKILL.md');
 	});
 
 	it('activates a direct packaged reference through session.skill and scopes its files to that operation', async () => {
-		const harness = new Harness('instance', 'default', createAgentConfig({}), createEnv(), new InMemorySessionStore());
+		const harness = new Harness(
+			'instance',
+			'default',
+			createAgentConfig({}),
+			createEnv(),
+			new InMemorySessionStore(),
+		);
 		const session = await harness.session();
 		const agent = Reflect.get(session, 'harness') as {
-			state: { messages: AgentMessage[]; tools: Array<{ name: string; execute(id: string, params: unknown): Promise<{ content: Array<{ text: string }> }> }> };
+			state: {
+				messages: AgentMessage[];
+				tools: Array<{
+					name: string;
+					execute(id: string, params: unknown): Promise<{ content: Array<{ text: string }> }>;
+				}>;
+			};
 			prompt(text: string): Promise<void>;
 			waitForIdle(): Promise<void>;
 		};
@@ -110,7 +187,9 @@ describe('packaged skill activation prompt', () => {
 			prompt = text;
 			const read = agent.state.tools.find((tool) => tool.name === 'read');
 			if (!read) throw new Error('read tool missing');
-			const output = await read.execute('tool', { path: '/.flue/packaged-skills/skill%3Areview%3Afixture/LICENSE.txt' });
+			const output = await read.execute('tool', {
+				path: '/.flue/packaged-skills/skill%3Areview%3Afixture/LICENSE.txt',
+			});
 			fileContents = output.content[0]?.text ?? '';
 			agent.state.messages.push(assistantMessage('reviewed'));
 		};
@@ -123,9 +202,19 @@ describe('packaged skill activation prompt', () => {
 	});
 
 	it('activates a registered packaged reference by name', async () => {
-		const harness = new Harness('instance', 'default', createAgentConfig({ review: packagedReference }), createEnv(), new InMemorySessionStore());
+		const harness = new Harness(
+			'instance',
+			'default',
+			createAgentConfig({ review: packagedReference }),
+			createEnv(),
+			new InMemorySessionStore(),
+		);
 		const session = await harness.session();
-		const agent = Reflect.get(session, 'harness') as { state: { messages: AgentMessage[] }; prompt(text: string): Promise<void>; waitForIdle(): Promise<void> };
+		const agent = Reflect.get(session, 'harness') as {
+			state: { messages: AgentMessage[] };
+			prompt(text: string): Promise<void>;
+			waitForIdle(): Promise<void>;
+		};
 		let prompt = '';
 		agent.prompt = async (text) => {
 			prompt = text;
@@ -139,10 +228,18 @@ describe('packaged skill activation prompt', () => {
 	});
 
 	it('does not accept file paths as string skill activation names', async () => {
-		const harness = new Harness('instance', 'default', createAgentConfig({}), createEnv(), new InMemorySessionStore());
+		const harness = new Harness(
+			'instance',
+			'default',
+			createAgentConfig({}),
+			createEnv(),
+			new InMemorySessionStore(),
+		);
 		const session = await harness.session();
 
-		await expect(session.skill('review/SKILL.md')).rejects.toThrow('Skill "review/SKILL.md" not registered');
+		await expect(session.skill('review/SKILL.md')).rejects.toThrow(
+			'Skill "review/SKILL.md" not registered',
+		);
 	});
 
 	it('exposes active packaged files through connector-backed sessions', async () => {
@@ -154,17 +251,25 @@ describe('packaged skill activation prompt', () => {
 			new InMemorySessionStore(),
 			undefined,
 			[],
-			() => [{
-				name: 'code',
-				label: 'Code',
-				description: 'Execute code.',
-				parameters: {},
-				execute: async () => ({ content: [{ type: 'text', text: 'code' }], details: {} }),
-			}],
+			() => [
+				{
+					name: 'code',
+					label: 'Code',
+					description: 'Execute code.',
+					parameters: {},
+					execute: async () => ({ content: [{ type: 'text', text: 'code' }], details: {} }),
+				},
+			],
 		);
 		const session = await harness.session();
 		const agent = Reflect.get(session, 'harness') as {
-			state: { messages: AgentMessage[]; tools: Array<{ name: string; execute(id: string, params: unknown): Promise<{ content: Array<{ text: string }> }> }> };
+			state: {
+				messages: AgentMessage[];
+				tools: Array<{
+					name: string;
+					execute(id: string, params: unknown): Promise<{ content: Array<{ text: string }> }>;
+				}>;
+			};
 			prompt(text: string): Promise<void>;
 			waitForIdle(): Promise<void>;
 		};
@@ -172,7 +277,9 @@ describe('packaged skill activation prompt', () => {
 		agent.prompt = async () => {
 			const read = agent.state.tools.find((tool) => tool.name === 'read');
 			if (!read) throw new Error('read tool missing');
-			const output = await read.execute('tool', { path: '/.flue/packaged-skills/skill%3Areview%3Afixture/LICENSE.txt' });
+			const output = await read.execute('tool', {
+				path: '/.flue/packaged-skills/skill%3Areview%3Afixture/LICENSE.txt',
+			});
 			fileContents = output.content[0]?.text ?? '';
 			agent.state.messages.push(assistantMessage('reviewed'));
 		};
@@ -194,17 +301,25 @@ describe('packaged skill activation prompt', () => {
 			new InMemorySessionStore(),
 			undefined,
 			[],
-			() => [{
-				name: 'code',
-				label: 'Code',
-				description: 'Execute code.',
-				parameters: {},
-				execute: async () => ({ content: [{ type: 'text', text: 'code' }], details: {} }),
-			}],
+			() => [
+				{
+					name: 'code',
+					label: 'Code',
+					description: 'Execute code.',
+					parameters: {},
+					execute: async () => ({ content: [{ type: 'text', text: 'code' }], details: {} }),
+				},
+			],
 		);
 		const session = await harness.session();
 		const agent = Reflect.get(session, 'harness') as {
-			state: { messages: AgentMessage[]; tools: Array<{ name: string; execute(id: string, params: unknown): Promise<{ content: Array<{ text: string }> }> }> };
+			state: {
+				messages: AgentMessage[];
+				tools: Array<{
+					name: string;
+					execute(id: string, params: unknown): Promise<{ content: Array<{ text: string }> }>;
+				}>;
+			};
 			prompt(text: string): Promise<void>;
 			waitForIdle(): Promise<void>;
 		};
@@ -227,13 +342,20 @@ describe('packaged skill activation prompt', () => {
 	});
 
 	it('selects directly activated packaged files by reference id when names collide', async () => {
-		const registeredReference: SkillReference = { ...packagedReference, id: 'skill:review:registered' };
+		const registeredReference: SkillReference = {
+			...packagedReference,
+			id: 'skill:review:registered',
+		};
 		const registeredDirectory: PackagedSkillDirectory = {
 			...packagedDirectory,
 			id: registeredReference.id,
 			files: {
 				...packagedDirectory.files,
-				'LICENSE.txt': { encoding: 'base64', kind: 'text', content: Buffer.from('Registered terms.').toString('base64') },
+				'LICENSE.txt': {
+					encoding: 'base64',
+					kind: 'text',
+					content: Buffer.from('Registered terms.').toString('base64'),
+				},
 			},
 		};
 		const config = createAgentConfig({ review: registeredReference });
@@ -241,10 +363,22 @@ describe('packaged skill activation prompt', () => {
 			[packagedReference.id]: packagedDirectory,
 			[registeredReference.id]: registeredDirectory,
 		};
-		const harness = new Harness('instance', 'default', config, createEnv(), new InMemorySessionStore());
+		const harness = new Harness(
+			'instance',
+			'default',
+			config,
+			createEnv(),
+			new InMemorySessionStore(),
+		);
 		const session = await harness.session();
 		const agent = Reflect.get(session, 'harness') as {
-			state: { messages: AgentMessage[]; tools: Array<{ name: string; execute(id: string, params: unknown): Promise<{ content: Array<{ text: string }> }> }> };
+			state: {
+				messages: AgentMessage[];
+				tools: Array<{
+					name: string;
+					execute(id: string, params: unknown): Promise<{ content: Array<{ text: string }> }>;
+				}>;
+			};
 			prompt(text: string): Promise<void>;
 			waitForIdle(): Promise<void>;
 		};
@@ -252,7 +386,9 @@ describe('packaged skill activation prompt', () => {
 		agent.prompt = async () => {
 			const read = agent.state.tools.find((tool) => tool.name === 'read');
 			if (!read) throw new Error('read tool missing');
-			const output = await read.execute('tool', { path: '/.flue/packaged-skills/skill%3Areview%3Afixture/LICENSE.txt' });
+			const output = await read.execute('tool', {
+				path: '/.flue/packaged-skills/skill%3Areview%3Afixture/LICENSE.txt',
+			});
 			activatedFile = output.content[0]?.text ?? '';
 			agent.state.messages.push(assistantMessage('reviewed'));
 		};
@@ -264,10 +400,22 @@ describe('packaged skill activation prompt', () => {
 	});
 
 	it('does not expose imported packaged files to ordinary prompts unless the reference is registered', async () => {
-		const harness = new Harness('instance', 'default', createAgentConfig({}), createEnv(), new InMemorySessionStore());
+		const harness = new Harness(
+			'instance',
+			'default',
+			createAgentConfig({}),
+			createEnv(),
+			new InMemorySessionStore(),
+		);
 		const session = await harness.session();
 		const agent = Reflect.get(session, 'harness') as {
-			state: { messages: AgentMessage[]; tools: Array<{ name: string; execute(id: string, params: unknown): Promise<{ content: Array<{ text: string }> }> }> };
+			state: {
+				messages: AgentMessage[];
+				tools: Array<{
+					name: string;
+					execute(id: string, params: unknown): Promise<{ content: Array<{ text: string }> }>;
+				}>;
+			};
 			prompt(text: string): Promise<void>;
 			waitForIdle(): Promise<void>;
 		};
@@ -275,7 +423,9 @@ describe('packaged skill activation prompt', () => {
 		agent.prompt = async () => {
 			const read = agent.state.tools.find((tool) => tool.name === 'read');
 			if (!read) throw new Error('read tool missing');
-			const output = await read.execute('tool', { path: '/.flue/packaged-skills/skill%3Areview%3Afixture/LICENSE.txt' });
+			const output = await read.execute('tool', {
+				path: '/.flue/packaged-skills/skill%3Areview%3Afixture/LICENSE.txt',
+			});
 			fileContents = output.content[0]?.text ?? '';
 			agent.state.messages.push(assistantMessage('done'));
 		};

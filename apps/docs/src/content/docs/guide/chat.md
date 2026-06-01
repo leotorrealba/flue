@@ -154,10 +154,10 @@ If you separately expose this agent through a direct HTTP or WebSocket route, th
 
 A chat integration usually has two kinds of continuing state:
 
-| Concern | Owner |
-| --- | --- |
+| Concern                                                                 | Owner                                                       |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------- |
 | Thread subscriptions, webhook deduplication, and chat-side coordination | Your platform integration, such as a Chat SDK state adapter |
-| Agent session history and agent runtime capabilities | Flue |
+| Agent session history and agent runtime capabilities                    | Flue                                                        |
 
 Chat SDK's in-memory state adapter is useful for local development and examples. Use a persistent Chat SDK state adapter when subscriptions or chat-side coordination must survive restarts or multiple application instances. That choice does not configure persistence or durability for Flue agent processing.
 

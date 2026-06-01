@@ -1,11 +1,11 @@
 /** Runtime provider registries consumed by `resolveModel` and Session. */
 
 import {
+	type Api,
 	getModel,
 	type KnownProvider,
-	registerApiProvider as piRegisterApiProvider,
-	type Api,
 	type Model,
+	registerApiProvider as piRegisterApiProvider,
 } from '@earendil-works/pi-ai';
 import type { CloudflareGatewayOptions } from '../cloudflare/gateway.ts';
 import { CLOUDFLARE_AI_BINDING_API } from '../cloudflare-model.ts';
@@ -29,9 +29,7 @@ export interface CloudflareAIBinding {
  * Provider declarations keyed by provider ID. HTTP providers carry endpoint
  * settings; Workers AI binding providers carry the captured binding object.
  */
-export type ProviderRegistration =
-	| HttpProviderRegistration
-	| CloudflareAIBindingRegistration;
+export type ProviderRegistration = HttpProviderRegistration | CloudflareAIBindingRegistration;
 
 /** Register an HTTP-backed provider ID with {@link registerProvider}. */
 export interface HttpProviderRegistration {
@@ -104,13 +102,9 @@ const providersById = new Map<string, ProviderRegistration>();
  * Last-write-wins. On Cloudflare, registering the `cloudflare` provider ID in
  * `app.ts` takes precedence over the generated Workers AI binding default.
  */
-export function registerProvider(
-	providerId: string,
-	registration: ProviderRegistration,
-): void {
+export function registerProvider(providerId: string, registration: ProviderRegistration): void {
 	providersById.set(providerId, registration);
 }
-
 
 /** Whether a provider ID has already been registered. */
 export function hasRegisteredProvider(providerId: string): boolean {
@@ -164,17 +158,12 @@ const providerSettingsById = new Map<string, ProviderConfiguration>();
  *
  * Keyed by provider ID. Last-write-wins.
  */
-export function configureProvider(
-	providerId: string,
-	settings: ProviderConfiguration,
-): void {
+export function configureProvider(providerId: string, settings: ProviderConfiguration): void {
 	providerSettingsById.set(providerId, settings);
 }
 
 /** Internal read accessor for provider settings. */
-export function getProviderConfiguration(
-	providerId: string,
-): ProviderConfiguration | undefined {
+export function getProviderConfiguration(providerId: string): ProviderConfiguration | undefined {
 	return providerSettingsById.get(providerId);
 }
 

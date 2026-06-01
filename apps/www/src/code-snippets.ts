@@ -28,4 +28,3 @@ export default createAgent(() => ({
   sandbox: local(),
   instructions,
 }));`;
-

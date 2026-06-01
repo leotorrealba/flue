@@ -1,9 +1,5 @@
 ---
-{
-  "category": "sandbox",
-  "website": "https://exe.dev",
-  "aliases": ["exe"]
-}
+{ 'category': 'sandbox', 'website': 'https://exe.dev', 'aliases': ['exe'] }
 ---
 
 # Add a Flue Connector: exe.dev
@@ -42,7 +38,7 @@ Create any missing parent directories.
 Write this file verbatim. Do not "improve" it — it conforms to the published
 `SandboxApi` contract.
 
-```ts
+````ts
 /**
  * exe.dev connector for Flue.
  *
@@ -84,18 +80,13 @@ Write this file verbatim. Do not "improve" it — it conforms to the published
  * }
  * ```
  */
-import { createSandboxSessionEnv } from "@flue/runtime";
-import type {
-  FileStat,
-  SandboxApi,
-  SandboxFactory,
-  SessionEnv,
-} from "@flue/runtime";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import { Client as SSHClient } from "ssh2";
-import type { ConnectConfig, SFTPWrapper } from "ssh2";
+import { createSandboxSessionEnv } from '@flue/runtime';
+import type { FileStat, SandboxApi, SandboxFactory, SessionEnv } from '@flue/runtime';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { Client as SSHClient } from 'ssh2';
+import type { ConnectConfig, SFTPWrapper } from 'ssh2';
 
 export interface ExeDevVm {
   /** VM hostname, e.g. "maple-dune.exe.xyz". */
@@ -149,17 +140,17 @@ export interface DeleteExeVmOptions {
 }
 
 export class ExeDevError extends Error {
-  override name = "ExeDevError";
+  override name = 'ExeDevError';
 
   constructor(message: string) {
     super(message);
-    if (typeof Error.captureStackTrace === "function") {
+    if (typeof Error.captureStackTrace === 'function') {
       Error.captureStackTrace(this, ExeDevError);
     }
   }
 }
 
-const EXE_API_URL = "https://exe.dev/exec";
+const EXE_API_URL = 'https://exe.dev/exec';
 const DEFAULT_VM_READY_TIMEOUT_MS = 90_000;
 const VM_NAME = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
 const SHELL_ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -167,10 +158,10 @@ const SHELL_ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 /** Run an exe.dev CLI command via the HTTPS API. */
 async function exeApi(token: string, command: string): Promise<string> {
   const res = await fetch(EXE_API_URL, {
-    method: "POST",
+    method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
-      "Content-Type": "text/plain",
+      'Content-Type': 'text/plain',
     },
     body: command,
   });
@@ -198,37 +189,34 @@ export function parseVmResponse(output: string): ExeDevVm & { name: string } {
     data = JSON.parse(output);
   } catch {
     throw new ExeDevError(
-      "exe.dev HTTPS API returned non-JSON output:\n" + `  ${output.slice(0, 200)}`,
+      'exe.dev HTTPS API returned non-JSON output:\n' + `  ${output.slice(0, 200)}`,
     );
   }
   const name =
-    typeof data.vm_name === "string"
+    typeof data.vm_name === 'string'
       ? data.vm_name
-      : typeof data.name === "string"
+      : typeof data.name === 'string'
         ? data.name
-        : typeof data.vm === "string"
+        : typeof data.vm === 'string'
           ? data.vm
           : undefined;
   if (!name) {
     throw new ExeDevError(
-      "exe.dev HTTPS API response missing `vm_name`:\n" +
-        `  ${JSON.stringify(data).slice(0, 200)}`,
+      'exe.dev HTTPS API response missing `vm_name`:\n' + `  ${JSON.stringify(data).slice(0, 200)}`,
     );
   }
   const host =
-    typeof data.ssh_dest === "string" && data.ssh_dest
-      ? data.ssh_dest
-      : `${name}.exe.xyz`;
+    typeof data.ssh_dest === 'string' && data.ssh_dest ? data.ssh_dest : `${name}.exe.xyz`;
   const port =
-    typeof data.ssh_port === "number" && Number.isFinite(data.ssh_port)
-      ? data.ssh_port
-      : undefined;
+    typeof data.ssh_port === 'number' && Number.isFinite(data.ssh_port) ? data.ssh_port : undefined;
   return { name, host, port };
 }
 
 /** Create a VM via exe.dev's HTTPS API, then wait for SSH readiness. */
-export async function createExeVm(options: ExeDevLifecycleOptions): Promise<ExeDevVm & { name: string }> {
-  const cmd = options.name ? `new ${validateVmName(options.name)}` : "new";
+export async function createExeVm(
+  options: ExeDevLifecycleOptions,
+): Promise<ExeDevVm & { name: string }> {
+  const cmd = options.name ? `new ${validateVmName(options.name)}` : 'new';
   const vm = parseVmResponse(await exeApi(options.apiToken, cmd));
   await waitForExeVm(vm, options.ssh, options.readyTimeoutMs);
   return vm;
@@ -236,7 +224,9 @@ export async function createExeVm(options: ExeDevLifecycleOptions): Promise<ExeD
 
 /** Clone a VM via exe.dev's HTTPS API, then wait for SSH readiness. */
 export async function cloneExeVm(options: CloneExeVmOptions): Promise<ExeDevVm & { name: string }> {
-  const vm = parseVmResponse(await exeApi(options.apiToken, `cp ${validateVmName(options.source)}`));
+  const vm = parseVmResponse(
+    await exeApi(options.apiToken, `cp ${validateVmName(options.source)}`),
+  );
   await waitForExeVm(vm, options.ssh, options.readyTimeoutMs);
   return vm;
 }
@@ -291,27 +281,27 @@ export function resolveAuth(
     try {
       return fs.readFileSync(keyPath);
     } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code ?? "ERROR";
+      const code = (err as NodeJS.ErrnoException).code ?? 'ERROR';
       tried.push({ source, path: keyPath, reason: code });
       return undefined;
     }
   };
 
   if (opts.privateKeyPath) {
-    const key = tryPath(opts.privateKeyPath, "privateKeyPath option");
+    const key = tryPath(opts.privateKeyPath, 'privateKeyPath option');
     if (key) return { privateKey: key };
   }
 
   const envPath = env.EXE_SSH_KEY;
   if (envPath) {
-    const key = tryPath(envPath, "$EXE_SSH_KEY");
+    const key = tryPath(envPath, '$EXE_SSH_KEY');
     if (key) return { privateKey: key };
   }
 
   const home = os.homedir();
-  for (const name of ["id_ed25519", "id_rsa"]) {
-    const keyPath = path.join(home, ".ssh", name);
-    const key = tryPath(keyPath, "default");
+  for (const name of ['id_ed25519', 'id_rsa']) {
+    const keyPath = path.join(home, '.ssh', name);
+    const key = tryPath(keyPath, 'default');
     if (key) return { privateKey: key };
   }
 
@@ -319,37 +309,37 @@ export function resolveAuth(
 
   const triedLines =
     tried.length > 0
-      ? tried.map((t) => `    - ${t.path} (${t.source}, ${t.reason})`).join("\n")
-      : "    (none)";
+      ? tried.map((t) => `    - ${t.path} (${t.source}, ${t.reason})`).join('\n')
+      : '    (none)';
 
   throw new ExeDevError(
     "Couldn't find an SSH private key or running agent.\n" +
       `  Tried:\n${triedLines}\n` +
-      "  Fix it by one of:\n" +
+      '  Fix it by one of:\n' +
       "    - Pass `agent: '/path/to/agent.sock'` (or set $SSH_AUTH_SOCK)\n" +
-      "    - Set EXE_SSH_KEY=/path/to/your/key\n" +
-      "    - Pass `privateKeyPath` or `privateKey` to exedev()\n" +
-      "    - Generate a default key: ssh-keygen -t ed25519",
+      '    - Set EXE_SSH_KEY=/path/to/your/key\n' +
+      '    - Pass `privateKeyPath` or `privateKey` to exedev()\n' +
+      '    - Generate a default key: ssh-keygen -t ed25519',
   );
 }
 
 const RETRYABLE_ERROR_CODES = new Set([
-  "ENOTFOUND",
-  "EAI_AGAIN",
-  "ECONNREFUSED",
-  "ECONNRESET",
-  "ETIMEDOUT",
-  "EHOSTUNREACH",
-  "ENETUNREACH",
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
 ]);
 
 export function isRetryableSshError(err: unknown): boolean {
-  if (!err || typeof err !== "object") return false;
+  if (!err || typeof err !== 'object') return false;
   const e = err as { code?: unknown; errno?: unknown; message?: unknown };
-  if (typeof e.code === "string" && RETRYABLE_ERROR_CODES.has(e.code)) return true;
-  if (typeof e.errno === "string" && RETRYABLE_ERROR_CODES.has(e.errno)) return true;
+  if (typeof e.code === 'string' && RETRYABLE_ERROR_CODES.has(e.code)) return true;
+  if (typeof e.errno === 'string' && RETRYABLE_ERROR_CODES.has(e.errno)) return true;
   return (
-    typeof e.message === "string" &&
+    typeof e.message === 'string' &&
     /\b(ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH)\b/.test(
       e.message,
     )
@@ -389,13 +379,13 @@ async function sshConnect(
   const config: ConnectConfig = {
     host: vm.host,
     port: opts.port ?? vm.port ?? 22,
-    username: opts.username ?? "user",
+    username: opts.username ?? 'user',
     ...resolveAuth(opts),
   };
 
   await new Promise<void>((resolve, reject) => {
-    ssh.on("ready", resolve);
-    ssh.on("error", reject);
+    ssh.on('ready', resolve);
+    ssh.on('error', reject);
     ssh.connect(config);
   });
 
@@ -415,10 +405,10 @@ export interface SshLike {
 }
 
 export interface SshExecStream {
-  on(event: "data", listener: (data: Buffer) => void): unknown;
-  on(event: "close", listener: (code: number) => void): unknown;
-  on(event: "error", listener: (err: Error) => void): unknown;
-  stderr: { on(event: "data", listener: (data: Buffer) => void): unknown };
+  on(event: 'data', listener: (data: Buffer) => void): unknown;
+  on(event: 'close', listener: (code: number) => void): unknown;
+  on(event: 'error', listener: (err: Error) => void): unknown;
+  stderr: { on(event: 'data', listener: (data: Buffer) => void): unknown };
   close(): void;
 }
 
@@ -441,9 +431,9 @@ export class ExeDevSandboxApi implements SandboxApi {
           if (this.sftpInstance === s) this.sftpInstance = null;
           if (this.sftpPromise) this.sftpPromise = null;
         };
-        s.once("close", drop);
-        s.once("end", drop);
-        s.on("error", drop);
+        s.once('close', drop);
+        s.once('end', drop);
+        s.on('error', drop);
         this.sftpInstance = s;
         resolve(s);
       });
@@ -455,12 +445,12 @@ export class ExeDevSandboxApi implements SandboxApi {
     const sftp = await this.getSftp();
     return new Promise<string>((resolve, reject) => {
       const chunks: Buffer[] = [];
-      const stream = sftp.createReadStream(filePath, { encoding: "utf-8" });
-      stream.on("data", (chunk: Buffer | string) => {
+      const stream = sftp.createReadStream(filePath, { encoding: 'utf-8' });
+      stream.on('data', (chunk: Buffer | string) => {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
       });
-      stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
-      stream.on("error", reject);
+      stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+      stream.on('error', reject);
     });
   }
 
@@ -469,19 +459,19 @@ export class ExeDevSandboxApi implements SandboxApi {
     return new Promise<Uint8Array>((resolve, reject) => {
       const chunks: Buffer[] = [];
       const stream = sftp.createReadStream(filePath);
-      stream.on("data", (chunk: Buffer) => chunks.push(chunk));
-      stream.on("end", () => resolve(new Uint8Array(Buffer.concat(chunks))));
-      stream.on("error", reject);
+      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+      stream.on('end', () => resolve(new Uint8Array(Buffer.concat(chunks))));
+      stream.on('error', reject);
     });
   }
 
   async writeFile(filePath: string, content: string | Uint8Array): Promise<void> {
-    const buf = typeof content === "string" ? Buffer.from(content, "utf-8") : Buffer.from(content);
+    const buf = typeof content === 'string' ? Buffer.from(content, 'utf-8') : Buffer.from(content);
     const sftp = await this.getSftp();
     return new Promise<void>((resolve, reject) => {
       const stream = sftp.createWriteStream(filePath);
-      stream.on("close", () => resolve());
-      stream.on("error", reject);
+      stream.on('close', () => resolve());
+      stream.on('error', reject);
       stream.end(buf);
     });
   }
@@ -533,9 +523,9 @@ export class ExeDevSandboxApi implements SandboxApi {
   }
 
   async rm(filePath: string, options?: { recursive?: boolean; force?: boolean }): Promise<void> {
-    let flags = "";
-    if (options?.recursive) flags += "r";
-    if (options?.force) flags += "f";
+    let flags = '';
+    if (options?.recursive) flags += 'r';
+    if (options?.force) flags += 'f';
     if (flags) {
       await this.exec(`rm -${flags} '${shellEscape(filePath)}'`);
       return;
@@ -558,7 +548,7 @@ export class ExeDevSandboxApi implements SandboxApi {
     if (options?.env && Object.keys(options.env).length > 0) {
       const envPrefix = Object.entries(options.env)
         .map(([k, v]) => `export ${shellEnvAssignment(k, v)}`)
-        .join("; ");
+        .join('; ');
       cmd = `${envPrefix}; ${cmd}`;
     }
     if (options?.cwd) {
@@ -569,8 +559,8 @@ export class ExeDevSandboxApi implements SandboxApi {
       this.ssh.exec(cmd, {}, (err, stream) => {
         if (err) return reject(err);
 
-        let stdout = "";
-        let stderr = "";
+        let stdout = '';
+        let stderr = '';
         let settled = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -592,16 +582,16 @@ export class ExeDevSandboxApi implements SandboxApi {
           }, options.timeout * 1000);
         }
 
-        stream.on("data", (data: Buffer) => {
+        stream.on('data', (data: Buffer) => {
           stdout += data.toString();
         });
-        stream.stderr.on("data", (data: Buffer) => {
+        stream.stderr.on('data', (data: Buffer) => {
           stderr += data.toString();
         });
-        stream.on("close", (code: number) => {
+        stream.on('close', (code: number) => {
           finish({ stdout, stderr, exitCode: code ?? 0 });
         });
-        stream.on("error", (streamErr: Error) => {
+        stream.on('error', (streamErr: Error) => {
           if (settled) return;
           settled = true;
           if (timer) clearTimeout(timer);
@@ -613,16 +603,16 @@ export class ExeDevSandboxApi implements SandboxApi {
 }
 
 export function exedev(vm: ExeDevVm | string, options?: ExeDevConnectorOptions): SandboxFactory {
-  const resolvedVm = typeof vm === "string" ? { host: vm } : vm;
+  const resolvedVm = typeof vm === 'string' ? { host: vm } : vm;
   return {
     async createSessionEnv({ cwd }: { id: string; cwd?: string }): Promise<SessionEnv> {
       const { ssh } = await sshConnect(resolvedVm, options ?? {});
       const api = new ExeDevSandboxApi(ssh);
 
-      let sandboxCwd = cwd ?? "/home/user";
+      let sandboxCwd = cwd ?? '/home/user';
       if (!cwd) {
         try {
-          const { stdout } = await api.exec("echo $HOME");
+          const { stdout } = await api.exec('echo $HOME');
           const detected = stdout.trim();
           if (detected) sandboxCwd = detected;
         } catch {
@@ -634,7 +624,7 @@ export function exedev(vm: ExeDevVm | string, options?: ExeDevConnectorOptions):
     },
   };
 }
-```
+````
 
 ## Required dependencies
 
@@ -714,20 +704,20 @@ no obvious project convention like `EXE_VM_HOST`, ask for the exe.dev VM
 hostname before wiring the connector.
 
 ```ts
-import { createAgent, type FlueContext, type WorkflowRouteHandler } from "@flue/runtime";
-import { exedev } from "../connectors/exedev";
+import { createAgent, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
+import { exedev } from '../connectors/exedev';
 
 export const route: WorkflowRouteHandler = async (_c, next) => next();
 
-export async function run ({ init, env }: FlueContext) {
+export async function run({ init, env }: FlueContext) {
   const agent = createAgent(() => ({
     sandbox: exedev({ host: env.EXE_VM_HOST }),
-    model: "anthropic/claude-sonnet-4-6",
+    model: 'anthropic/claude-sonnet-4-6',
   }));
   const harness = await init(agent);
   const session = await harness.session();
 
-  return await session.shell("uname -a");
+  return await session.shell('uname -a');
 }
 ```
 
@@ -738,23 +728,23 @@ API token with `new` permission. The VM is created before `createAgent(...)` and
 then passed to `exedev(...)`.
 
 ```ts
-import { createAgent, type FlueContext, type WorkflowRouteHandler } from "@flue/runtime";
-import { createExeVm, deleteExeVm, exedev } from "../connectors/exedev";
+import { createAgent, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
+import { createExeVm, deleteExeVm, exedev } from '../connectors/exedev';
 
 export const route: WorkflowRouteHandler = async (_c, next) => next();
 
-export async function run ({ init, env }: FlueContext) {
+export async function run({ init, env }: FlueContext) {
   const vm = await createExeVm({ apiToken: env.EXE_API_TOKEN });
 
   try {
     const agent = createAgent(() => ({
       sandbox: exedev(vm),
-      model: "anthropic/claude-sonnet-4-6",
+      model: 'anthropic/claude-sonnet-4-6',
     }));
     const harness = await init(agent);
     const session = await harness.session();
 
-    return await session.shell("uname -a");
+    return await session.shell('uname -a');
   } finally {
     await deleteExeVm({ apiToken: env.EXE_API_TOKEN, name: vm.name });
   }
@@ -768,26 +758,26 @@ an API token with `cp` permission. If you delete the clone afterwards, the
 token also needs `rm` permission.
 
 ```ts
-import { createAgent, type FlueContext, type WorkflowRouteHandler } from "@flue/runtime";
-import { cloneExeVm, deleteExeVm, exedev } from "../connectors/exedev";
+import { createAgent, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
+import { cloneExeVm, deleteExeVm, exedev } from '../connectors/exedev';
 
 export const route: WorkflowRouteHandler = async (_c, next) => next();
 
-export async function run ({ init, env }: FlueContext) {
+export async function run({ init, env }: FlueContext) {
   const vm = await cloneExeVm({
     apiToken: env.EXE_API_TOKEN,
-    source: "my-dev-vm",
+    source: 'my-dev-vm',
   });
 
   try {
     const agent = createAgent(() => ({
       sandbox: exedev(vm),
-      model: "anthropic/claude-sonnet-4-6",
+      model: 'anthropic/claude-sonnet-4-6',
     }));
     const harness = await init(agent);
     const session = await harness.session();
 
-    return await session.shell("uname -a");
+    return await session.shell('uname -a');
   } finally {
     await deleteExeVm({ apiToken: env.EXE_API_TOKEN, name: vm.name });
   }

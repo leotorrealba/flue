@@ -44,12 +44,15 @@ export async function run({ init, payload }: FlueContext) {
   const harness = await init(translator);
   const session = await harness.session();
 
-  const { data } = await session.prompt(`Translate this to ${payload.language}: "${payload.text}"`, {
-    result: v.object({
-      translation: v.string(),
-      confidence: v.picklist(['low', 'medium', 'high']),
-    }),
-  });
+  const { data } = await session.prompt(
+    `Translate this to ${payload.language}: "${payload.text}"`,
+    {
+      result: v.object({
+        translation: v.string(),
+        confidence: v.picklist(['low', 'medium', 'high']),
+      }),
+    },
+  );
 
   return data;
 }
@@ -73,9 +76,7 @@ Cloudflare requires an explicit migration whenever a Worker adds a Durable Objec
   "name": "my-flue-worker",
   "compatibility_date": "2026-04-01",
   "compatibility_flags": ["nodejs_compat"],
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["FlueRegistry", "TranslateWorkflow"] }
-  ]
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FlueRegistry", "TranslateWorkflow"] }],
 }
 ```
 
@@ -266,13 +267,13 @@ Flue automates one piece: **any DO binding whose `class_name` ends with `Sandbox
   "compatibility_date": "2026-04-01",
   "compatibility_flags": ["nodejs_compat"],
   "durable_objects": {
-    "bindings": [{ "class_name": "Sandbox", "name": "Sandbox" }]
+    "bindings": [{ "class_name": "Sandbox", "name": "Sandbox" }],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["FlueRegistry", "Assistant"] },
-    { "tag": "v2", "new_sqlite_classes": ["Sandbox"] }
+    { "tag": "v2", "new_sqlite_classes": ["Sandbox"] },
   ],
-  "containers": [{ "class_name": "Sandbox", "image": "./Dockerfile" }]
+  "containers": [{ "class_name": "Sandbox", "image": "./Dockerfile" }],
 }
 ```
 
@@ -307,17 +308,17 @@ Different agents can use different container images. Declare a separate binding 
   "durable_objects": {
     "bindings": [
       { "class_name": "PyBoxSandbox", "name": "PyBox" },
-      { "class_name": "NodeSandbox", "name": "NodeBox" }
-    ]
+      { "class_name": "NodeSandbox", "name": "NodeBox" },
+    ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["FlueRegistry", "Assistant"] },
-    { "tag": "v2", "new_sqlite_classes": ["PyBoxSandbox", "NodeSandbox"] }
+    { "tag": "v2", "new_sqlite_classes": ["PyBoxSandbox", "NodeSandbox"] },
   ],
   "containers": [
     { "class_name": "PyBoxSandbox", "image": "./docker/python.Dockerfile" },
-    { "class_name": "NodeSandbox", "image": "./docker/node.Dockerfile" }
-  ]
+    { "class_name": "NodeSandbox", "image": "./docker/node.Dockerfile" },
+  ],
 }
 ```
 
@@ -368,11 +369,11 @@ WebSocket-exposed created agents use the same owning Durable Object scope. Flue'
 
 A deployment or code update can reset a Durable Object while an operation is running. Flue handles interrupted Cloudflare operations according to their execution model:
 
-| Operation | After interruption |
-| --- | --- |
-| Direct attached agent HTTP/WebSocket prompt | Flue makes a best-effort retry of interrupted prompt work from its captured input and the latest saved session state. The attached response or socket stream may fail and missed output is not replayed. No public agent run exists. |
-| Dispatched agent input | Durable delivery and deduplication are keyed by `dispatchId` and persisted session/delivery state, not by a run. |
-| Flue workflow invocation (`202`, SSE, `?wait=result`, or workflow WebSocket) | Flue terminalizes the interrupted run as errored. An attached SSE, synchronous response, or WebSocket may fail. Flue does not automatically start a replacement run. |
+| Operation                                                                    | After interruption                                                                                                                                                                                                                   |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Direct attached agent HTTP/WebSocket prompt                                  | Flue makes a best-effort retry of interrupted prompt work from its captured input and the latest saved session state. The attached response or socket stream may fail and missed output is not replayed. No public agent run exists. |
+| Dispatched agent input                                                       | Durable delivery and deduplication are keyed by `dispatchId` and persisted session/delivery state, not by a run.                                                                                                                     |
+| Flue workflow invocation (`202`, SSE, `?wait=result`, or workflow WebSocket) | Flue terminalizes the interrupted run as errored. An attached SSE, synchronous response, or WebSocket may fail. Flue does not automatically start a replacement run.                                                                 |
 
 Cloudflare direct HTTP and WebSocket prompt execution is wrapped in a Fiber that checkpoints the submitted prompt for best-effort retry. Session transcript persistence is unchanged: interrupted assistant/tool progress not yet saved at the normal idle boundary is regenerated from the latest saved session snapshot. There are narrow interruption windows before prompt checkpointing or after transcript save but before Fiber cleanup where retry can be unavailable or duplicate already-completed work.
 

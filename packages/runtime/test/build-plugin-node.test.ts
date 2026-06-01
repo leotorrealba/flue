@@ -29,8 +29,13 @@ describe('Node build plugin', () => {
 		expect(entry).toContain('const dispatchAgentNames = new Map();');
 		expect(entry).toContain('dispatchAgentNames.set(mod.default, name);');
 		expect(entry).toContain('resolveDispatchAgentName: (agent) => dispatchAgentNames.get(agent),');
-		expect(entry).toContain('const normalized = normalizeBuiltModules(agentModules, workflowModules);');
-		const dispatchQueueBody = entry.slice(entry.indexOf('const dispatchQueue ='), entry.indexOf('function createContextForRequest'));
+		expect(entry).toContain(
+			'const normalized = normalizeBuiltModules(agentModules, workflowModules);',
+		);
+		const dispatchQueueBody = entry.slice(
+			entry.indexOf('const dispatchQueue ='),
+			entry.indexOf('function createContextForRequest'),
+		);
 		expect(dispatchQueueBody).not.toContain('runStore');
 		expect(dispatchQueueBody).not.toContain('runSubscribers');
 		expect(dispatchQueueBody).not.toContain('runRegistry');
@@ -47,7 +52,9 @@ describe('Node build plugin', () => {
 
 		const { child, port } = await startGeneratedServer(root);
 		try {
-			const response = await fetch(`http://localhost:${port}/workflows/smoke?wait=result`, { method: 'POST' });
+			const response = await fetch(`http://localhost:${port}/workflows/smoke?wait=result`, {
+				method: 'POST',
+			});
 			expect(response.status).toBe(200);
 			expect(await response.json()).toMatchObject({ result: { ok: true } });
 		} finally {
@@ -59,7 +66,10 @@ describe('Node build plugin', () => {
 		const root = createFixtureRoot('flue-vite-node-markdown-');
 		fs.mkdirSync(path.join(root, 'workflows'));
 		fs.mkdirSync(path.join(root, 'instructions'));
-		fs.writeFileSync(path.join(root, 'instructions', 'proposal.md'), '# Proposal\n\nWrite carefully.\n');
+		fs.writeFileSync(
+			path.join(root, 'instructions', 'proposal.md'),
+			'# Proposal\n\nWrite carefully.\n',
+		);
 		fs.writeFileSync(
 			path.join(root, 'workflows', 'inspect.ts'),
 			`import instructions from '../instructions/proposal.md' with { type: 'markdown' };\nexport const route = async (_c, next) => next();\nexport async function run() { return { instructions }; }\n`,
@@ -68,9 +78,13 @@ describe('Node build plugin', () => {
 
 		const { child, port } = await startGeneratedServer(root);
 		try {
-			const response = await fetch(`http://localhost:${port}/workflows/inspect?wait=result`, { method: 'POST' });
+			const response = await fetch(`http://localhost:${port}/workflows/inspect?wait=result`, {
+				method: 'POST',
+			});
 			expect(response.status).toBe(200);
-			expect(await response.json()).toMatchObject({ result: { instructions: '# Proposal\n\nWrite carefully.\n' } });
+			expect(await response.json()).toMatchObject({
+				result: { instructions: '# Proposal\n\nWrite carefully.\n' },
+			});
 		} finally {
 			child.kill('SIGTERM');
 		}
@@ -85,7 +99,10 @@ describe('Node build plugin', () => {
 			`---\nname: review\ndescription: Reviews requested work.\nlicense: LICENSE.txt\n---\nReview the request.\n`,
 		);
 		fs.writeFileSync(path.join(root, 'skills', 'review', 'LICENSE.txt'), 'License terms.\n');
-		fs.writeFileSync(path.join(root, 'skills', 'review', 'references', 'checklist.md'), 'Check the result.\n');
+		fs.writeFileSync(
+			path.join(root, 'skills', 'review', 'references', 'checklist.md'),
+			'Check the result.\n',
+		);
 		fs.writeFileSync(
 			path.join(root, 'workflows', 'inspect.ts'),
 			`import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport const route = async (_c, next) => next();\nexport async function run() { return { reference: review, hasBody: 'body' in review, hasFiles: 'files' in review }; }\n`,
@@ -94,11 +111,17 @@ describe('Node build plugin', () => {
 
 		const { child, port } = await startGeneratedServer(root);
 		try {
-			const response = await fetch(`http://localhost:${port}/workflows/inspect?wait=result`, { method: 'POST' });
+			const response = await fetch(`http://localhost:${port}/workflows/inspect?wait=result`, {
+				method: 'POST',
+			});
 			expect(response.status).toBe(200);
 			expect(await response.json()).toMatchObject({
 				result: {
-					reference: { __flueSkillReference: true, name: 'review', description: 'Reviews requested work.' },
+					reference: {
+						__flueSkillReference: true,
+						name: 'review',
+						description: 'Reviews requested work.',
+					},
 					hasBody: false,
 					hasFiles: false,
 				},
@@ -152,7 +175,9 @@ describe('Node build plugin', () => {
 
 		const { child, port } = await startGeneratedServer(root);
 		try {
-			const rejected = await fetch(`http://localhost:${port}/workflows/protected-job?wait=result`, { method: 'POST' });
+			const rejected = await fetch(`http://localhost:${port}/workflows/protected-job?wait=result`, {
+				method: 'POST',
+			});
 			expect(rejected.status).toBe(401);
 			const allowed = await fetch(`http://localhost:${port}/workflows/protected-job?wait=result`, {
 				method: 'POST',
@@ -179,7 +204,9 @@ describe('Node build plugin', () => {
 
 		const { child, port } = await startGeneratedServer(root);
 		try {
-			const response = await fetch(`http://localhost:${port}/agents/assistant/instance-1`, { method: 'POST' });
+			const response = await fetch(`http://localhost:${port}/agents/assistant/instance-1`, {
+				method: 'POST',
+			});
 			expect(response.status).toBe(403);
 			expect(await response.text()).toBe('Blocked');
 		} finally {
@@ -207,7 +234,9 @@ describe('Node build plugin', () => {
 
 		const { child, port } = await startGeneratedServer(root);
 		try {
-			const response = await fetch(`http://localhost:${port}/workflows/notify?wait=result`, { method: 'POST' });
+			const response = await fetch(`http://localhost:${port}/workflows/notify?wait=result`, {
+				method: 'POST',
+			});
 			expect(response.status).toBe(200);
 			expect(await response.json()).toMatchObject({ result: { accepted: true } });
 		} finally {
@@ -240,7 +269,10 @@ describe('Node build plugin', () => {
 		try {
 			const response = await fetch(`http://localhost:${port}/enqueue`, { method: 'POST' });
 			expect(response.status).toBe(200);
-			expect(await response.json()).toMatchObject({ dispatchId: expect.any(String), acceptedAt: expect.any(String) });
+			expect(await response.json()).toMatchObject({
+				dispatchId: expect.any(String),
+				acceptedAt: expect.any(String),
+			});
 		} finally {
 			child.kill('SIGTERM');
 		}
@@ -249,7 +281,10 @@ describe('Node build plugin', () => {
 	it('preserves authored app fetch receivers and forwards Node bindings', async () => {
 		const root = createFixtureRoot('flue-custom-fetch-app-');
 		fs.mkdirSync(path.join(root, 'workflows'));
-		fs.writeFileSync(path.join(root, 'workflows', 'unused.ts'), `export async function run() { return null; }\n`);
+		fs.writeFileSync(
+			path.join(root, 'workflows', 'unused.ts'),
+			`export async function run() { return null; }\n`,
+		);
 		fs.writeFileSync(
 			path.join(root, 'app.ts'),
 			`const app = {\n` +
@@ -266,7 +301,11 @@ describe('Node build plugin', () => {
 		try {
 			const response = await fetch(`http://localhost:${port}/`);
 			expect(response.status).toBe(200);
-			expect(await response.json()).toEqual({ prefix: 'bound', hasIncoming: true, hasOutgoing: true });
+			expect(await response.json()).toEqual({
+				prefix: 'bound',
+				hasIncoming: true,
+				hasOutgoing: true,
+			});
 		} finally {
 			child.kill('SIGTERM');
 		}
@@ -291,9 +330,15 @@ describe('Node build plugin', () => {
 			const socket = new WebSocket(`ws://localhost:${port}/workflows/socket-job?token=ok`);
 			const messages = collectMessages(socket);
 			await waitForOpen(socket);
-			socket.send(JSON.stringify({ version: 1, type: 'invoke', requestId: 'req-1', payload: { ok: true } }));
+			socket.send(
+				JSON.stringify({ version: 1, type: 'invoke', requestId: 'req-1', payload: { ok: true } }),
+			);
 			const result = await waitForMessage(messages, (message) => message.type === 'result');
-			expect(result).toMatchObject({ type: 'result', requestId: 'req-1', result: { echoed: { ok: true } } });
+			expect(result).toMatchObject({
+				type: 'result',
+				requestId: 'req-1',
+				result: { echoed: { ok: true } },
+			});
 			await waitForClose(socket);
 		} finally {
 			child.kill('SIGTERM');
@@ -317,12 +362,20 @@ describe('Node build plugin', () => {
 			const socket = new WebSocket(`ws://localhost:${port}/workflows/socket-job`);
 			const messages = collectMessages(socket);
 			await waitForOpen(socket);
-			socket.send(JSON.stringify({ version: 1, type: 'invoke', requestId: 'req-1', payload: { ok: true } }));
+			socket.send(
+				JSON.stringify({ version: 1, type: 'invoke', requestId: 'req-1', payload: { ok: true } }),
+			);
 			const result = await waitForMessage(messages, (message) => message.type === 'result');
-			expect(result).toMatchObject({ type: 'result', requestId: 'req-1', result: { echoed: { ok: true } } });
+			expect(result).toMatchObject({
+				type: 'result',
+				requestId: 'req-1',
+				result: { echoed: { ok: true } },
+			});
 			expect(messages.some((message) => message.type === 'ready')).toBe(true);
 			expect(messages.some((message) => message.type === 'started')).toBe(true);
-			expect(messages.some((message) => message.type === 'event' && message.event.type === 'run_start')).toBe(true);
+			expect(
+				messages.some((message) => message.type === 'event' && message.event.type === 'run_start'),
+			).toBe(true);
 			await waitForClose(socket);
 		} finally {
 			child.kill('SIGTERM');
@@ -362,13 +415,20 @@ describe('Node build plugin', () => {
 
 		const { child, port } = await startGeneratedServer(root);
 		try {
-			const http = await fetch(`http://localhost:${port}/agents/assistant/instance-1`, { method: 'POST' });
+			const http = await fetch(`http://localhost:${port}/agents/assistant/instance-1`, {
+				method: 'POST',
+			});
 			expect(http.status).toBe(404);
 			const socket = new WebSocket(`ws://localhost:${port}/agents/assistant/instance-1`);
 			const messages = collectMessages(socket);
 			await waitForOpen(socket);
 			const ready = await waitForMessage(messages, (message) => message.type === 'ready');
-			expect(ready).toMatchObject({ type: 'ready', target: 'agent', name: 'assistant', instanceId: 'instance-1' });
+			expect(ready).toMatchObject({
+				type: 'ready',
+				target: 'agent',
+				name: 'assistant',
+				instanceId: 'instance-1',
+			});
 			socket.send(JSON.stringify({ version: 1, type: 'ping', requestId: 'ping-1' }));
 			const pong = await waitForMessage(messages, (message) => message.type === 'pong');
 			expect(pong).toMatchObject({ type: 'pong', requestId: 'ping-1' });
@@ -402,7 +462,9 @@ describe('Node build plugin', () => {
 		try {
 			const rejected = new WebSocket(`ws://localhost:${port}/api/agents/assistant/instance-1`);
 			expect(await waitForSocketFailure(rejected)).toBe(true);
-			const socket = new WebSocket(`ws://localhost:${port}/api/agents/assistant/instance-1?token=ok`);
+			const socket = new WebSocket(
+				`ws://localhost:${port}/api/agents/assistant/instance-1?token=ok`,
+			);
 			const messages = collectMessages(socket);
 			await waitForOpen(socket);
 			const ready = await waitForMessage(messages, (message) => message.type === 'ready');
@@ -416,10 +478,18 @@ describe('Node build plugin', () => {
 	it('rejects duplicate agent basenames', async () => {
 		const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flue-duplicate-agents-'));
 		fs.mkdirSync(path.join(root, 'agents'));
-		fs.writeFileSync(path.join(root, 'agents', 'assistant.ts'), 'export default createAgent(() => ({ model: false }));\n');
-		fs.writeFileSync(path.join(root, 'agents', 'assistant.js'), 'export default createAgent(() => ({ model: false }));\n');
+		fs.writeFileSync(
+			path.join(root, 'agents', 'assistant.ts'),
+			'export default createAgent(() => ({ model: false }));\n',
+		);
+		fs.writeFileSync(
+			path.join(root, 'agents', 'assistant.js'),
+			'export default createAgent(() => ({ model: false }));\n',
+		);
 
-		await expect(build({ root, sourceRoot: root, target: 'node' })).rejects.toThrow('Duplicate agent basename "assistant"');
+		await expect(build({ root, sourceRoot: root, target: 'node' })).rejects.toThrow(
+			'Duplicate agent basename "assistant"',
+		);
 	});
 
 	it('invokes an internal-only workflow over local IPC without public HTTP exposure', async () => {
@@ -431,20 +501,29 @@ describe('Node build plugin', () => {
 		);
 		await build({ root, sourceRoot: root, target: 'node' });
 
-		const child = startGeneratedIpcChild(root, { FLUE_CLI_TARGET: 'workflow', FLUE_CLI_NAME: 'private-job' });
+		const child = startGeneratedIpcChild(root, {
+			FLUE_CLI_TARGET: 'workflow',
+			FLUE_CLI_NAME: 'private-job',
+		});
 		try {
 			const ready = await waitForChildMessage(child, (message) => message.type === 'ready');
 			expect(ready).toMatchObject({ type: 'ready', target: 'workflow', name: 'private-job' });
 			child.send?.({ version: 1, type: 'invoke', requestId: 'req-ipc', payload: { ok: true } });
 			const result = await waitForChildMessage(child, (message) => message.type === 'result');
-			expect(result).toMatchObject({ type: 'result', requestId: 'req-ipc', result: { payload: { ok: true }, url: 'http://flue.local/_cli' } });
+			expect(result).toMatchObject({
+				type: 'result',
+				requestId: 'req-ipc',
+				result: { payload: { ok: true }, url: 'http://flue.local/_cli' },
+			});
 		} finally {
 			if (child.exitCode === null) child.kill('SIGTERM');
 		}
 
 		const { child: server, port } = await startGeneratedServer(root);
 		try {
-			const response = await fetch(`http://localhost:${port}/workflows/private-job`, { method: 'POST' });
+			const response = await fetch(`http://localhost:${port}/workflows/private-job`, {
+				method: 'POST',
+			});
 			expect(response.status).toBe(404);
 		} finally {
 			server.kill('SIGTERM');
@@ -460,7 +539,10 @@ describe('Node build plugin', () => {
 		);
 		await build({ root, sourceRoot: root, target: 'node' });
 
-		const child = startGeneratedIpcChild(root, { FLUE_CLI_TARGET: 'workflow', FLUE_CLI_NAME: 'protected-job' });
+		const child = startGeneratedIpcChild(root, {
+			FLUE_CLI_TARGET: 'workflow',
+			FLUE_CLI_NAME: 'protected-job',
+		});
 		try {
 			await waitForChildMessage(child, (message) => message.type === 'ready');
 			child.send?.({ version: 1, type: 'invoke', requestId: 'req-protected' });
@@ -472,7 +554,9 @@ describe('Node build plugin', () => {
 
 		const { child: server, port } = await startGeneratedServer(root);
 		try {
-			const response = await fetch(`http://localhost:${port}/workflows/protected-job?wait=result`, { method: 'POST' });
+			const response = await fetch(`http://localhost:${port}/workflows/protected-job?wait=result`, {
+				method: 'POST',
+			});
 			expect(response.status).toBe(403);
 		} finally {
 			server.kill('SIGTERM');
@@ -488,13 +572,35 @@ describe('Node build plugin', () => {
 		);
 		await build({ root, sourceRoot: root, target: 'node' });
 
-		const child = startGeneratedIpcChild(root, { FLUE_CLI_TARGET: 'agent', FLUE_CLI_NAME: 'assistant', FLUE_CLI_ID: 'thread-1' });
+		const child = startGeneratedIpcChild(root, {
+			FLUE_CLI_TARGET: 'agent',
+			FLUE_CLI_NAME: 'assistant',
+			FLUE_CLI_ID: 'thread-1',
+		});
 		try {
 			const ready = await waitForChildMessage(child, (message) => message.type === 'ready');
-			expect(ready).toMatchObject({ type: 'ready', target: 'agent', name: 'assistant', instanceId: 'thread-1' });
-			child.send?.({ version: 1, type: 'prompt', requestId: 'req-agent', message: 'hello', session: 'support' });
-			const error = await waitForChildMessage(child, (message) => message.type === 'error' && message.requestId === 'req-agent');
-			expect(error).toMatchObject({ type: 'error', requestId: 'req-agent', error: { type: 'internal_error' } });
+			expect(ready).toMatchObject({
+				type: 'ready',
+				target: 'agent',
+				name: 'assistant',
+				instanceId: 'thread-1',
+			});
+			child.send?.({
+				version: 1,
+				type: 'prompt',
+				requestId: 'req-agent',
+				message: 'hello',
+				session: 'support',
+			});
+			const error = await waitForChildMessage(
+				child,
+				(message) => message.type === 'error' && message.requestId === 'req-agent',
+			);
+			expect(error).toMatchObject({
+				type: 'error',
+				requestId: 'req-agent',
+				error: { type: 'internal_error' },
+			});
 			child.send?.({ version: 1, type: 'ping', requestId: 'req-after-error' });
 			const pong = await waitForChildMessage(child, (message) => message.type === 'pong');
 			expect(pong).toMatchObject({ type: 'pong', requestId: 'req-after-error' });
@@ -506,12 +612,20 @@ describe('Node build plugin', () => {
 	it('fails local CLI mode without an inherited IPC connection', async () => {
 		const root = createFixtureRoot('flue-local-ipc-missing-connection-');
 		fs.mkdirSync(path.join(root, 'workflows'));
-		fs.writeFileSync(path.join(root, 'workflows', 'job.ts'), `export async function run() { return true; }\n`);
+		fs.writeFileSync(
+			path.join(root, 'workflows', 'job.ts'),
+			`export async function run() { return true; }\n`,
+		);
 		await build({ root, sourceRoot: root, target: 'node' });
 		const child = spawn('node', [path.join(root, 'dist', 'server.mjs')], {
 			cwd: root,
 			stdio: ['ignore', 'pipe', 'pipe'],
-			env: { ...process.env, FLUE_MODE: 'local', FLUE_CLI_TARGET: 'workflow', FLUE_CLI_NAME: 'job' },
+			env: {
+				...process.env,
+				FLUE_MODE: 'local',
+				FLUE_CLI_TARGET: 'workflow',
+				FLUE_CLI_NAME: 'job',
+			},
 		});
 		const output = await waitForProcessExit(child);
 		expect(output).toContain('Local CLI execution requires an inherited IPC connection');
@@ -530,7 +644,9 @@ describe('Node build plugin', () => {
 
 		const { child, port } = await startGeneratedServer(root);
 		try {
-			const response = await fetch(`http://localhost:${port}/workflows/draft?wait=result`, { method: 'POST' });
+			const response = await fetch(`http://localhost:${port}/workflows/draft?wait=result`, {
+				method: 'POST',
+			});
 			expect(response.status).toBe(200);
 			expect(await response.json()).toMatchObject({ result: { ok: true } });
 		} finally {
@@ -545,8 +661,14 @@ describe('Node build plugin', () => {
 			path.join(root, 'shared.ts'),
 			`import { createAgent } from '@flue/runtime';\nexport default createAgent(() => ({ model: false }));\n`,
 		);
-		fs.writeFileSync(path.join(root, 'agents', 'first.ts'), `export { default } from '../shared.ts';\n`);
-		fs.writeFileSync(path.join(root, 'agents', 'second.ts'), `export { default } from '../shared.ts';\n`);
+		fs.writeFileSync(
+			path.join(root, 'agents', 'first.ts'),
+			`export { default } from '../shared.ts';\n`,
+		);
+		fs.writeFileSync(
+			path.join(root, 'agents', 'second.ts'),
+			`export { default } from '../shared.ts';\n`,
+		);
 		await build({ root, sourceRoot: root, target: 'node' });
 
 		const port = await findAvailablePort();
@@ -579,7 +701,10 @@ function startGeneratedIpcChild(root: string, env: Record<string, string>): Chil
 	});
 }
 
-async function waitForChildMessage(child: ChildProcess, predicate: (message: Record<string, any>) => boolean): Promise<Record<string, any>> {
+async function waitForChildMessage(
+	child: ChildProcess,
+	predicate: (message: Record<string, any>) => boolean,
+): Promise<Record<string, any>> {
 	return new Promise((resolve, reject) => {
 		const timeout = setTimeout(() => {
 			child.off('message', onMessage);
@@ -620,13 +745,17 @@ async function waitForOpen(socket: WebSocket): Promise<void> {
 	if (socket.readyState === WebSocket.OPEN) return;
 	await new Promise<void>((resolve, reject) => {
 		socket.addEventListener('open', () => resolve(), { once: true });
-		socket.addEventListener('error', () => reject(new Error('WebSocket failed before opening.')), { once: true });
+		socket.addEventListener('error', () => reject(new Error('WebSocket failed before opening.')), {
+			once: true,
+		});
 	});
 }
 
 async function waitForClose(socket: WebSocket): Promise<void> {
 	if (socket.readyState === WebSocket.CLOSED) return;
-	await new Promise<void>((resolve) => socket.addEventListener('close', () => resolve(), { once: true }));
+	await new Promise<void>((resolve) =>
+		socket.addEventListener('close', () => resolve(), { once: true }),
+	);
 }
 
 async function waitForSocketFailure(socket: WebSocket): Promise<boolean> {

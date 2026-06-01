@@ -29,7 +29,9 @@ export class InMemoryRunStore implements RunStore {
 
 	async createRun(input: CreateRunInput): Promise<void> {
 		if (input.owner.instanceId !== input.runId) {
-			throw new Error('[flue] Workflow run owners must use the same instanceId as the run record runId.');
+			throw new Error(
+				'[flue] Workflow run owners must use the same instanceId as the run record runId.',
+			);
 		}
 		const instance = this.getInstance(ownerKey(input.owner));
 		instance.runs.set(input.runId, {
@@ -72,7 +74,11 @@ export class InMemoryRunStore implements RunStore {
 		if (!run) return [];
 		const events = this.getInstance(ownerKey(run.owner)).events.get(runId) ?? [];
 		return events
-			.filter((event) => fromIndex === undefined || (typeof event.eventIndex === 'number' && event.eventIndex >= fromIndex))
+			.filter(
+				(event) =>
+					fromIndex === undefined ||
+					(typeof event.eventIndex === 'number' && event.eventIndex >= fromIndex),
+			)
 			.map((event) => JSON.parse(event.payload) as FlueEvent);
 	}
 

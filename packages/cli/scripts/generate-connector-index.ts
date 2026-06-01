@@ -32,7 +32,7 @@
  *   - malformed `aliases` (not an array, contains non-strings or empty strings)
  *   - any name (slug or alias) resolving to two different connectors
  */
-import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

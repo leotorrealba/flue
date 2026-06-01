@@ -14,12 +14,12 @@ pnpm exec flue add smolvm
 
 ## Requirements
 
-| Requirement | Value |
-| --- | --- |
-| Provider package | `smolvm-embedded` |
+| Requirement          | Value                                                    |
+| -------------------- | -------------------------------------------------------- |
+| Provider package     | `smolvm-embedded`                                        |
 | Supported host shape | macOS or Linux host with suitable virtualization support |
-| Credential | None required by smolvm itself |
-| Unsupported runtime | Edge/Worker runtimes without local hypervisor execution |
+| Credential           | None required by smolvm itself                           |
+| Unsupported runtime  | Edge/Worker runtimes without local hypervisor execution  |
 
 ## Choose this connector when
 

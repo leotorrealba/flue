@@ -14,12 +14,12 @@ pnpm exec flue add vercel
 
 ## Requirements
 
-| Requirement | Value |
-| --- | --- |
-| Provider package | `@vercel/sandbox` |
-| Authentication | `VERCEL_OIDC_TOKEN` or the authentication flow appropriate to your Vercel environment |
-| Integration shape | Application creates a sandbox, then passes it through the generated connector |
-| Lifecycle ownership | Your application decides retention and cleanup |
+| Requirement         | Value                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| Provider package    | `@vercel/sandbox`                                                                     |
+| Authentication      | `VERCEL_OIDC_TOKEN` or the authentication flow appropriate to your Vercel environment |
+| Integration shape   | Application creates a sandbox, then passes it through the generated connector         |
+| Lifecycle ownership | Your application decides retention and cleanup                                        |
 
 ## Typical use
 

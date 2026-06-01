@@ -14,12 +14,12 @@ pnpm exec flue add islo
 
 ## Requirements
 
-| Requirement | Value |
-| --- | --- |
-| Target | Node.js or another host with Node child-process capability |
-| Runtime dependency | The `islo` binary installed on `PATH` |
-| Credential | Existing CLI authentication or `ISLO_API_KEY` for server/CI operation |
-| Sandbox identity | A named islo sandbox created and managed by your application or deployment setup |
+| Requirement        | Value                                                                            |
+| ------------------ | -------------------------------------------------------------------------------- |
+| Target             | Node.js or another host with Node child-process capability                       |
+| Runtime dependency | The `islo` binary installed on `PATH`                                            |
+| Credential         | Existing CLI authentication or `ISLO_API_KEY` for server/CI operation            |
+| Sandbox identity   | A named islo sandbox created and managed by your application or deployment setup |
 
 ## Choose this connector when
 

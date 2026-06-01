@@ -36,7 +36,9 @@ class DurableRunStore implements RunStore {
 
 	async createRun(input: CreateRunInput): Promise<void> {
 		if (input.owner.instanceId !== input.runId) {
-			throw new Error('[flue] Workflow run owners must use the same instanceId as the run record runId.');
+			throw new Error(
+				'[flue] Workflow run owners must use the same instanceId as the run record runId.',
+			);
 		}
 		this.sql.exec(
 			`INSERT OR REPLACE INTO flue_runs
@@ -90,11 +92,15 @@ class DurableRunStore implements RunStore {
 				...(fromIndex === undefined ? [runId] : [runId, fromIndex]),
 			)
 			.toArray();
-		return rows.flatMap((row) => (typeof row.payload === 'string' ? [JSON.parse(row.payload)] : []));
+		return rows.flatMap((row) =>
+			typeof row.payload === 'string' ? [JSON.parse(row.payload)] : [],
+		);
 	}
 
 	async getRun(runId: string): Promise<RunRecord | null> {
-		const rows = this.sql.exec("SELECT * FROM flue_runs WHERE run_id = ? AND owner_kind = 'workflow'", runId).toArray();
+		const rows = this.sql
+			.exec("SELECT * FROM flue_runs WHERE run_id = ? AND owner_kind = 'workflow'", runId)
+			.toArray();
 		const row = rows[0];
 		if (!row) return null;
 		return rowToRunRecord(row);
@@ -154,7 +160,9 @@ function ensureRunTables(sql: SqlStorage): void {
 	sql.exec(
 		'CREATE INDEX IF NOT EXISTS flue_runs_workflow_started_idx ON flue_runs (owner_kind, workflow_name, started_at DESC)',
 	);
-	sql.exec('CREATE INDEX IF NOT EXISTS flue_run_events_run_idx ON flue_run_events (run_id, event_index ASC)');
+	sql.exec(
+		'CREATE INDEX IF NOT EXISTS flue_run_events_run_idx ON flue_run_events (run_id, event_index ASC)',
+	);
 }
 
 function ensureColumn(sql: SqlStorage, table: string, column: string, definition: string): void {
@@ -183,10 +191,13 @@ function rowToRunRecord(row: SqlRow): RunRecord {
 		status: row.status as RunRecord['status'],
 		startedAt: String(row.started_at),
 		payload,
-		restartedFromRunId: typeof row.restarted_from_run_id === 'string' ? row.restarted_from_run_id : undefined,
-		restartedAsRunId: typeof row.restarted_as_run_id === 'string' ? row.restarted_as_run_id : undefined,
+		restartedFromRunId:
+			typeof row.restarted_from_run_id === 'string' ? row.restarted_from_run_id : undefined,
+		restartedAsRunId:
+			typeof row.restarted_as_run_id === 'string' ? row.restarted_as_run_id : undefined,
 		endedAt: typeof row.ended_at === 'string' ? row.ended_at : undefined,
-		isError: row.is_error === null || row.is_error === undefined ? undefined : Boolean(row.is_error),
+		isError:
+			row.is_error === null || row.is_error === undefined ? undefined : Boolean(row.is_error),
 		durationMs: typeof row.duration_ms === 'number' ? row.duration_ms : undefined,
 		result,
 		error,

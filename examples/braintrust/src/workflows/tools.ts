@@ -1,4 +1,10 @@
-import { Type, createAgent, defineTool, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
+import {
+	createAgent,
+	defineTool,
+	type FlueContext,
+	Type,
+	type WorkflowRouteHandler,
+} from '@flue/runtime';
 
 export const route: WorkflowRouteHandler = async (_c, next) => next();
 
@@ -15,6 +21,9 @@ export async function run({ init, payload }: FlueContext) {
 	const harness = await init(agent);
 	const session = await harness.session();
 	const city = typeof payload.city === 'string' ? payload.city : 'San Francisco';
-	const response = await session.prompt(`Use the weather tool to report current weather in ${city}.`, { tools: [lookup] });
+	const response = await session.prompt(
+		`Use the weather tool to report current weather in ${city}.`,
+		{ tools: [lookup] },
+	);
 	return { message: response.text };
 }

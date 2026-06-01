@@ -50,7 +50,9 @@ export function getCloudflareContext(): CloudflareContext {
 export function getDurableObjectIdentity(): FlueDurableObjectIdentity {
 	const ctx = getCloudflareContext();
 	if (!ctx.durableObjectIdentity) {
-		throw new Error('[flue:cloudflare] Durable Object identity is not available in this Cloudflare context.');
+		throw new Error(
+			'[flue:cloudflare] Durable Object identity is not available in this Cloudflare context.',
+		);
 	}
 	return ctx.durableObjectIdentity;
 }

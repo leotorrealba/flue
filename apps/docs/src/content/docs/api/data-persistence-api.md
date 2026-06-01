@@ -10,11 +10,7 @@ For deciding what must survive deployment, see [Agents](/docs/guide/building-age
 ## Imports
 
 ```ts
-import {
-  createAgent,
-  type SessionData,
-  type SessionStore,
-} from '@flue/runtime';
+import { createAgent, type SessionData, type SessionStore } from '@flue/runtime';
 ```
 
 ## `SessionStore`
@@ -27,11 +23,11 @@ interface SessionStore {
 }
 ```
 
-| Method | Contract |
-| --- | --- |
+| Method           | Contract                                                                         |
+| ---------------- | -------------------------------------------------------------------------------- |
 | `save(id, data)` | Persist the complete current session record under the supplied Flue storage key. |
-| `load(id)` | Return previously saved session data, or `null` when no stored session exists. |
-| `delete(id)` | Delete the stored session state for that key. |
+| `load(id)`       | Return previously saved session data, or `null` when no stored session exists.   |
+| `delete(id)`     | Delete the stored session state for that key.                                    |
 
 Choose a store with consistency, retention, access control, and tenant-isolation properties appropriate to the conversation content your application retains.
 
@@ -72,30 +68,30 @@ change.
 
 `entries` contains the stored session history tree:
 
-| Entry kind | Contains |
-| --- | --- |
-| `message` | Recorded user, assistant, and tool-shaped messages, including dispatch metadata where applicable. |
-| `compaction` | Summaries and token accounting used to shorten active model context. |
-| `branch_summary` | Summary records for retained branch information. |
+| Entry kind       | Contains                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------- |
+| `message`        | Recorded user, assistant, and tool-shaped messages, including dispatch metadata where applicable. |
+| `compaction`     | Summaries and token accounting used to shorten active model context.                              |
+| `branch_summary` | Summary records for retained branch information.                                                  |
 
 Treat `SessionData` as potentially sensitive. It can include model-visible text, tool output, dispatch input snapshots, and summaries derived from earlier content.
 
 ## Target defaults
 
-| Runtime path | Default conversation-state behavior |
-| --- | --- |
-| Generated Node.js application with no `persist` override | Uses process-memory storage; state is lost on restart and is not shared between replicas. |
+| Runtime path                                                                              | Default conversation-state behavior                                                                         |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Generated Node.js application with no `persist` override                                  | Uses process-memory storage; state is lost on restart and is not shared between replicas.                   |
 | Generated Cloudflare Durable Object-backed agent/workflow path with no `persist` override | Uses Durable Object SQLite-backed session storage by default when the durable storage context is available. |
-| Created agent returning `persist` | Uses the supplied `SessionStore` instead of the target default for its sessions. |
+| Created agent returning `persist`                                                         | Uses the supplied `SessionStore` instead of the target default for its sessions.                            |
 
 ## Separate persistence responsibilities
 
-| State category | Controlled by |
-| --- | --- |
-| Agent session messages and compaction state | `SessionStore` / `persist` or the target default |
-| Sandbox files, installed dependencies, and workspace artifacts | The configured sandbox or connector |
-| Workflow run records and persisted run events | Workflow-run runtime storage, not `SessionStore` alone |
-| Mutations performed through tools or external APIs | The external system and application idempotency policy |
+| State category                                                 | Controlled by                                          |
+| -------------------------------------------------------------- | ------------------------------------------------------ |
+| Agent session messages and compaction state                    | `SessionStore` / `persist` or the target default       |
+| Sandbox files, installed dependencies, and workspace artifacts | The configured sandbox or connector                    |
+| Workflow run records and persisted run events                  | Workflow-run runtime storage, not `SessionStore` alone |
+| Mutations performed through tools or external APIs             | The external system and application idempotency policy |
 
 A persisted conversation does not make sandbox files durable. A durable workspace does not retain conversation history unless session persistence does as well.
 

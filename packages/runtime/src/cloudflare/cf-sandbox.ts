@@ -1,7 +1,7 @@
 /** Wraps a @cloudflare/sandbox instance (from getSandbox()) into SessionEnv. */
 import { abortErrorFor } from '../abort.ts';
-import { createSandboxSessionEnv } from '../sandbox.ts';
 import type { SandboxApi } from '../sandbox.ts';
+import { createSandboxSessionEnv } from '../sandbox.ts';
 import type { SessionEnv } from '../types.ts';
 
 export async function cfSandboxToSessionEnv(
@@ -104,8 +104,7 @@ export async function cfSandboxToSessionEnv(
 			const externalSignal = execOpts?.signal;
 			if (externalSignal?.aborted) throw abortErrorFor(externalSignal);
 
-			const timeoutMs =
-				typeof execOpts?.timeout === 'number' ? execOpts.timeout * 1000 : undefined;
+			const timeoutMs = typeof execOpts?.timeout === 'number' ? execOpts.timeout * 1000 : undefined;
 			const result = await sandbox.exec(command, {
 				cwd: execOpts?.cwd,
 				env: execOpts?.env,

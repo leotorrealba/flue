@@ -1,6 +1,11 @@
 /** Run-history HTTP endpoints shared by the Node and Cloudflare targets. */
 
-import { InvalidRequestError, RunNotFoundError, RunStoreUnavailableError, toPublicError } from '../errors.ts';
+import {
+	InvalidRequestError,
+	RunNotFoundError,
+	RunStoreUnavailableError,
+	toPublicError,
+} from '../errors.ts';
 import type { FlueEvent } from '../types.ts';
 import type { RunOwner } from './run-registry.ts';
 import type { RunRecord, RunStore } from './run-store.ts';
@@ -103,7 +108,11 @@ interface ReplayThenTailOptions {
 	fromIndex: number | undefined;
 }
 
-export function streamActiveRunEvents(store: RunStore, subscribers: RunSubscriberRegistry, runId: string): Response {
+export function streamActiveRunEvents(
+	store: RunStore,
+	subscribers: RunSubscriberRegistry,
+	runId: string,
+): Response {
 	return streamReplayThenTail({ store, subscribers, runId, fromIndex: undefined });
 }
 
@@ -207,9 +216,7 @@ function streamReplayThenTail(opts: ReplayThenTailOptions): Response {
 				} catch (error) {
 					if (closed) return;
 					try {
-						controller.enqueue(
-							encoder.encode(encodeSseError(error, lastSentIndex)),
-						);
+						controller.enqueue(encoder.encode(encodeSseError(error, lastSentIndex)));
 					} catch {
 						// stream already gone.
 					}

@@ -7,11 +7,11 @@ workflows use the project-owned `src/connectors/cloudflare-shell.ts` implementat
 
 ## Agents
 
-| Agent                          | Demonstrates                                                                       |
-| ------------------------------ | ---------------------------------------------------------------------------------- |
-| `with-cloudflare-binding.ts`   | Routing model traffic through the Workers AI binding (no API keys).               |
-| `skills-from-r2.ts`            | Hydrating a cf-shell `Workspace` from an R2 bucket and using a discovered skill.  |
-| `skills-from-git.ts`           | Hydrating a cf-shell `Workspace` from a git repo via `createGit`.                 |
+| Agent                        | Demonstrates                                                                     |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| `with-cloudflare-binding.ts` | Routing model traffic through the Workers AI binding (no API keys).              |
+| `skills-from-r2.ts`          | Hydrating a cf-shell `Workspace` from an R2 bucket and using a discovered skill. |
+| `skills-from-git.ts`         | Hydrating a cf-shell `Workspace` from a git repo via `createGit`.                |
 
 ## Setup
 

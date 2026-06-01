@@ -31,8 +31,6 @@ export async function run({ init }: FlueContext) {
 		},
 	);
 
-	console.log(
-		`[compaction-test] Result: ${data.article} — ${data.keyPoints.length} key points`,
-	);
+	console.log(`[compaction-test] Result: ${data.article} — ${data.keyPoints.length} key points`);
 	return data;
 }

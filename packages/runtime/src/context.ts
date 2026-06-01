@@ -82,7 +82,9 @@ function mergeSkillCatalog(
 	}
 	for (const [name, skill] of Object.entries(discoveredSkills)) {
 		if (Object.hasOwn(merged, name)) {
-			throw new Error(`[flue] Skill name "${name}" appears in both agent definition and workspace discovery.`);
+			throw new Error(
+				`[flue] Skill name "${name}" appears in both agent definition and workspace discovery.`,
+			);
 		}
 		merged[name] = skill;
 	}

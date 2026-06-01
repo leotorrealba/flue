@@ -14,11 +14,11 @@ pnpm exec flue add e2b
 
 ## Requirements
 
-| Requirement | Value |
-| --- | --- |
-| Provider package | `e2b` |
-| Credential | `E2B_API_KEY` |
-| Environment | Provider-managed Linux sandbox |
+| Requirement         | Value                                                      |
+| ------------------- | ---------------------------------------------------------- |
+| Provider package    | `e2b`                                                      |
+| Credential          | `E2B_API_KEY`                                              |
+| Environment         | Provider-managed Linux sandbox                             |
 | Lifecycle ownership | Your application creates and closes or retains the sandbox |
 
 ## Integration shape

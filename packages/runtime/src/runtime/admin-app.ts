@@ -72,11 +72,17 @@ function adminOpenApiOptions() {
 	};
 }
 
-function lazyOpenApiRouteHandler(app: Hono, getOptions: () => ReturnType<typeof adminOpenApiOptions>): MiddlewareHandler {
+function lazyOpenApiRouteHandler(
+	app: Hono,
+	getOptions: () => ReturnType<typeof adminOpenApiOptions>,
+): MiddlewareHandler {
 	return (c, next) => openAPIRouteHandler(app, getOptions())(c, next);
 }
 
-function validated(target: 'param' | 'query', schema: Parameters<typeof validator>[1]): MiddlewareHandler {
+function validated(
+	target: 'param' | 'query',
+	schema: Parameters<typeof validator>[1],
+): MiddlewareHandler {
 	return validator(target, schema, (result) => {
 		if (result.success) return;
 		throw new ValidationError({
@@ -213,7 +219,5 @@ function parseListQuery(request: Request): { cursor?: string; limit?: number } {
 
 function statusFromRequest(request: Request): RunStatus | undefined {
 	const status = new URL(request.url).searchParams.get('status');
-	return status === 'active' || status === 'completed' || status === 'errored'
-		? status
-		: undefined;
+	return status === 'active' || status === 'completed' || status === 'errored' ? status : undefined;
 }

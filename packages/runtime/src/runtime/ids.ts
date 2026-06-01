@@ -11,7 +11,9 @@ function generateRunNonce(): string {
 
 export function generateWorkflowRunId(workflowName: string): string {
 	if (!workflowName || workflowName.includes(':')) {
-		throw new Error('[flue] Workflow names used in run ids must be non-empty and must not contain ":".');
+		throw new Error(
+			'[flue] Workflow names used in run ids must be non-empty and must not contain ":".',
+		);
 	}
 	return `workflow:${workflowName}:${generateRunNonce()}`;
 }

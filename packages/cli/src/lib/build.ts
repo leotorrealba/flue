@@ -1,19 +1,13 @@
-import { cloudflare } from '@cloudflare/vite-plugin';
 import * as fs from 'node:fs';
 import { builtinModules, createRequire } from 'node:module';
 import * as path from 'node:path';
+import { cloudflare } from '@cloudflare/vite-plugin';
 import { packageUpSync } from 'package-up';
 import { CloudflarePlugin } from './build-plugin-cloudflare.ts';
 import { NodePlugin } from './build-plugin-node.ts';
+import type { AgentInfo, BuildContext, BuildOptions, BuildPlugin, WorkflowInfo } from './types.ts';
 import { markdownImportPlugin } from './vite-markdown-import-plugin.ts';
 import { skillReferencePlugin } from './vite-skill-reference-plugin.ts';
-import type {
-	AgentInfo,
-	BuildContext,
-	BuildOptions,
-	BuildPlugin,
-	WorkflowInfo,
-} from './types.ts';
 
 /**
  * Result returned by {@link build}. `changed` indicates whether any file in
@@ -74,9 +68,7 @@ async function buildApplication(options: BuildOptions): Promise<BuildResult> {
 	}
 
 	if (agents.length > 0) {
-		console.log(
-			`[flue] Found ${agents.length} agent(s): ${agents.map((a) => a.name).join(', ')}`,
-		);
+		console.log(`[flue] Found ${agents.length} agent(s): ${agents.map((a) => a.name).join(', ')}`);
 	}
 	if (workflows.length > 0) {
 		console.log(
@@ -124,7 +116,12 @@ async function buildApplication(options: BuildOptions): Promise<BuildResult> {
 					sourcemap: true,
 					target: 'node22',
 					rolldownOptions: {
-						external: [...pluginExternal, ...userExternals, ...builtinModules, ...builtinModules.map((name) => `node:${name}`)],
+						external: [
+							...pluginExternal,
+							...userExternals,
+							...builtinModules,
+							...builtinModules.map((name) => `node:${name}`),
+						],
 						output: { entryFileNames: 'server.mjs', format: 'es' },
 					},
 				},
@@ -140,16 +137,22 @@ async function buildApplication(options: BuildOptions): Promise<BuildResult> {
 		}
 	} else if (bundleStrategy === 'vite-cloudflare') {
 		if (!plugin.entryFilename || !plugin.additionalOutputs) {
-			throw new Error(`[flue] Plugin "${plugin.name}" set bundle: 'vite-cloudflare' but did not provide its generated entry and configuration outputs.`);
+			throw new Error(
+				`[flue] Plugin "${plugin.name}" set bundle: 'vite-cloudflare' but did not provide its generated entry and configuration outputs.`,
+			);
 		}
 		const inputDir = cloudflareViteInputDir(root);
 		const entryPath = path.join(inputDir, plugin.entryFilename);
-		let generatedChanged = !fs.existsSync(entryPath) || fs.readFileSync(entryPath, 'utf-8') !== serverCode;
+		let generatedChanged =
+			!fs.existsSync(entryPath) || fs.readFileSync(entryPath, 'utf-8') !== serverCode;
 		fs.mkdirSync(inputDir, { recursive: true });
 		if (generatedChanged) fs.writeFileSync(entryPath, serverCode, 'utf-8');
 		const inputs = await plugin.additionalOutputs(ctx);
 		for (const [filename, content] of Object.entries(inputs)) {
-			const filePath = filename === 'wrangler.jsonc' ? cloudflareViteConfigPath(root) : path.join(inputDir, filename);
+			const filePath =
+				filename === 'wrangler.jsonc'
+					? cloudflareViteConfigPath(root)
+					: path.join(inputDir, filename);
 			const changed = !fs.existsSync(filePath) || fs.readFileSync(filePath, 'utf-8') !== content;
 			fs.mkdirSync(path.dirname(filePath), { recursive: true });
 			if (changed) fs.writeFileSync(filePath, content, 'utf-8');
@@ -179,8 +182,7 @@ async function buildApplication(options: BuildOptions): Promise<BuildResult> {
 			fs.mkdirSync(path.dirname(filePath), { recursive: true });
 			// Avoid touching generated files if content is unchanged so development
 			// watchers do not see spurious mtime updates and reload for no reason.
-			const changed =
-				!fs.existsSync(filePath) || fs.readFileSync(filePath, 'utf-8') !== content;
+			const changed = !fs.existsSync(filePath) || fs.readFileSync(filePath, 'utf-8') !== content;
 			if (changed) {
 				fs.writeFileSync(filePath, content, 'utf-8');
 				console.log(`[flue] Generated: ${filePath}`);
@@ -193,7 +195,10 @@ async function buildApplication(options: BuildOptions): Promise<BuildResult> {
 	return { changed: anyChanged };
 }
 
-async function withTemporaryProcessEnv<T>(env: Record<string, string>, fn: () => Promise<T>): Promise<T> {
+async function withTemporaryProcessEnv<T>(
+	env: Record<string, string>,
+	fn: () => Promise<T>,
+): Promise<T> {
 	const previous = new Map<string, string | undefined>();
 	for (const [key, value] of Object.entries(env)) {
 		previous.set(key, process.env[key]);
@@ -352,22 +357,37 @@ export function createCloudflareViteConfig(
 	const sharedConfig = createSharedViteConfig(root, bootstrapEntries);
 	return {
 		...sharedConfig,
-		plugins: [...sharedConfig.plugins, ...cloudflare({ configPath, persistState: options.persistState ?? true, inspectorPort: false })],
+		plugins: [
+			...sharedConfig.plugins,
+			...cloudflare({
+				configPath,
+				persistState: options.persistState ?? true,
+				inspectorPort: false,
+			}),
+		],
 	};
 }
 
 function viteGeneratedEntryDependencyResolver(root: string) {
-	const resolvers = [...collectNodePaths(root)].map((nodePath) => createRequire(path.join(nodePath, '__flue_vite_resolve__.cjs')));
+	const resolvers = [...collectNodePaths(root)].map((nodePath) =>
+		createRequire(path.join(nodePath, '__flue_vite_resolve__.cjs')),
+	);
 	return {
 		name: 'flue-generated-entry-dependency-resolver',
 		enforce: 'pre' as const,
 		resolveId(source: string) {
-			if (source.startsWith('.') || source.startsWith('/') || source.startsWith('\0') || source.startsWith('virtual:') || source.startsWith('node:')) return null;
+			if (
+				source.startsWith('.') ||
+				source.startsWith('/') ||
+				source.startsWith('\0') ||
+				source.startsWith('virtual:') ||
+				source.startsWith('node:')
+			)
+				return null;
 			for (const resolve of resolvers) {
 				try {
 					return resolve.resolve(source);
-				} catch {
-				}
+				} catch {}
 			}
 			return null;
 		},

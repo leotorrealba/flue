@@ -26,12 +26,12 @@
  * and the migration / fallback options if you don't have Loader access.
  */
 import { createAgent, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
+import * as v from 'valibot';
 import {
 	getDefaultWorkspace,
 	getShellSandbox,
 	hydrateFromBucket,
 } from '../connectors/cloudflare-shell';
-import * as v from 'valibot';
 
 export const route: WorkflowRouteHandler = async (_c, next) => next();
 

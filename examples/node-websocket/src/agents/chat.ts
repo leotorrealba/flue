@@ -1,4 +1,4 @@
-import { createAgent, type AgentWebSocketHandler } from '@flue/runtime';
+import { type AgentWebSocketHandler, createAgent } from '@flue/runtime';
 
 export const websocket: AgentWebSocketHandler = async (_c, next) => next();
 

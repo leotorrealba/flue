@@ -19,7 +19,9 @@ export class InMemoryRunRegistry implements RunRegistry {
 	async recordRunStart(input: RecordRunStartInput): Promise<void> {
 		if (this.pointers.has(input.runId)) return;
 		if (input.owner.instanceId !== input.runId) {
-			throw new Error('[flue] Workflow run owners must use the same instanceId as the pointer runId.');
+			throw new Error(
+				'[flue] Workflow run owners must use the same instanceId as the pointer runId.',
+			);
 		}
 		this.pointers.set(input.runId, {
 			runId: input.runId,

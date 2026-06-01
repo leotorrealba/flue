@@ -66,24 +66,24 @@ Throws when the profile contains unknown fields, invalid capabilities, duplicate
 
 #### `AgentProfile`
 
-| Field           | Type                        | Description                                                                    |
-| --------------- | --------------------------- | ------------------------------------------------------------------------------ |
-| `name`          | `string`                    | Profile name. Required when selecting this profile with `session.task()`.      |
-| `model`         | `string \| false`           | Default model specifier. Set to `false` to require call-level model selection. |
-| `instructions`  | `string`                    | Instructions prepended to discovered workspace context.                        |
-| `skills`        | `Skill[]`                   | Registered skills available to initialized sessions.                           |
-| `tools`         | `ToolDefinition[]`          | Custom model-callable tools available to initialized sessions.                 |
-| `subagents`     | `AgentProfile[]`            | Named profiles available for delegated `session.task()` operations.            |
-| `thinkingLevel` | `ThinkingLevel`             | Default reasoning effort. Individual operations may override this value.       |
+| Field           | Type                        | Description                                                                                                                                                                 |
+| --------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`          | `string`                    | Profile name. Required when selecting this profile with `session.task()`.                                                                                                   |
+| `model`         | `string \| false`           | Default model specifier. Set to `false` to require call-level model selection.                                                                                              |
+| `instructions`  | `string`                    | Instructions prepended to discovered workspace context.                                                                                                                     |
+| `skills`        | `Skill[]`                   | Registered skills available to initialized sessions.                                                                                                                        |
+| `tools`         | `ToolDefinition[]`          | Custom model-callable tools available to initialized sessions.                                                                                                              |
+| `subagents`     | `AgentProfile[]`            | Named profiles available for delegated `session.task()` operations.                                                                                                         |
+| `thinkingLevel` | `ThinkingLevel`             | Default reasoning effort. Individual operations may override this value.                                                                                                    |
 | `compaction`    | `false \| CompactionConfig` | Automatic conversation-compaction configuration. `false` disables threshold compaction; overflow recovery and explicit `session.compact()` calls still compact when needed. |
 
 #### `CompactionConfig`
 
-| Field              | Type     | Default                                  | Description                                             |
-| ------------------ | -------- | ---------------------------------------- | ------------------------------------------------------- |
-| `reserveTokens`    | `number` | model-aware; capped at `20000`                | Token headroom reserved before automatic compaction. Smaller model output limits and small context windows reduce this default. |
-| `keepRecentTokens` | `number` | `8000`                                   | Recent tokens preserved unsummarized after compaction.  |
-| `model`            | `string` | session model                            | Model specifier override used for compaction summaries. |
+| Field              | Type     | Default                        | Description                                                                                                                     |
+| ------------------ | -------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `reserveTokens`    | `number` | model-aware; capped at `20000` | Token headroom reserved before automatic compaction. Smaller model output limits and small context windows reduce this default. |
+| `keepRecentTokens` | `number` | `8000`                         | Recent tokens preserved unsummarized after compaction.                                                                          |
+| `model`            | `string` | session model                  | Model specifier override used for compaction summaries.                                                                         |
 
 #### `Skill`
 
@@ -192,19 +192,19 @@ The initializer runs whenever the runtime initializes a harness from the created
 
 #### `AgentRuntimeConfig`
 
-| Field           | Type                                     | Description                                                                                                         |
-| --------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `profile`       | `AgentProfile`                           | Reusable baseline profile. Created-agent fields replace or extend profile values.                                   |
-| `model`         | `string \| false`                        | Default model specifier. Set to `false` to require call-level model selection.                                      |
-| `instructions`  | `string`                                 | Instructions prepended to discovered workspace context.                                                             |
-| `skills`        | `Skill[]`                                | Additional registered skills available to initialized sessions.                                                     |
-| `tools`         | `ToolDefinition[]`                       | Additional custom model-callable tools available to initialized sessions.                                           |
-| `subagents`     | `AgentProfile[]`                         | Additional named profiles available for delegated `session.task()` operations.                                      |
-| `thinkingLevel` | `ThinkingLevel`                          | Default reasoning effort. Individual operations may override this value.                                            |
+| Field           | Type                                     | Description                                                                                                                                                                 |
+| --------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `profile`       | `AgentProfile`                           | Reusable baseline profile. Created-agent fields replace or extend profile values.                                                                                           |
+| `model`         | `string \| false`                        | Default model specifier. Set to `false` to require call-level model selection.                                                                                              |
+| `instructions`  | `string`                                 | Instructions prepended to discovered workspace context.                                                                                                                     |
+| `skills`        | `Skill[]`                                | Additional registered skills available to initialized sessions.                                                                                                             |
+| `tools`         | `ToolDefinition[]`                       | Additional custom model-callable tools available to initialized sessions.                                                                                                   |
+| `subagents`     | `AgentProfile[]`                         | Additional named profiles available for delegated `session.task()` operations.                                                                                              |
+| `thinkingLevel` | `ThinkingLevel`                          | Default reasoning effort. Individual operations may override this value.                                                                                                    |
 | `compaction`    | `false \| CompactionConfig`              | Automatic conversation-compaction configuration. `false` disables threshold compaction; overflow recovery and explicit `session.compact()` calls still compact when needed. |
-| `cwd`           | `string`                                 | Working directory inside the initialized sandbox.                                                                   |
-| `sandbox`       | `false \| SandboxFactory \| BashFactory` | Sandbox factory used to construct the initialized environment. See [Sandboxes](/docs/guide/sandboxes/).             |
-| `persist`       | `SessionStore`                           | Conversation-state store used by initialized sessions. See [Data Persistence API](/docs/api/data-persistence-api/). |
+| `cwd`           | `string`                                 | Working directory inside the initialized sandbox.                                                                                                                           |
+| `sandbox`       | `false \| SandboxFactory \| BashFactory` | Sandbox factory used to construct the initialized environment. See [Sandboxes](/docs/guide/sandboxes/).                                                                     |
+| `persist`       | `SessionStore`                           | Conversation-state store used by initialized sessions. See [Data Persistence API](/docs/api/data-persistence-api/).                                                         |
 
 #### `CreatedAgent`
 

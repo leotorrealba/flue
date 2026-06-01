@@ -46,14 +46,14 @@ workflow:tools
 
 The bridge uses:
 
-| Flue events | Braintrust representation |
-| --- | --- |
-| `run_start` / `run_end` | root `task` span |
-| `operation_start` / `operation` | nested `task` span |
-| `turn_request` / `turn` | nested `llm` span |
-| `tool_start` / `tool_call` | nested `tool` span |
-| `task_start` / `task` | nested `task` span |
-| `compaction_start` / `compaction` | nested `task` span |
+| Flue events                       | Braintrust representation |
+| --------------------------------- | ------------------------- |
+| `run_start` / `run_end`           | root `task` span          |
+| `operation_start` / `operation`   | nested `task` span        |
+| `turn_request` / `turn`           | nested `llm` span         |
+| `tool_start` / `tool_call`        | nested `tool` span        |
+| `task_start` / `task`             | nested `task` span        |
+| `compaction_start` / `compaction` | nested `task` span        |
 
 Workflows are the only Flue executions represented as runs. For direct or dispatched persistent-agent input, `operationId` is the finite trace boundary and `instanceId`, `session`, and optional `dispatchId` should be retained as attributes.
 

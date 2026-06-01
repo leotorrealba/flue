@@ -16,12 +16,12 @@ The repository includes a runnable integration shape in `examples/hello-world/.f
 
 ## Requirements
 
-| Requirement | Value |
-| --- | --- |
-| Provider package | `@daytona/sdk` |
-| Credential | `DAYTONA_API_KEY` |
-| Integration shape | Your code creates a Daytona sandbox, then passes it through `daytona(sandbox)` |
-| Lifecycle ownership | Your application owns creation, retention, and deletion |
+| Requirement         | Value                                                                          |
+| ------------------- | ------------------------------------------------------------------------------ |
+| Provider package    | `@daytona/sdk`                                                                 |
+| Credential          | `DAYTONA_API_KEY`                                                              |
+| Integration shape   | Your code creates a Daytona sandbox, then passes it through `daytona(sandbox)` |
+| Lifecycle ownership | Your application owns creation, retention, and deletion                        |
 
 ## Typical use
 

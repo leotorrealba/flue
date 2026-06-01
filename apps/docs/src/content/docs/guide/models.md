@@ -12,11 +12,11 @@ This guide covers model selection and provider setup. For configuring addressabl
 
 A model specifier is the unique string Flue uses to refer to a specific model across providers. It combines a provider ID, such as `anthropic`, `cloudflare`, `openai`, or `openrouter`, with a model ID recognized by that provider:
 
-| Model specifier | Provider ID | Model ID |
-| --- | --- | --- |
-| `anthropic/claude-sonnet-4-6` | `anthropic` | `claude-sonnet-4-6` |
-| `openai/gpt-5.5` | `openai` | `gpt-5.5` |
-| `openrouter/moonshotai/kimi-k2.6` | `openrouter` | `moonshotai/kimi-k2.6` |
+| Model specifier                       | Provider ID  | Model ID                   |
+| ------------------------------------- | ------------ | -------------------------- |
+| `anthropic/claude-sonnet-4-6`         | `anthropic`  | `claude-sonnet-4-6`        |
+| `openai/gpt-5.5`                      | `openai`     | `gpt-5.5`                  |
+| `openrouter/moonshotai/kimi-k2.6`     | `openrouter` | `moonshotai/kimi-k2.6`     |
 | `cloudflare/@cf/moonshotai/kimi-k2.6` | `cloudflare` | `@cf/moonshotai/kimi-k2.6` |
 
 Use a model specifier to choose an agent's default model:
@@ -35,14 +35,14 @@ Model specifiers can also be supplied by reusable profiles and subagents, or use
 
 Reasoning effort controls how much additional reasoning Flue requests from a model. Set it with `thinkingLevel`, using one of the supported levels:
 
-| Value | Intent |
-| --- | --- |
-| `'off'` | Do not request additional reasoning. |
-| `'minimal'` | Request the smallest reasoning effort. |
-| `'low'` | Favor lower reasoning cost or latency. |
-| `'medium'` | Balance reasoning effort and cost. This is Flue's default. |
-| `'high'` | Favor more careful reasoning. |
-| `'xhigh'` | Request the highest exposed effort tier. |
+| Value       | Intent                                                     |
+| ----------- | ---------------------------------------------------------- |
+| `'off'`     | Do not request additional reasoning.                       |
+| `'minimal'` | Request the smallest reasoning effort.                     |
+| `'low'`     | Favor lower reasoning cost or latency.                     |
+| `'medium'`  | Balance reasoning effort and cost. This is Flue's default. |
+| `'high'`    | Favor more careful reasoning.                              |
+| `'xhigh'`   | Request the highest exposed effort tier.                   |
 
 Set the ordinary reasoning effort for an agent alongside its model:
 
@@ -67,10 +67,10 @@ A provider is the service through which Flue reaches a model. A model may be ava
 
 Most hosted providers require credentials before they will accept model requests. Flue uses the provider integrations from [Pi](https://pi.dev/docs/latest/providers), including their standard environment-variable conventions. For built-in providers, making the expected credential available to your running application is normally all that is required:
 
-| Provider ID | Environment variable |
-| --- | --- |
-| `anthropic` | `ANTHROPIC_API_KEY` |
-| `openai` | `OPENAI_API_KEY` |
+| Provider ID  | Environment variable |
+| ------------ | -------------------- |
+| `anthropic`  | `ANTHROPIC_API_KEY`  |
+| `openai`     | `OPENAI_API_KEY`     |
 | `openrouter` | `OPENROUTER_API_KEY` |
 
 Keep credential values out of agent modules and committed configuration files. `flue build`, `flue dev`, `flue run`, and `flue connect` load project-root `.env` before configuration, with `--env` available to select one alternate file. During Cloudflare development, Worker runtime variables continue to use `.env` or `.dev.vars` through Workers tooling. See [Configuration](/docs/reference/configuration/) for details.
@@ -169,8 +169,8 @@ Declare an `AI` binding in your project's Wrangler configuration:
 {
   "$schema": "https://workers.cloudflare.com/schema/wrangler.json",
   "ai": {
-    "binding": "AI"
-  }
+    "binding": "AI",
+  },
 }
 ```
 

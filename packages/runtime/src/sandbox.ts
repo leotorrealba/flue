@@ -1,16 +1,11 @@
 /**
  * Sandbox adapters: wraps BashFactory or SandboxApi into SessionEnv.
  */
-import type {
-	BashFactory,
-	BashLike,
-	FileStat,
-	FlueFs,
-	SessionEnv,
-	ShellResult,
-} from './types.ts';
+
 import { abortErrorFor } from './abort.ts';
 import { normalizePath } from './session.ts';
+import type { BashFactory, BashLike, FileStat, FlueFs, SessionEnv, ShellResult } from './types.ts';
+
 export type { SessionEnv } from './types.ts';
 
 /** Adapt a SessionEnv to the public FlueFs surface. */
@@ -80,9 +75,7 @@ function createBashSessionEnv(bash: BashLike): SessionEnv {
 			// bash factories observe deadlines with the same fidelity as
 			// signal-aware sandbox connectors.
 			const timeoutSignal =
-				typeof opts?.timeout === 'number'
-					? AbortSignal.timeout(opts.timeout * 1000)
-					: undefined;
+				typeof opts?.timeout === 'number' ? AbortSignal.timeout(opts.timeout * 1000) : undefined;
 			const mergedSignal =
 				opts?.signal && timeoutSignal
 					? AbortSignal.any([opts.signal, timeoutSignal])

@@ -14,12 +14,12 @@ pnpm exec flue add exedev
 
 ## Requirements
 
-| Requirement | Value |
-| --- | --- |
-| Target | Node.js |
-| Package | `ssh2` |
-| Remote resource | An existing exe.dev VM reachable by SSH |
-| Authentication | SSH configuration; optional provider API credentials when your application manages VM lifecycle |
+| Requirement     | Value                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| Target          | Node.js                                                                                         |
+| Package         | `ssh2`                                                                                          |
+| Remote resource | An existing exe.dev VM reachable by SSH                                                         |
+| Authentication  | SSH configuration; optional provider API credentials when your application manages VM lifecycle |
 
 ## Choose this connector when
 

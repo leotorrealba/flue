@@ -1,8 +1,12 @@
 /** Internal session implementation. Not exported publicly — wrapped by FlueSession. */
 
-import type { AgentMessage, AgentTool, AgentToolResult, StreamFn } from '@earendil-works/pi-agent-core';
+import type {
+	AgentMessage,
+	AgentTool,
+	AgentToolResult,
+	StreamFn,
+} from '@earendil-works/pi-agent-core';
 import { Agent } from '@earendil-works/pi-agent-core';
-import { streamSimple } from '@earendil-works/pi-ai';
 import type {
 	AssistantMessage,
 	ImageContent,
@@ -11,6 +15,7 @@ import type {
 	ToolResultMessage,
 	UserMessage,
 } from '@earendil-works/pi-ai';
+import { streamSimple } from '@earendil-works/pi-ai';
 import type * as v from 'valibot';
 import { abortErrorFor, createCallHandle } from './abort.ts';
 import {
@@ -42,10 +47,10 @@ import {
 	type ResultToolBundle,
 	ResultUnavailableError,
 } from './result.ts';
+import type { DispatchInput } from './runtime/dispatch-queue.ts';
 import { generateOperationId, generateTurnId } from './runtime/ids.ts';
 import { getProviderConfiguration, getRegisteredApiKey } from './runtime/providers.ts';
 import { createFlueFs } from './sandbox.ts';
-
 import type {
 	AgentConfig,
 	AgentProfile,
@@ -58,6 +63,7 @@ import type {
 	FlueFs,
 	FlueSession,
 	MessageEntry,
+	PackagedSkillDirectory,
 	PromptModel,
 	PromptOptions,
 	PromptResponse,
@@ -70,27 +76,30 @@ import type {
 	SessionToolFactory,
 	ShellOptions,
 	ShellResult,
-	PackagedSkillDirectory,
-	SkillReference,
 	SkillOptions,
+	SkillReference,
 	TaskOptions,
 	ThinkingLevel,
 	ToolDefinition,
 } from './types.ts';
-import type { DispatchInput } from './runtime/dispatch-queue.ts';
 import { addUsage, emptyUsage, fromProviderUsage } from './usage.ts';
 
 const MAX_TASK_DEPTH = 4;
 
 type TurnInputMessage = Extract<FlueEvent, { type: 'turn_request' }>['input']['messages'][number];
-type TurnInputTool = NonNullable<Extract<FlueEvent, { type: 'turn_request' }>['input']['tools']>[number];
+type TurnInputTool = NonNullable<
+	Extract<FlueEvent, { type: 'turn_request' }>['input']['tools']
+>[number];
 type TurnOutput = NonNullable<Extract<FlueEvent, { type: 'turn' }>['output']>;
 type ProviderTextOrImageContent = Exclude<UserMessage['content'], string>[number];
 type ProviderContentBlock =
 	| ProviderTextOrImageContent
 	| AssistantMessage['content'][number]
 	| ToolResultMessage['content'][number];
-type TurnUserContent = Exclude<Extract<TurnInputMessage, { role: 'user' }>['content'], string>[number];
+type TurnUserContent = Exclude<
+	Extract<TurnInputMessage, { role: 'user' }>['content'],
+	string
+>[number];
 type TurnAssistantContent = Extract<TurnInputMessage, { role: 'assistant' }>['content'][number];
 type TurnToolResultContent = Extract<TurnInputMessage, { role: 'toolResult' }>['content'][number];
 type TurnContent = TurnUserContent | TurnAssistantContent | TurnToolResultContent;
@@ -99,9 +108,10 @@ function toTurnMessage(message: Message): TurnInputMessage {
 	if (message.role === 'user') {
 		return {
 			role: 'user',
-			content: typeof message.content === 'string'
-				? message.content
-				: (message.content.map(toTurnContent) as TurnUserContent[]),
+			content:
+				typeof message.content === 'string'
+					? message.content
+					: (message.content.map(toTurnContent) as TurnUserContent[]),
 		};
 	}
 	if (message.role === 'assistant') {
@@ -276,7 +286,9 @@ export class SessionHistory {
 	static fromData(data: SessionData | null): SessionHistory {
 		if (!data) return SessionHistory.empty();
 		if (data.version !== 4) {
-			throw new Error(`[flue] Session data version ${String(data.version)} is unsupported. Clear persisted session state created by an earlier Flue beta.`);
+			throw new Error(
+				`[flue] Session data version ${String(data.version)} is unsupported. Clear persisted session state created by an earlier Flue beta.`,
+			);
 		}
 		return new SessionHistory(data.entries, data.leafId);
 	}
@@ -327,7 +339,10 @@ export class SessionHistory {
 		const firstKeptIndex = path.findIndex((entry) => entry.id === compaction.firstKeptEntryId);
 		const keptStart = firstKeptIndex >= 0 ? firstKeptIndex : latestCompactionIndex + 1;
 		const context: ContextEntry[] = [
-			{ message: createContextSummaryMessage(compaction.summary, compaction.timestamp), entry: compaction },
+			{
+				message: createContextSummaryMessage(compaction.summary, compaction.timestamp),
+				entry: compaction,
+			},
 		];
 		context.push(...pathToContextEntries(path.slice(keptStart, latestCompactionIndex)));
 		context.push(...pathToContextEntries(path.slice(latestCompactionIndex + 1)));
@@ -367,16 +382,20 @@ export class SessionHistory {
 
 	findDispatchInput(dispatchId: string): MessageEntry | undefined {
 		return this.getActivePath().find(
-			(entry): entry is MessageEntry => entry.type === 'message' && entry.dispatch?.dispatchId === dispatchId,
+			(entry): entry is MessageEntry =>
+				entry.type === 'message' && entry.dispatch?.dispatchId === dispatchId,
 		);
 	}
 
-	appendMessages(messages: AgentMessage[], source?: MessageSource, dispatch?: DispatchMessageMetadata): string[] {
+	appendMessages(
+		messages: AgentMessage[],
+		source?: MessageSource,
+		dispatch?: DispatchMessageMetadata,
+	): string[] {
 		let dispatchAttached = false;
 		return messages.map((message) => {
-			const messageDispatch = dispatch && !dispatchAttached && message.role === 'user'
-				? dispatch
-				: undefined;
+			const messageDispatch =
+				dispatch && !dispatchAttached && message.role === 'user' ? dispatch : undefined;
 			if (messageDispatch) dispatchAttached = true;
 			return this.appendMessage(message, source, messageDispatch);
 		});
@@ -449,7 +468,10 @@ function pathToContextEntries(path: SessionEntry[]): ContextEntry[] {
 		if (entry.type === 'message') {
 			context.push({ message: entry.message, entry });
 		} else if (entry.type === 'branch_summary') {
-			context.push({ message: createUserContextMessage(`[Branch Summary]\n\n${entry.summary}`, entry.timestamp), entry });
+			context.push({
+				message: createUserContextMessage(`[Branch Summary]\n\n${entry.summary}`, entry.timestamp),
+				entry,
+			});
 		}
 	}
 	return context;
@@ -463,7 +485,9 @@ function findLatestCompactionIndex(path: SessionEntry[]): number {
 }
 
 function createContextSummaryMessage(summary: string, timestamp: string): AgentMessage {
-	const text = summary.startsWith('[Context Summary]') ? summary : `[Context Summary]\n\n${summary}`;
+	const text = summary.startsWith('[Context Summary]')
+		? summary
+		: `[Context Summary]\n\n${summary}`;
 	return createUserContextMessage(text, timestamp);
 }
 
@@ -564,7 +588,11 @@ export class Session implements FlueSession {
 		turnId: string,
 		purpose: 'agent' | 'compaction' | 'compaction_prefix',
 		model: Model<any>,
-		context: { systemPrompt?: string; messages: Message[]; tools?: Array<{ name: string; description: string; parameters: unknown }> },
+		context: {
+			systemPrompt?: string;
+			messages: Message[];
+			tools?: Array<{ name: string; description: string; parameters: unknown }>;
+		},
 		reasoning: string | undefined,
 	): void {
 		const tools = context.tools?.map(
@@ -611,10 +639,7 @@ export class Session implements FlueSession {
 		const systemPrompt = this.config.systemPrompt;
 
 		const builtinTools = this.createBuiltinTools(this.env, []);
-		const tools = [
-			...builtinTools,
-			...this.createCustomTools(this.agentTools, builtinTools),
-		];
+		const tools = [...builtinTools, ...this.createCustomTools(this.agentTools, builtinTools)];
 
 		const previousMessages = this.history.buildContext();
 
@@ -648,7 +673,11 @@ export class Session implements FlueSession {
 					this.emit({ type: 'message_start', message: event.message });
 					break;
 				case 'message_update': {
-					this.emit({ type: 'message_update', message: event.message, assistantMessageEvent: event.assistantMessageEvent });
+					this.emit({
+						type: 'message_update',
+						message: event.message,
+						assistantMessageEvent: event.assistantMessageEvent,
+					});
 					const aEvent = event.assistantMessageEvent;
 					if (aEvent.type === 'text_delta') {
 						this.emit({ type: 'text_delta', text: aEvent.delta });
@@ -666,14 +695,36 @@ export class Session implements FlueSession {
 					break;
 				case 'tool_execution_start':
 					this.toolStartTimes.set(event.toolCallId, Date.now());
-					this.emit({ type: 'tool_execution_start', toolName: event.toolName, toolCallId: event.toolCallId, args: event.args });
-					this.emit({ type: 'tool_start', toolName: event.toolName, toolCallId: event.toolCallId, args: event.args });
+					this.emit({
+						type: 'tool_execution_start',
+						toolName: event.toolName,
+						toolCallId: event.toolCallId,
+						args: event.args,
+					});
+					this.emit({
+						type: 'tool_start',
+						toolName: event.toolName,
+						toolCallId: event.toolCallId,
+						args: event.args,
+					});
 					break;
 				case 'tool_execution_update':
-					this.emit({ type: 'tool_execution_update', toolName: event.toolName, toolCallId: event.toolCallId, args: event.args, partialResult: event.partialResult });
+					this.emit({
+						type: 'tool_execution_update',
+						toolName: event.toolName,
+						toolCallId: event.toolCallId,
+						args: event.args,
+						partialResult: event.partialResult,
+					});
 					break;
 				case 'tool_execution_end':
-					this.emit({ type: 'tool_execution_end', toolName: event.toolName, toolCallId: event.toolCallId, result: event.result, isError: event.isError });
+					this.emit({
+						type: 'tool_execution_end',
+						toolName: event.toolName,
+						toolCallId: event.toolCallId,
+						result: event.result,
+						isError: event.isError,
+					});
 					this.emit({
 						type: 'tool_call',
 						toolName: event.toolName,
@@ -686,9 +737,16 @@ export class Session implements FlueSession {
 					break;
 				case 'turn_end': {
 					const turnId = this.activeTurnId ?? generateTurnId();
-					this.emit({ type: 'turn_end', turnId, purpose: 'agent', message: event.message, toolResults: event.toolResults });
+					this.emit({
+						type: 'turn_end',
+						turnId,
+						purpose: 'agent',
+						message: event.message,
+						toolResults: event.toolResults,
+					});
 					const message = event.message;
-					const assistant = message.role === 'assistant' ? (message as AssistantMessage) : undefined;
+					const assistant =
+						message.role === 'assistant' ? (message as AssistantMessage) : undefined;
 					const output = assistant ? (toTurnMessage(assistant) as TurnOutput) : undefined;
 					const model = this.harness.state.model;
 					this.emit({
@@ -770,18 +828,23 @@ export class Session implements FlueSession {
 
 	processDirectInput(input: { message: string }): CallHandle<PromptResponse> {
 		return createCallHandle(undefined, (signal) =>
-			this.runOperation('prompt', signal, () => this.runPromptCall({
-				promptText: input.message,
-				schema: undefined,
-				tools: undefined,
-				model: undefined,
-				thinkingLevel: undefined,
-				images: undefined,
-				source: 'prompt',
-				errorLabel: 'prompt',
-				callSite: 'this direct input',
+			this.runOperation(
+				'prompt',
 				signal,
-			}) as Promise<PromptResponse>),
+				() =>
+					this.runPromptCall({
+						promptText: input.message,
+						schema: undefined,
+						tools: undefined,
+						model: undefined,
+						thinkingLevel: undefined,
+						images: undefined,
+						source: 'prompt',
+						errorLabel: 'prompt',
+						callSite: 'this direct input',
+						signal,
+					}) as Promise<PromptResponse>,
+			),
 		);
 	}
 
@@ -800,7 +863,10 @@ export class Session implements FlueSession {
 		options: SkillOptions<S> & { schema: S },
 	): CallHandle<PromptResultResponse<v.InferOutput<S>>>;
 	skill(skill: SkillReference | string, options?: SkillOptions): CallHandle<PromptResponse>;
-	skill(skill: SkillReference | string, options?: SkillOptions<v.GenericSchema | undefined>): CallHandle<any> {
+	skill(
+		skill: SkillReference | string,
+		options?: SkillOptions<v.GenericSchema | undefined>,
+	): CallHandle<any> {
 		return createCallHandle(options?.signal, (signal) =>
 			this.runOperation('skill', signal, async () => {
 				const schema = resolveResultOption(options);
@@ -1023,7 +1089,10 @@ export class Session implements FlueSession {
 
 	private resolvePackagedSkill(reference: SkillReference) {
 		const packaged = this.config.packagedSkills?.[reference.id];
-		if (!packaged) throw new Error(`[flue] Packaged skill "${reference.name}" is unavailable for this application build.`);
+		if (!packaged)
+			throw new Error(
+				`[flue] Packaged skill "${reference.name}" is unavailable for this application build.`,
+			);
 		return packaged;
 	}
 
@@ -1067,10 +1136,7 @@ export class Session implements FlueSession {
 	}
 
 	/** Reject custom tools that collide with active built-ins or each other. */
-	private validateCustomToolNames(
-		tools: ToolDefinition[],
-		builtinTools: AgentTool<any>[],
-	): void {
+	private validateCustomToolNames(tools: ToolDefinition[], builtinTools: AgentTool<any>[]): void {
 		const reserved = new Set<string>(builtinTools.map((t) => t.name));
 		reserved.add('task');
 		const names = new Set<string>();
@@ -1111,15 +1177,27 @@ export class Session implements FlueSession {
 				const packagedRead = createPackagedSkillReadTool(packagedSkills);
 				const connectorRead = connectorTools.find((tool) => tool.name === 'read');
 				if (connectorRead) {
-					connectorTools = connectorTools.map((tool) => tool !== connectorRead ? tool : {
-						...tool,
-						execute: (id, params, signal) => {
-							const resourcePath = typeof params === 'object' && params !== null && 'path' in params ? params.path : undefined;
-							return typeof resourcePath === 'string' && resourcePath.startsWith('/.flue/packaged-skills/')
-								? packagedRead.execute(id, params as { path: string; offset?: number; limit?: number }, signal)
-								: connectorRead.execute(id, params, signal);
-						},
-					});
+					connectorTools = connectorTools.map((tool) =>
+						tool !== connectorRead
+							? tool
+							: {
+									...tool,
+									execute: (id, params, signal) => {
+										const resourcePath =
+											typeof params === 'object' && params !== null && 'path' in params
+												? params.path
+												: undefined;
+										return typeof resourcePath === 'string' &&
+											resourcePath.startsWith('/.flue/packaged-skills/')
+											? packagedRead.execute(
+													id,
+													params as { path: string; offset?: number; limit?: number },
+													signal,
+												)
+											: connectorRead.execute(id, params, signal);
+									},
+								},
+					);
 				} else {
 					connectorTools = [...connectorTools, packagedRead];
 				}
@@ -1178,11 +1256,7 @@ export class Session implements FlueSession {
 			[...this.agentTools, ...options.tools],
 			builtinTools,
 		);
-		this.harness.state.tools = [
-			...builtinTools,
-			...customTools,
-			...(options.extraTools ?? []),
-		];
+		this.harness.state.tools = [...builtinTools, ...customTools, ...(options.extraTools ?? [])];
 		try {
 			return await fn({ resolvedModel });
 		} finally {
@@ -1334,8 +1408,7 @@ export class Session implements FlueSession {
 			const schema = resolveResultOption(options);
 			const childOptions: PromptOptions<v.GenericSchema | undefined> = {
 				model:
-					options?.model ??
-					(taskAgent?.model !== undefined ? undefined : options?.inheritedModel),
+					options?.model ?? (taskAgent?.model !== undefined ? undefined : options?.inheritedModel),
 				thinkingLevel:
 					options?.thinkingLevel ??
 					(taskAgent?.thinkingLevel !== undefined ? undefined : options?.inheritedThinkingLevel),
@@ -1667,7 +1740,10 @@ export class Session implements FlueSession {
 			}
 			const firstKeptEntry = contextEntries[preparation.firstKeptIndex]?.entry;
 			if (!firstKeptEntry || firstKeptEntry.type !== 'message') {
-				this.internalLog('info', '[flue:compaction] Nothing to compact (first kept message has no entry)');
+				this.internalLog(
+					'info',
+					'[flue:compaction] Nothing to compact (first kept message has no entry)',
+				);
 				return;
 			}
 
@@ -1707,7 +1783,10 @@ export class Session implements FlueSession {
 							output,
 							usage: fromProviderUsage(response?.usage),
 							stopReason: response?.stopReason,
-							isError: error !== undefined || response?.stopReason === 'error' || response?.stopReason === 'aborted',
+							isError:
+								error !== undefined ||
+								response?.stopReason === 'error' ||
+								response?.stopReason === 'aborted',
 							error: error === undefined ? response?.errorMessage : serializeError(error),
 						});
 					},
@@ -1836,11 +1915,12 @@ export class Session implements FlueSession {
 	private async runPersistedDispatchInput(input: DispatchInput): Promise<PromptResponse> {
 		return this.runPersistedContextInput({
 			findInput: () => this.history.findDispatchInput(input.dispatchId),
-			persistInput: () => this.history.appendMessage(
-				createUserContextMessage(renderDispatchInput(input), new Date().toISOString()),
-				'dispatch',
-				dispatchMetadata(input),
-			),
+			persistInput: () =>
+				this.history.appendMessage(
+					createUserContextMessage(renderDispatchInput(input), new Date().toISOString()),
+					'dispatch',
+					dispatchMetadata(input),
+				),
 			errorLabel: `dispatch(${input.dispatchId})`,
 			outputSource: 'dispatch',
 			callSite: 'this dispatched input',
@@ -1878,9 +1958,12 @@ export class Session implements FlueSession {
 				if (following.some((entry) => entry.type === 'message' && entry.message.role === 'user')) {
 					throw new Error(options.recoveryError);
 				}
-				const persistedAssistant = [...following].reverse().find(
-					(entry): entry is MessageEntry => entry.type === 'message' && entry.message.role === 'assistant',
-				);
+				const persistedAssistant = [...following]
+					.reverse()
+					.find(
+						(entry): entry is MessageEntry =>
+							entry.type === 'message' && entry.message.role === 'assistant',
+					);
 				if (!persistedAssistant) {
 					const beforeLength = this.harness.state.messages.length;
 					await this.harness.continue();
@@ -1891,7 +1974,9 @@ export class Session implements FlueSession {
 				} else {
 					const assistant = persistedAssistant.message as AssistantMessage;
 					if (assistant.stopReason === 'error' || assistant.stopReason === 'aborted') {
-						throw new Error(`[flue] ${options.errorLabel} failed: ${assistant.errorMessage ?? assistant.stopReason}`);
+						throw new Error(
+							`[flue] ${options.errorLabel} failed: ${assistant.errorMessage ?? assistant.stopReason}`,
+						);
 					}
 				}
 				return {
@@ -1923,8 +2008,7 @@ export class Session implements FlueSession {
 		activePackagedSkills?: Record<string, PackagedSkillDirectory>;
 		signal: AbortSignal;
 	}): Promise<
-		| PromptResponse
-		| (Omit<PromptResultResponse<unknown>, 'result'> & { result: unknown })
+		PromptResponse | (Omit<PromptResultResponse<unknown>, 'result'> & { result: unknown })
 	> {
 		const resultBundle = args.schema ? createResultTools(args.schema) : undefined;
 

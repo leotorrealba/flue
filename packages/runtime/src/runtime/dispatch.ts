@@ -38,11 +38,18 @@ function validateAndCloneDispatchRequest(
 	if (typeof request.id !== 'string' || request.id.trim() === '') {
 		throw new Error('[flue] dispatch() requires a non-empty "id" target agent instance id.');
 	}
-	if (request.session !== undefined && (typeof request.session !== 'string' || request.session.trim() === '')) {
-		throw new Error('[flue] dispatch() requires a non-empty "session" target session id when provided.');
+	if (
+		request.session !== undefined &&
+		(typeof request.session !== 'string' || request.session.trim() === '')
+	) {
+		throw new Error(
+			'[flue] dispatch() requires a non-empty "session" target session id when provided.',
+		);
 	}
 	if (request.input === undefined) {
-		throw new Error('[flue] dispatch() requires an "input" payload. Use null for an intentional empty payload.');
+		throw new Error(
+			'[flue] dispatch() requires an "input" payload. Use null for an intentional empty payload.',
+		);
 	}
 	if (!agentExists(rt, agent)) {
 		throw new Error(`[flue] dispatch() target agent "${agent}" is not registered.`);
@@ -60,7 +67,9 @@ function cloneJsonSerializable(value: unknown, label: string): unknown {
 	try {
 		json = JSON.stringify(value);
 	} catch (error) {
-		throw new Error(`[flue] ${label} must be JSON-serializable: ${error instanceof Error ? error.message : String(error)}`);
+		throw new Error(
+			`[flue] ${label} must be JSON-serializable: ${error instanceof Error ? error.message : String(error)}`,
+		);
 	}
 	return JSON.parse(json) as unknown;
 }
@@ -86,7 +95,9 @@ function assertJsonLike(value: unknown, path: string, seen: WeakSet<object>): vo
 		return;
 	}
 	if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) {
-		throw new Error(`[flue] ${path} must contain only plain JSON objects, arrays, strings, numbers, booleans, or null.`);
+		throw new Error(
+			`[flue] ${path} must contain only plain JSON objects, arrays, strings, numbers, booleans, or null.`,
+		);
 	}
 	for (const [key, child] of Object.entries(value)) {
 		assertJsonLike(child, `${path}.${key}`, seen);

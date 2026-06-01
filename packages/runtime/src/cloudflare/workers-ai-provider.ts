@@ -22,10 +22,7 @@ import type {
 	ToolCall,
 	Usage,
 } from '@earendil-works/pi-ai';
-import {
-	createAssistantMessageEventStream,
-	parseStreamingJson,
-} from '@earendil-works/pi-ai';
+import { createAssistantMessageEventStream, parseStreamingJson } from '@earendil-works/pi-ai';
 import { convertMessages } from '@earendil-works/pi-ai/openai-completions';
 import { CLOUDFLARE_AI_BINDING_API, type CloudflareAIBindingApi } from '../cloudflare-model.ts';
 import { getModelBinding } from '../runtime/providers.ts';
@@ -385,11 +382,7 @@ const streamCloudflareWorkersAi: StreamFunction<CloudflareAIBindingApi, SimpleSt
 				const chunk = rawChunk as ChatCompletionChunk | null;
 				if (!chunk || typeof chunk !== 'object') continue;
 				output.responseId ||= chunk.id;
-				if (
-					typeof chunk.model === 'string' &&
-					chunk.model.length > 0 &&
-					chunk.model !== model.id
-				) {
+				if (typeof chunk.model === 'string' && chunk.model.length > 0 && chunk.model !== model.id) {
 					output.responseModel ||= chunk.model;
 				}
 				if (chunk.usage) {
@@ -409,11 +402,7 @@ const streamCloudflareWorkersAi: StreamFunction<CloudflareAIBindingApi, SimpleSt
 				const delta = choice.delta;
 				if (!delta) continue;
 
-				if (
-					delta.content !== null &&
-					delta.content !== undefined &&
-					delta.content.length > 0
-				) {
+				if (delta.content !== null && delta.content !== undefined && delta.content.length > 0) {
 					if (!currentBlock || currentBlock.type !== 'text') {
 						finishCurrentBlock(currentBlock);
 						currentBlock = { type: 'text', text: '' };
@@ -460,15 +449,11 @@ const streamCloudflareWorkersAi: StreamFunction<CloudflareAIBindingApi, SimpleSt
 
 				if (delta.tool_calls) {
 					for (const toolCall of delta.tool_calls) {
-						const streamIndex =
-							typeof toolCall.index === 'number' ? toolCall.index : undefined;
+						const streamIndex = typeof toolCall.index === 'number' ? toolCall.index : undefined;
 						const continueExisting =
 							currentBlock?.type === 'toolCall' &&
-							((streamIndex !== undefined &&
-								currentBlock.streamIndex === streamIndex) ||
-								(streamIndex === undefined &&
-									!!toolCall.id &&
-									currentBlock.id === toolCall.id));
+							((streamIndex !== undefined && currentBlock.streamIndex === streamIndex) ||
+								(streamIndex === undefined && !!toolCall.id && currentBlock.id === toolCall.id));
 						if (!continueExisting) {
 							finishCurrentBlock(currentBlock);
 							currentBlock = {
@@ -486,8 +471,7 @@ const streamCloudflareWorkersAi: StreamFunction<CloudflareAIBindingApi, SimpleSt
 								partial: output,
 							});
 						}
-						const block =
-							currentBlock?.type === 'toolCall' ? currentBlock : null;
+						const block = currentBlock?.type === 'toolCall' ? currentBlock : null;
 						if (block) {
 							if (!block.id && toolCall.id) block.id = toolCall.id;
 							if (!block.name && toolCall.function?.name) {
@@ -536,10 +520,8 @@ const streamCloudflareWorkersAi: StreamFunction<CloudflareAIBindingApi, SimpleSt
 					delete (block as StreamingToolCallBlock).streamIndex;
 				}
 			}
-			output.stopReason =
-				options?.signal?.aborted || isAbortError(error) ? 'aborted' : 'error';
-			output.errorMessage =
-				error instanceof Error ? error.message : JSON.stringify(error);
+			output.stopReason = options?.signal?.aborted || isAbortError(error) ? 'aborted' : 'error';
+			output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
 			stream.push({ type: 'error', reason: output.stopReason, error: output });
 			stream.end();
 		}
@@ -571,7 +553,7 @@ function resolveBinding(model: Model<CloudflareAIBindingApi>): Ai {
 			'[flue] Cloudflare AI binding not available. ' +
 				'Models prefixed with "cloudflare/" require running on the Cloudflare ' +
 				'target with `"ai": { "binding": "AI" }` declared in wrangler.jsonc. ' +
-				'For URL-based access without the binding, use pi-ai\'s ' +
+				"For URL-based access without the binding, use pi-ai's " +
 				'`cloudflare-workers-ai/...` or `cloudflare-ai-gateway/...` providers ' +
 				'(both require Cloudflare API credentials in env vars).',
 		);
@@ -598,7 +580,9 @@ function applyReasoningEffort(
 	payload.reasoning_effort = mapReasoningEffort(level);
 }
 
-function mapReasoningEffort(level: NonNullable<SimpleStreamOptions['reasoning']>): WorkersAIReasoningEffort {
+function mapReasoningEffort(
+	level: NonNullable<SimpleStreamOptions['reasoning']>,
+): WorkersAIReasoningEffort {
 	switch (level) {
 		case 'minimal':
 		case 'low':

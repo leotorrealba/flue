@@ -1,4 +1,4 @@
-import { createAgent, defineAgentProfile, type AgentRouteHandler } from '@flue/runtime';
+import { type AgentRouteHandler, createAgent, defineAgentProfile } from '@flue/runtime';
 
 export const route: AgentRouteHandler = async (_c, next) => next();
 

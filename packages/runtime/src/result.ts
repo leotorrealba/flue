@@ -38,8 +38,13 @@ export function buildPackagedSkillPrompt(
 ): string {
 	const skillFile = directory.files['SKILL.md'];
 	if (!skillFile) throw new Error(`[flue] Packaged skill "${reference.name}" is missing SKILL.md.`);
-	const raw = new TextDecoder().decode(Uint8Array.from(atob(skillFile.content), (character) => character.charCodeAt(0)));
-	const skill = parseSkillMarkdown(raw, { directoryName: reference.name, path: `${reference.name}/SKILL.md` });
+	const raw = new TextDecoder().decode(
+		Uint8Array.from(atob(skillFile.content), (character) => character.charCodeAt(0)),
+	);
+	const skill = parseSkillMarkdown(raw, {
+		directoryName: reference.name,
+		path: `${reference.name}/SKILL.md`,
+	});
 	const parts = [
 		`Run the skill named "${reference.name}".`,
 		'',
@@ -47,17 +52,22 @@ export function buildPackagedSkillPrompt(
 		skill.body,
 		'</skill_instructions>',
 	];
-	const resources = Object.keys(directory.files).filter((filePath) => filePath !== 'SKILL.md').sort();
+	const resources = Object.keys(directory.files)
+		.filter((filePath) => filePath !== 'SKILL.md')
+		.sort();
 	if (resources.length > 0) {
 		parts.push(
 			'',
 			'Supporting skill resources are available but are not loaded into context unless needed:',
 			'<skill_resources>',
-			...resources.map((filePath) => `- ${filePath} → read ${formatPackagedSkillFilePath(reference.id, filePath)}`),
+			...resources.map(
+				(filePath) => `- ${filePath} → read ${formatPackagedSkillFilePath(reference.id, filePath)}`,
+			),
 			'</skill_resources>',
 		);
 	}
-	if (args && Object.keys(args).length > 0) parts.push('', 'Arguments:', JSON.stringify(args, null, 2));
+	if (args && Object.keys(args).length > 0)
+		parts.push('', 'Arguments:', JSON.stringify(args, null, 2));
 	if (schema) parts.push(buildResultFooter());
 	return parts.join('\n');
 }
@@ -237,7 +247,10 @@ function needsEnvelope(schema: v.GenericSchema): boolean {
 }
 
 function stripJsonSchemaMeta(jsonSchema: Record<string, unknown>): Record<string, unknown> {
-	const { $schema: _schema, ...rest } = jsonSchema as { $schema?: unknown } & Record<string, unknown>;
+	const { $schema: _schema, ...rest } = jsonSchema as { $schema?: unknown } & Record<
+		string,
+		unknown
+	>;
 	return rest;
 }
 

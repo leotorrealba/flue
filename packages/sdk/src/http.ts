@@ -1,5 +1,7 @@
 /** Static headers or a function that resolves headers for each HTTP request. */
-export type RequestHeaders = Record<string, string> | (() => Record<string, string> | Promise<Record<string, string>>);
+export type RequestHeaders =
+	| Record<string, string>
+	| (() => Record<string, string> | Promise<Record<string, string>>);
 
 export interface HttpClientOptions {
 	/** Origin serving deployed Flue application routes. HTTP routes resolve from its root path. */
@@ -64,8 +66,12 @@ export class HttpClient {
 		return url.toString();
 	}
 
-	async requestHeaders(extra: Record<string, string> | undefined, hasBody: boolean): Promise<Record<string, string>> {
-		const headers = typeof this.headers === 'function' ? await this.headers() : (this.headers ?? {});
+	async requestHeaders(
+		extra: Record<string, string> | undefined,
+		hasBody: boolean,
+	): Promise<Record<string, string>> {
+		const headers =
+			typeof this.headers === 'function' ? await this.headers() : (this.headers ?? {});
 		return {
 			...(hasBody ? { 'content-type': 'application/json' } : {}),
 			...(this.token ? { authorization: `Bearer ${this.token}` } : {}),

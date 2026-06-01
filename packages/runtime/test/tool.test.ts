@@ -17,7 +17,13 @@ function createEnv(): SessionEnv {
 		readFile: async () => '',
 		readFileBuffer: async () => new Uint8Array(),
 		writeFile: async () => {},
-		stat: async () => ({ isFile: true, isDirectory: false, isSymbolicLink: false, size: 0, mtime: new Date(0) }),
+		stat: async () => ({
+			isFile: true,
+			isDirectory: false,
+			isSymbolicLink: false,
+			size: 0,
+			mtime: new Date(0),
+		}),
 		readdir: async () => [],
 		exists: async () => false,
 		mkdir: async () => {},
@@ -49,7 +55,10 @@ describe('defineTool', () => {
 		[null, 'requires a tool definition object'],
 		[{ name: '', description: 'Desc', parameters: {}, execute: async () => 'ok' }, 'name'],
 		[{ name: 'tool', description: '', parameters: {}, execute: async () => 'ok' }, 'description'],
-		[{ name: 'tool', description: 'Desc', parameters: null, execute: async () => 'ok' }, 'parameters'],
+		[
+			{ name: 'tool', description: 'Desc', parameters: null, execute: async () => 'ok' },
+			'parameters',
+		],
 		[{ name: 'tool', description: 'Desc', parameters: {}, execute: null }, 'execute'],
 	])('rejects invalid definitions %#', (value, message) => {
 		expect(() => defineTool(value as never)).toThrow(String(message));
@@ -58,21 +67,34 @@ describe('defineTool', () => {
 
 describe('init capability extensions', () => {
 	it('adds harness-wide tools, skills, and subagents', async () => {
-		const initTool = defineTool({ name: 'init_tool', description: 'Init.', parameters: {}, execute: async () => 'init' });
+		const initTool = defineTool({
+			name: 'init_tool',
+			description: 'Init.',
+			parameters: {},
+			execute: async () => 'init',
+		});
 		const ctx = createFlueContext({
 			id: 'init-extensions',
 			runId: undefined,
 			payload: {},
 			env: {},
-			agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+			agentConfig: {
+				systemPrompt: '',
+				skills: {},
+				model: undefined,
+				resolveModel: () => undefined,
+			},
 			createDefaultEnv: async () => createEnv(),
 			defaultStore: new InMemorySessionStore(),
 		});
-		const harness = await ctx.init(createAgent(() => ({ model: false })), {
-			tools: [initTool],
-			skills: [{ name: 'init_skill', description: 'Init skill.' }],
-			subagents: [{ name: 'init_agent', model: false }],
-		});
+		const harness = await ctx.init(
+			createAgent(() => ({ model: false })),
+			{
+				tools: [initTool],
+				skills: [{ name: 'init_skill', description: 'Init skill.' }],
+				subagents: [{ name: 'init_agent', model: false }],
+			},
+		);
 		const session = await harness.session();
 		const config = Reflect.get(session, 'config') as AgentConfig;
 		const state = Reflect.get(session, 'harness') as { state: { tools: Array<{ name: string }> } };
@@ -83,18 +105,33 @@ describe('init capability extensions', () => {
 	});
 
 	it('rejects duplicate capability names added through init', async () => {
-		const tool = defineTool({ name: 'lookup', description: 'Lookup.', parameters: {}, execute: async () => 'ok' });
+		const tool = defineTool({
+			name: 'lookup',
+			description: 'Lookup.',
+			parameters: {},
+			execute: async () => 'ok',
+		});
 		const ctx = createFlueContext({
 			id: 'init-duplicate',
 			runId: undefined,
 			payload: {},
 			env: {},
-			agentConfig: { systemPrompt: '', skills: {}, model: undefined, resolveModel: () => undefined },
+			agentConfig: {
+				systemPrompt: '',
+				skills: {},
+				model: undefined,
+				resolveModel: () => undefined,
+			},
 			createDefaultEnv: async () => createEnv(),
 			defaultStore: new InMemorySessionStore(),
 		});
 
-		await expect(ctx.init(createAgent(() => ({ model: false, tools: [tool] })), { tools: [tool] })).rejects.toThrow('duplicate tool name "lookup"');
+		await expect(
+			ctx.init(
+				createAgent(() => ({ model: false, tools: [tool] })),
+				{ tools: [tool] },
+			),
+		).rejects.toThrow('duplicate tool name "lookup"');
 	});
 });
 
@@ -119,8 +156,18 @@ describe('subagent task selection', () => {
 	});
 
 	it('uses named subagent instructions, skills, and tools instead of parent defaults', async () => {
-		const parentTool = defineTool({ name: 'parent_tool', description: 'Parent.', parameters: {}, execute: async () => 'parent' });
-		const childTool = defineTool({ name: 'child_tool', description: 'Child.', parameters: {}, execute: async () => 'child' });
+		const parentTool = defineTool({
+			name: 'parent_tool',
+			description: 'Parent.',
+			parameters: {},
+			execute: async () => 'parent',
+		});
+		const childTool = defineTool({
+			name: 'child_tool',
+			description: 'Child.',
+			parameters: {},
+			execute: async () => 'child',
+		});
 		const config: AgentConfig = {
 			systemPrompt: 'parent prompt',
 			instructions: 'Parent instructions.',
@@ -137,9 +184,19 @@ describe('subagent task selection', () => {
 			model: undefined,
 			resolveModel: () => undefined,
 		};
-		const harness = new Harness('instance', 'default', config, createEnv(), new InMemorySessionStore(), undefined, [parentTool]);
+		const harness = new Harness(
+			'instance',
+			'default',
+			config,
+			createEnv(),
+			new InMemorySessionStore(),
+			undefined,
+			[parentTool],
+		);
 		const parent = await harness.session();
-		const createTaskSession = Reflect.get(harness, 'createTaskSession').bind(harness) as (options: any) => Promise<any>;
+		const createTaskSession = Reflect.get(harness, 'createTaskSession').bind(harness) as (
+			options: any,
+		) => Promise<any>;
 		const child = await createTaskSession({
 			parentSession: parent.name,
 			taskId: 'task-agent-defaults',
@@ -148,7 +205,9 @@ describe('subagent task selection', () => {
 			depth: 1,
 		});
 		const childConfig = Reflect.get(child, 'config') as AgentConfig;
-		const childHarness = Reflect.get(child, 'harness') as { state: { tools: Array<{ name: string }> } };
+		const childHarness = Reflect.get(child, 'harness') as {
+			state: { tools: Array<{ name: string }> };
+		};
 
 		expect(childConfig.systemPrompt).toContain('Child instructions.');
 		expect(childConfig.systemPrompt).toContain('child_skill');
@@ -163,7 +222,13 @@ describe('subagent task selection', () => {
 		const harness = new Harness(
 			'instance',
 			'default',
-			{ systemPrompt: '', skills: {}, subagents: {}, model: undefined, resolveModel: () => undefined },
+			{
+				systemPrompt: '',
+				skills: {},
+				subagents: {},
+				model: undefined,
+				resolveModel: () => undefined,
+			},
 			createEnv(),
 			new InMemorySessionStore(),
 			(event) => {
@@ -172,7 +237,11 @@ describe('subagent task selection', () => {
 		);
 		const session = await harness.session();
 
-		await expect(session.task('Delegate.', { agent: 'missing' })).rejects.toThrow('Subagent "missing" is not declared');
-		expect(events.filter((event) => event.type === 'task_start' || event.type === 'task')).toEqual([]);
+		await expect(session.task('Delegate.', { agent: 'missing' })).rejects.toThrow(
+			'Subagent "missing" is not declared',
+		);
+		expect(events.filter((event) => event.type === 'task_start' || event.type === 'task')).toEqual(
+			[],
+		);
 	});
 });

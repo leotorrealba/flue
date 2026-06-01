@@ -70,7 +70,11 @@ export class Harness implements FlueHarness {
 					cwd: options?.cwd,
 					signal,
 				});
-				const shellResult = { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode };
+				const shellResult = {
+					stdout: result.stdout,
+					stderr: result.stderr,
+					exitCode: result.exitCode,
+				};
 				this.emit({
 					type: 'tool_call',
 					toolName: 'bash',
@@ -106,7 +110,10 @@ export class Harness implements FlueHarness {
 	private runSessionOperation<T>(sessionName: string, operation: () => Promise<T>): Promise<T> {
 		const previous = this.pendingSessionOperations.get(sessionName) ?? Promise.resolve();
 		const result = previous.then(operation);
-		const tail = result.then(() => {}, () => {});
+		const tail = result.then(
+			() => {},
+			() => {},
+		);
 		this.pendingSessionOperations.set(sessionName, tail);
 		void tail.then(() => {
 			if (this.pendingSessionOperations.get(sessionName) === tail) {
@@ -120,7 +127,9 @@ export class Harness implements FlueHarness {
 		const open = this.openSessions.get(sessionName);
 		if (open) {
 			if (mode === 'create') {
-				throw new Error(`[flue] Session "${sessionName}" already exists in harness "${this.name}".`);
+				throw new Error(
+					`[flue] Session "${sessionName}" already exists in harness "${this.name}".`,
+				);
 			}
 			return open;
 		}
@@ -168,7 +177,10 @@ export class Harness implements FlueHarness {
 				await open.delete();
 				return;
 			}
-			await deleteSessionTree(this.store, createSessionStorageKey(this.instanceId, this.name, sessionName));
+			await deleteSessionTree(
+				this.store,
+				createSessionStorageKey(this.instanceId, this.name, sessionName),
+			);
 		});
 	}
 
@@ -246,7 +258,9 @@ export class Harness implements FlueHarness {
 		this.eventCallback?.({ ...event, harness: event.harness ?? this.name });
 	}
 
-	private decorateEventCallback(callback: FlueEventCallback | undefined): FlueEventCallback | undefined {
+	private decorateEventCallback(
+		callback: FlueEventCallback | undefined,
+	): FlueEventCallback | undefined {
 		return callback
 			? (event) => {
 					callback({ ...event, harness: event.harness ?? this.name });
@@ -271,7 +285,11 @@ function createSessionStorageKey(instanceId: string, harness: string, sessionNam
 	return `agent-session:${JSON.stringify([instanceId, harness, sessionName])}`;
 }
 
-function createSessionAffinityKey(instanceId: string, harness: string, sessionName: string): string {
+function createSessionAffinityKey(
+	instanceId: string,
+	harness: string,
+	sessionName: string,
+): string {
 	return `${instanceId}::${harness}::${sessionName}`;
 }
 

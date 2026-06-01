@@ -23,10 +23,12 @@ assert.equal(response.status, 200);
 assert.equal(await response.text(), 'ok');
 
 const comments = await waitForOutboundComment();
-assert.deepEqual(comments, [{
-	issueNumber: 42,
-	body: 'Reply from a Flue agent through Chat SDK.',
-}]);
+assert.deepEqual(comments, [
+	{
+		issueNumber: 42,
+		body: 'Reply from a Flue agent through Chat SDK.',
+	},
+]);
 
 async function sendWebhookWhenReady() {
 	const deadline = Date.now() + 10000;

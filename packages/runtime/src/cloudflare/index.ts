@@ -1,5 +1,5 @@
-export { getVirtualSandbox } from './virtual-sandbox.ts';
 export type { VirtualSandboxOptions } from './virtual-sandbox.ts';
+export { getVirtualSandbox } from './virtual-sandbox.ts';
 
 const CLOUDFLARE_SHELL_CONNECTOR_MIGRATION =
 	'Run `flue add @cloudflare/shell`, then import Cloudflare Shell helpers from your generated `connectors/cloudflare-shell` file.';
@@ -22,20 +22,24 @@ export function hydrateFromBucket(..._args: unknown[]): never {
 	);
 }
 
-export { cfSandboxToSessionEnv } from './cf-sandbox.ts';
-
-export { store } from './session-store.ts';
-
-export { runWithCloudflareContext, getCloudflareContext, getDurableObjectIdentity } from './context.ts';
-export type { CloudflareContext, FlueDurableObjectIdentity } from './context.ts';
-
-export { getCloudflareAIBindingApiProvider } from './workers-ai-provider.ts';
-
 export type { CloudflareAIBinding, CloudflareAIBindingRegistration } from '../runtime/providers.ts';
+export { cfSandboxToSessionEnv } from './cf-sandbox.ts';
+export type { CloudflareContext, FlueDurableObjectIdentity } from './context.ts';
+export {
+	getCloudflareContext,
+	getDurableObjectIdentity,
+	runWithCloudflareContext,
+} from './context.ts';
 export type { CloudflareGatewayOptions } from './gateway.ts';
-
 export { FlueRegistry } from './registry-do.ts';
 export { createCloudflareRunRegistry } from './run-registry.ts';
+export { store } from './session-store.ts';
+export type {
+	CloudflareAgentWebSocketOptions,
+	CloudflareWebSocketAttachment,
+	CloudflareWebSocketConnection,
+	CloudflareWorkflowWebSocketOptions,
+} from './websocket.ts';
 
 export {
 	connectCloudflareAgentWebSocket,
@@ -43,9 +47,4 @@ export {
 	messageCloudflareAgentWebSocket,
 	messageCloudflareWorkflowWebSocket,
 } from './websocket.ts';
-export type {
-	CloudflareAgentWebSocketOptions,
-	CloudflareWebSocketAttachment,
-	CloudflareWebSocketConnection,
-	CloudflareWorkflowWebSocketOptions,
-} from './websocket.ts';
+export { getCloudflareAIBindingApiProvider } from './workers-ai-provider.ts';

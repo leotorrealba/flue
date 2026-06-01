@@ -104,7 +104,6 @@ export default createAgent(() => ({
 
 `createAgent(...)` can replace profile fields such as the model or instructions, and add tools, skills, or subagents needed for a specific agent.
 
-
 ## Subagents
 
 Subagents are another use for agent profiles: they let an agent delegate focused work to another agent.

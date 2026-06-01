@@ -20,13 +20,21 @@ describe('Cloudflare build plugin', () => {
 		expect(entry).toContain('const prior = await doInstance.inspectFiberByKey(idempotencyKey);');
 		expect(entry).toContain('assertCurrentDispatchInput(prior?.metadata?.input);');
 		expect(entry).toContain('assertCurrentDispatchInput(input);');
-		expect(entry).toContain('processManagedAgentDispatch(input, doInstance, agentName, fiberCtx.id)');
+		expect(entry).toContain(
+			'processManagedAgentDispatch(input, doInstance, agentName, fiberCtx.id)',
+		);
 		expect(entry).toContain('waitForEarlierManagedDispatch(doInstance, input, fiberId)');
-		expect(entry).toContain('assertNoPendingDispatchForDirectSession(doInstance, agentName, session)');
-		expect(entry).toContain('for (const fiber of fibers) assertCurrentDispatchInput(fiber.metadata?.input);');
+		expect(entry).toContain(
+			'assertNoPendingDispatchForDirectSession(doInstance, agentName, session)',
+		);
+		expect(entry).toContain(
+			'for (const fiber of fibers) assertCurrentDispatchInput(fiber.metadata?.input);',
+		);
 		expect(entry).toContain("if (ctx.name === 'flue:dispatch') {");
 		expect(entry).toContain('return handleFlueDispatchRecovered(ctx, this, "moderator");');
-		expect(entry).toContain('const ctx = createContextForRequest(doInstance.name, undefined, input, doInstance, request, undefined, input.dispatchId);');
+		expect(entry).toContain(
+			'const ctx = createContextForRequest(doInstance.name, undefined, input, doInstance, request, undefined, input.dispatchId);',
+		);
 		expect(entry).toContain('createDispatchAgentHandler(agent, input)(ctx)');
 		expect(entry).toContain('resolveDispatchAgentName: (agent) => dispatchAgentNames.get(agent),');
 		expect(entry).not.toContain('runId: input.dispatchId');
@@ -41,7 +49,9 @@ describe('Cloudflare build plugin', () => {
 		expect(entry).toContain('"moderator": "Moderator"');
 		expect(entry).toContain('const workflowClassNames = {');
 		expect(entry).toContain('"daily-report": "DailyReportWorkflow"');
-		expect(entry).toContain('durableObjectIdentity: createDurableObjectIdentity(doInstance, identity)');
+		expect(entry).toContain(
+			'durableObjectIdentity: createDurableObjectIdentity(doInstance, identity)',
+		);
 		expect(entry).toContain('bindingName: workflowBindingNameFromWorkflowName(workflowName)');
 		expect(entry).toContain('bindingName: agentBindingNameFromAgentName(agentName)');
 		expect(entry).not.toContain('createRegistryIdentity');
@@ -52,24 +62,35 @@ describe('Cloudflare build plugin', () => {
 
 		expect(entry).toContain('failRecoveredRun');
 		expect(entry).toContain("ctx.name !== 'flue:workflow:' + doInstance.name");
-		expect(entry).toContain('Flue workflow execution was interrupted. Start a new workflow run explicitly if retry is appropriate.');
+		expect(entry).toContain(
+			'Flue workflow execution was interrupted. Start a new workflow run explicitly if retry is appropriate.',
+		);
 		expect(entry).not.toContain('const restartRunId = generateWorkflowRunId(workflowName);');
 		expect(entry).not.toContain('x-flue-restarted-from-run-id');
 		expect(entry).not.toContain('restartedAsRunId: restartRunId');
 		expect(entry).not.toContain("operation: 'replacement_admission'");
 		expect(entry).not.toContain('isInternalRestart');
 		expect(entry).not.toContain('JSON.stringify(payload ?? {})');
-		const workflowRecoveryBody = entry.slice(entry.indexOf('async function handleFlueWorkflowFiberRecovered'), entry.indexOf('// ─── Per-DO Dispatch'));
+		const workflowRecoveryBody = entry.slice(
+			entry.indexOf('async function handleFlueWorkflowFiberRecovered'),
+			entry.indexOf('// ─── Per-DO Dispatch'),
+		);
 		expect(workflowRecoveryBody).not.toContain('runStore.getRun(interruptedRunId)');
 		expect(workflowRecoveryBody).not.toContain('runStore.getEvents(interruptedRunId)');
 		expect(workflowRecoveryBody).not.toContain('const startEvent');
 		expect(entry).toContain("return doInstance.runFiber('flue:workflow:' + runId");
-		const workflowHttpBody = entry.slice(entry.indexOf('async function dispatchWorkflow'), entry.indexOf('async function dispatchAgent'));
+		const workflowHttpBody = entry.slice(
+			entry.indexOf('async function dispatchWorkflow'),
+			entry.indexOf('async function dispatchAgent'),
+		);
 		expect(workflowHttpBody).toContain("return doInstance.runFiber('flue:workflow:' + runId");
 		expect(workflowHttpBody).not.toContain('keepAliveWhile');
 		expect(workflowHttpBody).not.toContain('runHandler:');
 		expect(entry).toContain('messageWorkflowSocket');
-		const workflowSocketBody = entry.slice(entry.indexOf('async function messageWorkflowSocket'), entry.indexOf('function socketRequest'));
+		const workflowSocketBody = entry.slice(
+			entry.indexOf('async function messageWorkflowSocket'),
+			entry.indexOf('function socketRequest'),
+		);
 		expect(workflowSocketBody).toContain('startWorkflowAdmission:');
 		expect(workflowSocketBody).toContain("doInstance.runFiber('flue:workflow:' + runId");
 		expect(workflowSocketBody).not.toContain('keepAliveWhile');
@@ -84,9 +105,14 @@ describe('Cloudflare build plugin', () => {
 		expect(entry).not.toContain("owner: { kind: 'agent', agentName, instanceId: id }");
 		expect(entry).not.toContain('flue_fiber_recovery');
 		expect(entry).toContain("runId = decodeURIComponent(segments[1] || '');");
-		expect(entry).toContain('createContext: (id_, runId, payload, req, initialEventIndex, dispatchId)');
+		expect(entry).toContain(
+			'createContext: (id_, runId, payload, req, initialEventIndex, dispatchId)',
+		);
 		expect(entry).toContain("assertAgentsDurabilityApi(doInstance, 'startFiber');");
-		const agentHttpBody = entry.slice(entry.indexOf('async function dispatchAgent'), entry.indexOf('function isWebSocketUpgrade'));
+		const agentHttpBody = entry.slice(
+			entry.indexOf('async function dispatchAgent'),
+			entry.indexOf('function isWebSocketUpgrade'),
+		);
 		expect(agentHttpBody).toContain("return doInstance.runFiber('flue:direct'");
 		expect(agentHttpBody).toContain('fiberCtx.stash({ payload: ctx.payload });');
 		expect(agentHttpBody).not.toContain('keepAliveWhile');
@@ -105,16 +131,21 @@ describe('Cloudflare build plugin', () => {
 		expect(entry).toContain('messageCloudflareWorkflowWebSocket');
 		expect(entry).toContain('if (isWebSocketUpgrade(request)) {');
 		expect(entry).toContain('await this.__unsafe_ensureInitialized();');
-		expect(entry).toContain("if (isFlueSocket(socket, 'agent', \"moderator\"))");
-		expect(entry).toContain("if (isFlueSocket(socket, 'workflow', \"daily-report\"))");
+		expect(entry).toContain('if (isFlueSocket(socket, \'agent\', "moderator"))');
+		expect(entry).toContain('if (isFlueSocket(socket, \'workflow\', "daily-report"))');
 		expect(entry).toContain('doInstance.ctx.acceptWebSocket(server);');
-		expect(entry).toContain("if (code === 1005 || code === 1006 || code === 1015) return;");
-		expect(entry).toContain("return closeFlueSocket(socket, code, reason);");
+		expect(entry).toContain('if (code === 1005 || code === 1006 || code === 1015) return;');
+		expect(entry).toContain('return closeFlueSocket(socket, code, reason);');
 		expect(entry).toContain("return closeFlueSocket(socket, 1011, 'WebSocket error');");
-		expect(entry).toContain('connectCloudflareAgentWebSocket(server, { name: agentName, id: doInstance.name, requestUrl: socketRequestUrl(request) });');
+		expect(entry).toContain(
+			'connectCloudflareAgentWebSocket(server, { name: agentName, id: doInstance.name, requestUrl: socketRequestUrl(request) });',
+		);
 		expect(entry).toContain("url.search = '';");
 		expect(entry).toContain('request: socketRequest(connection)');
-		const agentSocketBody = entry.slice(entry.indexOf('async function messageAgentSocket'), entry.indexOf('async function messageWorkflowSocket'));
+		const agentSocketBody = entry.slice(
+			entry.indexOf('async function messageAgentSocket'),
+			entry.indexOf('async function messageWorkflowSocket'),
+		);
 		expect(agentSocketBody).toContain("return doInstance.runFiber('flue:direct'");
 		expect(agentSocketBody).toContain('fiberCtx.stash({ payload: ctx.payload });');
 		expect(agentSocketBody).not.toContain('keepAliveWhile');
@@ -126,7 +157,10 @@ describe('Cloudflare build plugin', () => {
 	});
 
 	it('allows custom app routing to own Cloudflare WebSocket middleware and mounts', async () => {
-		const entry = await new CloudflarePlugin().generateEntryPoint({ ...testBuildContext(), appEntry: '/tmp/app.ts' });
+		const entry = await new CloudflarePlugin().generateEntryPoint({
+			...testBuildContext(),
+			appEntry: '/tmp/app.ts',
+		});
 
 		expect(entry).toContain("import userApp from '/tmp/app.ts';");
 		expect(entry).toContain('return app.fetch(request, env, ctx);');
@@ -141,7 +175,6 @@ describe('Cloudflare build plugin', () => {
 		expect(entry).toContain('Bash,\n  InMemoryFs,\n  createFlueContext,');
 		expect(entry).not.toContain("from 'just-bash'");
 	});
-
 });
 
 function testBuildContext(): BuildContext {

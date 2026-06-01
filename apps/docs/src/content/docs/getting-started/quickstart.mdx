@@ -24,7 +24,7 @@ Copy this prompt and paste it into your coding agent. Your agent will guide you 
 
 ## Manual installation
 
-***Note:** We recommend the AI-guided prompt above for most users. Follow the steps below if you prefer to set things up yourself.*
+**\*Note:** We recommend the AI-guided prompt above for most users. Follow the steps below if you prefer to set things up yourself.\*
 
 ### 1. Install Flue
 
@@ -39,7 +39,6 @@ npx flue init --target node # or: --target cloudflare
 
 Add `.env` to `.gitignore` and do not commit provider credentials. We use Anthropic in this example, but you can use any LLM provider that Pi supports. Read Pi's ["Providers" documentation](https://pi.dev/docs/latest/providers#api-keys) for the complete list of supported providers.
 
-
 ### 2. Create your first agent module
 
 Create `agents/hello-world.ts`. This example uses Claude Sonnet, but you can choose any [supported model](https://pi.dev/models) and configure its provider credentials instead:
@@ -48,13 +47,12 @@ Create `agents/hello-world.ts`. This example uses Claude Sonnet, but you can cho
 import { createAgent } from '@flue/runtime';
 
 export default createAgent(() => ({
-  model: 'anthropic/claude-sonnet-4-6',
-  instructions: 'Tell a funny "hello world" engineering joke.',
+	model: 'anthropic/claude-sonnet-4-6',
+	instructions: 'Tell a funny "hello world" engineering joke.',
 }));
 ```
 
 Don't forget to export the `agent` from `agents/hello-world.ts`. This is what makes it available in Flue as `hello-world`.
-
 
 ### 3. Talk to your agent locally
 

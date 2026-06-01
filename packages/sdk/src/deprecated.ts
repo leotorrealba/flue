@@ -31,6 +31,7 @@
 // so that named imports resolve at ESM link time. The values are dummies —
 // step 2 throws before any consumer can read them.
 const __noop = undefined;
+
 export {
 	// ./client
 	__noop as Type,

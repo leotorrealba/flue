@@ -17,9 +17,10 @@
  * const session = await harness.session();
  * ```
  */
-import { createSandboxSessionEnv } from '@flue/runtime';
-import type { SandboxApi, SandboxFactory, SessionEnv, FileStat } from '@flue/runtime';
+
 import type { Sandbox as DaytonaSandbox } from '@daytona/sdk';
+import type { FileStat, SandboxApi, SandboxFactory, SessionEnv } from '@flue/runtime';
+import { createSandboxSessionEnv } from '@flue/runtime';
 
 // ─── DaytonaSandboxApi ──────────────────────────────────────────────────────
 

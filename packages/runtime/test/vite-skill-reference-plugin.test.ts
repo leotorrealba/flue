@@ -2,10 +2,10 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { build as viteBuild, createServer } from 'vite';
-import type { PackagedSkillDirectory } from '../src/types.ts';
+import { createServer, build as viteBuild } from 'vite';
 import { describe, expect, it, vi } from 'vitest';
 import { skillReferencePlugin } from '../../cli/src/lib/vite-skill-reference-plugin.ts';
+import type { PackagedSkillDirectory } from '../src/types.ts';
 
 interface BuiltFixtureModule {
 	review: {
@@ -20,7 +20,9 @@ interface BuiltFixtureModule {
 
 describe('Vite skill-reference plugin', () => {
 	it('keeps Vite build dependencies installable with the published CLI', () => {
-		const packageJson = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), '../cli/package.json'), 'utf8')) as {
+		const packageJson = JSON.parse(
+			fs.readFileSync(path.resolve(process.cwd(), '../cli/package.json'), 'utf8'),
+		) as {
 			dependencies?: Record<string, string>;
 			devDependencies?: Record<string, string>;
 		};
@@ -81,7 +83,11 @@ describe('Vite skill-reference plugin', () => {
 	it('accepts attributed barrel re-exports of skill references', async () => {
 		const root = createFixtureRoot();
 		writeSkill(root, 'review');
-		writeModule(root, 'src/profile.ts', `export { default as review } from '../skills/review/SKILL.md' with { type: 'skill' };\n`);
+		writeModule(
+			root,
+			'src/profile.ts',
+			`export { default as review } from '../skills/review/SKILL.md' with { type: 'skill' };\n`,
+		);
 		writeModule(
 			root,
 			'src/entry.ts',
@@ -120,10 +126,18 @@ describe('Vite skill-reference plugin', () => {
 		const secondRoot = createFixtureRoot();
 		for (const root of [firstRoot, secondRoot]) {
 			writeSkill(root, 'review');
-			writeModule(root, 'src/entry.ts', `import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`);
+			writeModule(
+				root,
+				'src/entry.ts',
+				`import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`,
+			);
 		}
-		const first = await importBuiltFixture(await buildFixture(firstRoot, createFixturePlugin(firstRoot)));
-		const second = await importBuiltFixture(await buildFixture(secondRoot, createFixturePlugin(secondRoot)));
+		const first = await importBuiltFixture(
+			await buildFixture(firstRoot, createFixturePlugin(firstRoot)),
+		);
+		const second = await importBuiltFixture(
+			await buildFixture(secondRoot, createFixturePlugin(secondRoot)),
+		);
 
 		expect(first.review.id).toBe(second.review.id);
 	});
@@ -140,55 +154,106 @@ describe('Vite skill-reference plugin', () => {
 		const module = await importBuiltFixture(await buildFixture(root, createFixturePlugin(root)));
 
 		expect(module.review.id).not.toBe(module.marker);
-		expect(Object.keys(module.packaged())).toEqual(expect.arrayContaining([module.review.id, module.marker]));
+		expect(Object.keys(module.packaged())).toEqual(
+			expect.arrayContaining([module.review.id, module.marker]),
+		);
 	});
 
 	it('rejects unmarked SKILL.md imports without silently changing syntax', async () => {
 		const root = createFixtureRoot();
 		writeSkill(root, 'review');
-		writeModule(root, 'src/allowed.ts', `import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`);
-		writeModule(root, 'src/entry.ts', `import { review } from './allowed.ts';\nimport unmarked from '../skills/review/SKILL.md';\nexport { review, unmarked };\n`);
+		writeModule(
+			root,
+			'src/allowed.ts',
+			`import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`,
+		);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import { review } from './allowed.ts';\nimport unmarked from '../skills/review/SKILL.md';\nexport { review, unmarked };\n`,
+		);
 
-		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('must use an import attribute');
+		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow(
+			'must use an import attribute',
+		);
 	});
 
-	it.each(['raw', 'url', 'flue-skill', 'unexpected'])('rejects queried SKILL.md imports with ?%s', async (query) => {
-		const root = createFixtureRoot();
-		writeSkill(root, 'review');
-		writeModule(root, 'src/entry.ts', `import review from '../skills/review/SKILL.md?${query}';\nexport { review };\n`);
+	it.each(['raw', 'url', 'flue-skill', 'unexpected'])(
+		'rejects queried SKILL.md imports with ?%s',
+		async (query) => {
+			const root = createFixtureRoot();
+			writeSkill(root, 'review');
+			writeModule(
+				root,
+				'src/entry.ts',
+				`import review from '../skills/review/SKILL.md?${query}';\nexport { review };\n`,
+			);
 
-		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('must use an import attribute');
-	});
+			await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow(
+				'must use an import attribute',
+			);
+		},
+	);
 
-	it.each(['skill.md', 'NOTSKILL.md'])('does not reserve noncanonical markdown filename %s as a skill', async (filename) => {
-		const root = createFixtureRoot();
-		writeModule(root, `src/${filename}`, 'Ordinary markdown.\n');
-		writeModule(root, 'src/entry.ts', `import markdown from './${filename}?raw';\nexport const marker = markdown;\n`);
+	it.each(['skill.md', 'NOTSKILL.md'])(
+		'does not reserve noncanonical markdown filename %s as a skill',
+		async (filename) => {
+			const root = createFixtureRoot();
+			writeModule(root, `src/${filename}`, 'Ordinary markdown.\n');
+			writeModule(
+				root,
+				'src/entry.ts',
+				`import markdown from './${filename}?raw';\nexport const marker = markdown;\n`,
+			);
 
-		const module = await importBuiltFixture(await buildFixture(root, createFixturePlugin(root)));
+			const module = await importBuiltFixture(await buildFixture(root, createFixturePlugin(root)));
 
-		expect(module.marker).toBe('Ordinary markdown.\n');
-	});
+			expect(module.marker).toBe('Ordinary markdown.\n');
+		},
+	);
 
-	it.each(['skill.md', 'NOTSKILL.md'])('rejects noncanonical skill-reference target %s', async (filename) => {
-		const root = createFixtureRoot();
-		writeModule(root, `src/${filename}`, 'Not a packaged skill.\n');
-		writeModule(root, 'src/entry.ts', `import review from './${filename}' with { type: 'skill' };\nexport { review };\n`);
+	it.each(['skill.md', 'NOTSKILL.md'])(
+		'rejects noncanonical skill-reference target %s',
+		async (filename) => {
+			const root = createFixtureRoot();
+			writeModule(root, `src/${filename}`, 'Not a packaged skill.\n');
+			writeModule(
+				root,
+				'src/entry.ts',
+				`import review from './${filename}' with { type: 'skill' };\nexport { review };\n`,
+			);
 
-		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('Skill imports must target a SKILL.md file');
-	});
+			await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow(
+				'Skill imports must target a SKILL.md file',
+			);
+		},
+	);
 
 	it('rejects directly spelled internal module IDs', async () => {
 		const root = createFixtureRoot();
-		writeModule(root, 'src/entry.ts', `import review from '__x00__flue-skill:/tmp/review/SKILL.md';\nexport { review };\n`);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import review from '__x00__flue-skill:/tmp/review/SKILL.md';\nexport { review };\n`,
+		);
 
-		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('Internal packaged-skill module IDs cannot be imported directly');
+		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow(
+			'Internal packaged-skill module IDs cannot be imported directly',
+		);
 	});
 
 	it('rejects packaged-store imports from authored modules outside bootstrap', async () => {
 		const root = createFixtureRoot();
-		writeModule(root, 'src/user.ts', `import { getPackagedSkills } from 'virtual:flue/packaged-skills';\nexport const contents = getPackagedSkills();\n`);
-		writeModule(root, 'src/entry.ts', `import { contents } from './user.ts';\nexport { contents };\n`);
+		writeModule(
+			root,
+			'src/user.ts',
+			`import { getPackagedSkills } from 'virtual:flue/packaged-skills';\nexport const contents = getPackagedSkills();\n`,
+		);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import { contents } from './user.ts';\nexport { contents };\n`,
+		);
 
 		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('runtime-owned');
 	});
@@ -196,9 +261,15 @@ describe('Vite skill-reference plugin', () => {
 	it('rejects dynamic skill imports with an actionable diagnostic', async () => {
 		const root = createFixtureRoot();
 		writeSkill(root, 'review');
-		writeModule(root, 'src/entry.ts', `export const load = () => import('../skills/review/SKILL.md', { with: { type: 'skill' } });\n`);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`export const load = () => import('../skills/review/SKILL.md', { with: { type: 'skill' } });\n`,
+		);
 
-		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('Dynamic SKILL.md import');
+		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow(
+			'Dynamic SKILL.md import',
+		);
 	});
 
 	it('excludes generated files while packaging permitted hidden files', async () => {
@@ -207,7 +278,11 @@ describe('Vite skill-reference plugin', () => {
 		writeModule(root, 'skills/review/.notes', 'Included hidden note\n');
 		writeModule(root, 'skills/review/node_modules/ignored/index.js', 'ignored\n');
 		writeModule(root, 'skills/review/dist/ignored.txt', 'ignored\n');
-		writeModule(root, 'src/entry.ts', `import review from '../skills/review/SKILL.md' with { type: 'skill' };\nimport { getPackagedSkills } from 'virtual:flue/packaged-skills';\nexport { review };\nexport function packaged() { return getPackagedSkills(); }\n`);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import review from '../skills/review/SKILL.md' with { type: 'skill' };\nimport { getPackagedSkills } from 'virtual:flue/packaged-skills';\nexport { review };\nexport function packaged() { return getPackagedSkills(); }\n`,
+		);
 		const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 		try {
 			const module = await importBuiltFixture(await buildFixture(root, createFixturePlugin(root)));
@@ -221,41 +296,77 @@ describe('Vite skill-reference plugin', () => {
 		}
 	});
 
-	it.each(['.env', '.dev.vars.local', '.npmrc', '.netrc', 'credentials.json', 'private.pem', 'api.key', 'secrets.local'])('rejects sensitive packaged file %s', async (filename) => {
+	it.each([
+		'.env',
+		'.dev.vars.local',
+		'.npmrc',
+		'.netrc',
+		'credentials.json',
+		'private.pem',
+		'api.key',
+		'secrets.local',
+	])('rejects sensitive packaged file %s', async (filename) => {
 		const root = createFixtureRoot();
 		writeSkill(root, 'review');
 		writeModule(root, `skills/review/${filename}`, 'do-not-package\n');
-		writeModule(root, 'src/entry.ts', `import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`,
+		);
 
-		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('contains sensitive file');
+		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow(
+			'contains sensitive file',
+		);
 	});
 
-	it.each(['.aws/credentials', '.ssh/id_ed25519'])('rejects sensitive packaged directory content %s', async (filename) => {
-		const root = createFixtureRoot();
-		writeSkill(root, 'review');
-		writeModule(root, `skills/review/${filename}`, 'do-not-package\n');
-		writeModule(root, 'src/entry.ts', `import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`);
+	it.each(['.aws/credentials', '.ssh/id_ed25519'])(
+		'rejects sensitive packaged directory content %s',
+		async (filename) => {
+			const root = createFixtureRoot();
+			writeSkill(root, 'review');
+			writeModule(root, `skills/review/${filename}`, 'do-not-package\n');
+			writeModule(
+				root,
+				'src/entry.ts',
+				`import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`,
+			);
 
-		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('contains sensitive directory');
-	});
+			await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow(
+				'contains sensitive directory',
+			);
+		},
+	);
 
 	it('rejects symlinks inside imported skill directories', async () => {
 		const root = createFixtureRoot();
 		writeSkill(root, 'review');
 		writeModule(root, 'outside.txt', 'Do not package.\n');
 		fs.symlinkSync(path.join(root, 'outside.txt'), path.join(root, 'skills/review/linked.txt'));
-		writeModule(root, 'src/entry.ts', `import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`,
+		);
 
-		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('contains symbolic link');
+		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow(
+			'contains symbolic link',
+		);
 	});
 
 	it('rejects imported skill paths outside the application root', async () => {
 		const root = createFixtureRoot();
 		const outsideRoot = createFixtureRoot();
 		writeSkill(outsideRoot, 'review');
-		writeModule(root, 'src/entry.ts', `import review from ${JSON.stringify(path.join(outsideRoot, 'skills/review/SKILL.md'))} with { type: 'skill' };\nexport { review };\n`);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import review from ${JSON.stringify(path.join(outsideRoot, 'skills/review/SKILL.md'))} with { type: 'skill' };\nexport { review };\n`,
+		);
 
-		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('must be inside project root');
+		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow(
+			'must be inside project root',
+		);
 	});
 
 	it('rejects skill imports that traverse symlinked directories', async () => {
@@ -263,20 +374,32 @@ describe('Vite skill-reference plugin', () => {
 		const outsideRoot = createFixtureRoot();
 		writeSkill(outsideRoot, 'review');
 		fs.symlinkSync(path.join(outsideRoot, 'skills'), path.join(root, 'linked-skills'), 'dir');
-		writeModule(root, 'src/entry.ts', `import review from '../linked-skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import review from '../linked-skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`,
+		);
 
-		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('traverses symbolic link');
+		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow(
+			'traverses symbolic link',
+		);
 	});
 
 	it('warns when packaging a large file into the deployed application', async () => {
 		const root = createFixtureRoot();
 		writeSkill(root, 'review');
 		writeModule(root, 'skills/review/assets/large.bin', 'x'.repeat(1024 * 1024 + 1));
-		writeModule(root, 'src/entry.ts', `import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`,
+		);
 		const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 		try {
 			await buildFixture(root, createFixturePlugin(root));
-			expect(warning).toHaveBeenCalledWith(expect.stringContaining('packaged into the deployed application'));
+			expect(warning).toHaveBeenCalledWith(
+				expect.stringContaining('packaged into the deployed application'),
+			);
 		} finally {
 			warning.mockRestore();
 		}
@@ -287,7 +410,11 @@ describe('Vite skill-reference plugin', () => {
 		writeSkill(root, 'review');
 		const binary = Buffer.from([0x00, 0xff, 0x10, 0x80, 0x41]);
 		fs.writeFileSync(path.join(root, 'skills/review/payload.bin'), binary);
-		writeModule(root, 'src/entry.ts', `import review from '../skills/review/SKILL.md' with { type: 'skill' };\nimport { getPackagedSkills } from 'virtual:flue/packaged-skills';\nexport { review };\nexport function packaged() { return getPackagedSkills(); }\n`);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import review from '../skills/review/SKILL.md' with { type: 'skill' };\nimport { getPackagedSkills } from 'virtual:flue/packaged-skills';\nexport { review };\nexport function packaged() { return getPackagedSkills(); }\n`,
+		);
 
 		const module = await importBuiltFixture(await buildFixture(root, createFixturePlugin(root)));
 		const packaged = module.packaged()[module.review.id]?.files['payload.bin'];
@@ -300,9 +427,15 @@ describe('Vite skill-reference plugin', () => {
 	it('reuses strict Agent Skills validation during Vite loading', async () => {
 		const root = createFixtureRoot();
 		writeSkill(root, 'review', 'wrong-name');
-		writeModule(root, 'src/entry.ts', `import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`);
+		writeModule(
+			root,
+			'src/entry.ts',
+			`import review from '../skills/review/SKILL.md' with { type: 'skill' };\nexport { review };\n`,
+		);
 
-		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow('requires it to match directory "review"');
+		await expect(buildFixture(root, createFixturePlugin(root))).rejects.toThrow(
+			'requires it to match directory "review"',
+		);
 	});
 
 	it('loads attributed skill imports through the Vite development module pipeline', async () => {
@@ -396,14 +529,19 @@ describe('Vite skill-reference plugin', () => {
 			expect(decode(changedFileDirectory.files['LICENSE.txt'])).toBe('Updated license\n');
 
 			const skillPath = path.join(root, 'skills/review/SKILL.md');
-			fs.writeFileSync(skillPath, `---\nname: review\ndescription: Updated review instructions.\nlicense: LICENSE.txt\n---\nUse the updated checklist.\n`);
+			fs.writeFileSync(
+				skillPath,
+				`---\nname: review\ndescription: Updated review instructions.\nlicense: LICENSE.txt\n---\nUse the updated checklist.\n`,
+			);
 			server.watcher.emit('change', skillPath);
 			await flushWatcher();
 			const changedSkill = (await server.ssrLoadModule('/src/entry.ts')) as BuiltFixtureModule;
 			const changedSkillDirectory = changedSkill.packaged()[changedSkill.review.id];
 			if (!changedSkillDirectory) throw new Error('Changed skill directory missing');
 			expect(changedSkill.review.description).toBe('Updated review instructions.');
-			expect(decode(changedSkillDirectory.files['SKILL.md'])).toContain('Use the updated checklist.');
+			expect(decode(changedSkillDirectory.files['SKILL.md'])).toContain(
+				'Use the updated checklist.',
+			);
 
 			const noticePath = path.join(root, 'skills/review/NOTICE.txt');
 			fs.writeFileSync(noticePath, 'Notice text\n');
@@ -454,7 +592,11 @@ function writeSkill(root: string, directoryName: string, declaredName = director
 		`skills/${directoryName}/SKILL.md`,
 		`---\nname: ${declaredName}\ndescription: Reviews an implementation when requested.\nlicense: LICENSE.txt\n---\nFollow the checklist.\n`,
 	);
-	writeModule(root, `skills/${directoryName}/references/checklist.md`, 'Review every changed file.\n');
+	writeModule(
+		root,
+		`skills/${directoryName}/references/checklist.md`,
+		'Review every changed file.\n',
+	);
 	writeModule(root, `skills/${directoryName}/scripts/inspect.py`, 'print("inspect")\n');
 	writeModule(root, `skills/${directoryName}/assets/template.txt`, 'Template\n');
 	writeModule(root, `skills/${directoryName}/LICENSE.txt`, 'License text\n');
@@ -474,7 +616,10 @@ async function flushWatcher(): Promise<void> {
 	await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
-async function buildFixture(root: string, plugin: ReturnType<typeof skillReferencePlugin>): Promise<string> {
+async function buildFixture(
+	root: string,
+	plugin: ReturnType<typeof skillReferencePlugin>,
+): Promise<string> {
 	const outDir = path.join(root, 'dist');
 	await viteBuild({
 		configFile: false,
@@ -495,7 +640,9 @@ async function buildFixture(root: string, plugin: ReturnType<typeof skillReferen
 }
 
 async function importBuiltFixture(absolutePath: string): Promise<BuiltFixtureModule> {
-	return (await import(`${pathToFileURL(absolutePath).href}?time=${Date.now()}`)) as BuiltFixtureModule;
+	return (await import(
+		`${pathToFileURL(absolutePath).href}?time=${Date.now()}`
+	)) as BuiltFixtureModule;
 }
 
 function decode(file: { encoding: 'base64'; content: string } | undefined): string {

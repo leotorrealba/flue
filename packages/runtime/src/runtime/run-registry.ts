@@ -57,8 +57,7 @@ export function decodeRunCursor(cursor: string | undefined): CursorTuple | undef
 		if (typeof decoded?.s === 'string' && typeof decoded?.r === 'string') {
 			return { startedAt: decoded.s, runId: decoded.r };
 		}
-	} catch {
-	}
+	} catch {}
 	return undefined;
 }
 

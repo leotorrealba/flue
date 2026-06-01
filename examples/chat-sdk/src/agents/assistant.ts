@@ -1,4 +1,12 @@
-import { Type, createAgent, defineTool, fauxAssistantMessage, fauxText, fauxToolCall, registerFauxProvider } from '@flue/runtime';
+import {
+	createAgent,
+	defineTool,
+	fauxAssistantMessage,
+	fauxText,
+	fauxToolCall,
+	registerFauxProvider,
+	Type,
+} from '@flue/runtime';
 import { bot } from '../chat.ts';
 
 export default createAgent(() => {
@@ -10,33 +18,40 @@ export default createAgent(() => {
 	faux.setResponses([
 		(context) => {
 			const input = context.messages.at(-1);
-			const text = input?.role === 'user'
-				? typeof input.content === 'string'
-					? input.content
-					: input.content.map((block) => block.type === 'text' ? block.text : '').join('')
-				: '';
+			const text =
+				input?.role === 'user'
+					? typeof input.content === 'string'
+						? input.content
+						: input.content.map((block) => (block.type === 'text' ? block.text : '')).join('')
+					: '';
 			const threadId = /"threadId"\s*:\s*"([^"]+)"/.exec(text)?.[1] ?? '';
-			return fauxAssistantMessage(fauxToolCall('reply_to_chat_thread', {
-				threadId,
-				text: 'Reply from a Flue agent through Chat SDK.',
-			}), { stopReason: 'toolUse' });
+			return fauxAssistantMessage(
+				fauxToolCall('reply_to_chat_thread', {
+					threadId,
+					text: 'Reply from a Flue agent through Chat SDK.',
+				}),
+				{ stopReason: 'toolUse' },
+			);
 		},
 		fauxAssistantMessage(fauxText('Reply sent.')),
 	]);
 	return {
 		model: 'chat-sdk-example/assistant',
-		instructions: 'When receiving a chat message, use reply_to_chat_thread to reply in the supplied thread.',
-		tools: [defineTool({
-			name: 'reply_to_chat_thread',
-			description: 'Post a response into the originating Chat SDK thread.',
-			parameters: Type.Object({
-				threadId: Type.String(),
-				text: Type.String(),
+		instructions:
+			'When receiving a chat message, use reply_to_chat_thread to reply in the supplied thread.',
+		tools: [
+			defineTool({
+				name: 'reply_to_chat_thread',
+				description: 'Post a response into the originating Chat SDK thread.',
+				parameters: Type.Object({
+					threadId: Type.String(),
+					text: Type.String(),
+				}),
+				execute: async ({ threadId, text }) => {
+					await bot.thread(threadId).post(text);
+					return 'Reply sent.';
+				},
 			}),
-			execute: async ({ threadId, text }) => {
-				await bot.thread(threadId).post(text);
-				return 'Reply sent.';
-			},
-		})],
+		],
 	};
 });

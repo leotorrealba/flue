@@ -24,13 +24,13 @@ export default createAgent<unknown, Env>(({ id, env }) => ({
 
 ## Requirements
 
-| Requirement | Value |
-| --- | --- |
-| Target | Cloudflare only |
-| Package | `@cloudflare/sandbox` |
+| Requirement            | Value                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| Target                 | Cloudflare only                                                                |
+| Package                | `@cloudflare/sandbox`                                                          |
 | Platform configuration | Container image and Durable Object/container binding in Wrangler configuration |
-| Environment | Linux container filesystem and command behavior |
-| Lifecycle identity | Choose stable sandbox identity and retention appropriate to your application |
+| Environment            | Linux container filesystem and command behavior                                |
+| Lifecycle identity     | Choose stable sandbox identity and retention appropriate to your application   |
 
 ## Choose this integration when
 

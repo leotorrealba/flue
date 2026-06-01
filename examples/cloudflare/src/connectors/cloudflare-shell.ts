@@ -1,23 +1,23 @@
 import {
+	DynamicWorkerExecutor,
+	type DynamicWorkerExecutorOptions,
+	type ResolvedProvider,
+	resolveProvider,
+} from '@cloudflare/codemode';
+import {
+	type FsStat as CfFsStat,
 	STATE_TYPES,
 	Workspace,
 	WorkspaceFileSystem,
-	type FsStat as CfFsStat,
 } from '@cloudflare/shell';
 import { stateTools } from '@cloudflare/shell/workers';
 import {
-	DynamicWorkerExecutor,
-	resolveProvider,
-	type DynamicWorkerExecutorOptions,
-	type ResolvedProvider,
-} from '@cloudflare/codemode';
-import {
-	Type,
 	type FileStat,
 	type SandboxFactory,
 	type SessionEnv,
 	type SessionToolFactory,
 	type ShellResult,
+	Type,
 } from '@flue/runtime';
 import { getCloudflareContext } from '@flue/runtime/cloudflare';
 
@@ -162,7 +162,7 @@ function createWorkspaceSessionEnv(
 }
 
 const EXEC_NOT_SUPPORTED_MESSAGE =
-	'[flue] The cf-shell sandbox does not support exec(). The agent\'s `code` tool runs JavaScript ' +
+	"[flue] The cf-shell sandbox does not support exec(). The agent's `code` tool runs JavaScript " +
 	'in an isolated Worker against the workspace; from your own code, use `session.fs` / `harness.fs` ' +
 	'(readFile, writeFile, stat, readdir, etc.) — they route through the same Workspace. If you ' +
 	'specifically need bash/grep/find or a real Linux environment, use `@cloudflare/sandbox` ' +
@@ -188,19 +188,13 @@ const CodeParams = Type.Object({
 	}),
 });
 
-function createCodeTool(
-	executor: DynamicWorkerExecutor,
-	stateProvider: ResolvedProvider,
-) {
+function createCodeTool(executor: DynamicWorkerExecutor, stateProvider: ResolvedProvider) {
 	return {
 		name: 'code',
 		label: 'Run Code',
 		description: buildCodeToolDescription(),
 		parameters: CodeParams,
-		async execute(
-			_toolCallId: string,
-			params: unknown,
-		) {
+		async execute(_toolCallId: string, params: unknown) {
 			const code = (params as { code: string }).code;
 			const { result, error, logs } = await executor.execute(code, [stateProvider]);
 			if (error) {

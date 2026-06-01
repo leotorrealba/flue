@@ -158,6 +158,11 @@ export function docsHref(slug: string) {
 }
 
 export function getDocsSection(slug: string) {
-	return docsSections.find((section) => section.groups.some((group) => group.items.some((item) => 'slug' in item && item.slug === slug))) ?? docsSections[0];
+	return (
+		docsSections.find((section) =>
+			section.groups.some((group) =>
+				group.items.some((item) => 'slug' in item && item.slug === slug),
+			),
+		) ?? docsSections[0]
+	);
 }
-

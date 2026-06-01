@@ -9,13 +9,13 @@ The Flue ecosystem connects deployable applications to hosting environments and 
 
 Flue builds application artifacts for Node.js and Cloudflare. Deployment pages document how those artifacts fit a particular host or execution environment.
 
-| Destination | Use it for | Continue to… |
-| --- | --- | --- |
-| Node.js | An ordinary long-running Node server or container. | [Deploy on Node.js](/docs/ecosystem/deploy/node/) |
-| Cloudflare | A Worker with generated Durable Object-backed runtime integration. | [Deploy on Cloudflare](/docs/ecosystem/deploy/cloudflare/) |
-| Render | A managed Node web service with optional managed persistence. | [Deploy on Render](/docs/ecosystem/deploy/render/) |
-| GitHub Actions | One-shot Node workflow execution in CI. | [Use GitHub Actions](/docs/ecosystem/deploy/github-actions/) |
-| GitLab CI/CD | One-shot Node workflow execution in CI. | [Use GitLab CI/CD](/docs/ecosystem/deploy/gitlab-ci/) |
+| Destination    | Use it for                                                         | Continue to…                                                 |
+| -------------- | ------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Node.js        | An ordinary long-running Node server or container.                 | [Deploy on Node.js](/docs/ecosystem/deploy/node/)            |
+| Cloudflare     | A Worker with generated Durable Object-backed runtime integration. | [Deploy on Cloudflare](/docs/ecosystem/deploy/cloudflare/)   |
+| Render         | A managed Node web service with optional managed persistence.      | [Deploy on Render](/docs/ecosystem/deploy/render/)           |
+| GitHub Actions | One-shot Node workflow execution in CI.                            | [Use GitHub Actions](/docs/ecosystem/deploy/github-actions/) |
+| GitLab CI/CD   | One-shot Node workflow execution in CI.                            | [Use GitLab CI/CD](/docs/ecosystem/deploy/gitlab-ci/)        |
 
 For local development and build output, see [Develop & Build](/docs/guide/develop-and-build/).
 

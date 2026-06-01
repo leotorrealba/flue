@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createFlueClient, FlueSocketError, type LlmAssistantMessage, type LlmMessage, type WebSocketLike } from '../src/index.ts';
+import {
+	createFlueClient,
+	FlueSocketError,
+	type LlmAssistantMessage,
+	type LlmMessage,
+	type WebSocketLike,
+} from '../src/index.ts';
 
 class FakeSocket implements WebSocketLike {
 	readonly sent: string[] = [];
@@ -37,7 +43,9 @@ class FakeSocket implements WebSocketLike {
 	}
 }
 
-function socketClient(options: Parameters<typeof createFlueClient>[0] = { baseUrl: 'https://flue.test/api/' }) {
+function socketClient(
+	options: Parameters<typeof createFlueClient>[0] = { baseUrl: 'https://flue.test/api/' },
+) {
 	const sockets: Array<{ url: string; socket: FakeSocket }> = [];
 	const client = createFlueClient({
 		...options,
@@ -83,7 +91,13 @@ describe('WebSocket clients', () => {
 		const agent = client.agents.connect('assistant bot', 'customer/123');
 		const connection = sockets[0];
 		expect(connection?.url).toBe('wss://flue.test/agents/assistant%20bot/customer%2F123');
-		connection?.socket.message({ version: 1, type: 'ready', target: 'agent', name: 'assistant bot', instanceId: 'customer/123' });
+		connection?.socket.message({
+			version: 1,
+			type: 'ready',
+			target: 'agent',
+			name: 'assistant bot',
+			instanceId: 'customer/123',
+		});
 		await agent.ready;
 
 		const events: unknown[] = [];
@@ -91,20 +105,95 @@ describe('WebSocket clients', () => {
 		const pending = agent.prompt('Hello', { session: 'chat' });
 		await Promise.resolve();
 		const request = JSON.parse(connection?.socket.sent[0] ?? '{}') as { requestId: string };
-		expect(request).toMatchObject({ version: 1, type: 'prompt', message: 'Hello', session: 'chat' });
+		expect(request).toMatchObject({
+			version: 1,
+			type: 'prompt',
+			message: 'Hello',
+			session: 'chat',
+		});
 		const message: LlmMessage = { role: 'user', content: [{ type: 'text', text: 'Hello' }] };
-		const output: LlmAssistantMessage = { role: 'assistant', content: [{ type: 'text', text: 'Hi' }] };
+		const output: LlmAssistantMessage = {
+			role: 'assistant',
+			content: [{ type: 'text', text: 'Hi' }],
+		};
 		connection?.socket.message({ version: 1, type: 'started', requestId: request.requestId });
-		connection?.socket.message({ version: 1, type: 'event', requestId: request.requestId, event: { type: 'agent_start', instanceId: 'customer/123', session: 'chat' } });
-		connection?.socket.message({ version: 1, type: 'event', requestId: request.requestId, event: { type: 'turn_request', instanceId: 'customer/123', session: 'chat', turnId: 'turn_1', purpose: 'agent', model: 'model', provider: 'provider', api: 'api', input: { messages: [message] } } });
-		connection?.socket.message({ version: 1, type: 'event', requestId: request.requestId, event: { type: 'turn', instanceId: 'customer/123', session: 'chat', turnId: 'turn_1', purpose: 'agent', durationMs: 1, output, isError: false } });
-		connection?.socket.message({ version: 1, type: 'result', requestId: request.requestId, result: 'done' });
+		connection?.socket.message({
+			version: 1,
+			type: 'event',
+			requestId: request.requestId,
+			event: { type: 'agent_start', instanceId: 'customer/123', session: 'chat' },
+		});
+		connection?.socket.message({
+			version: 1,
+			type: 'event',
+			requestId: request.requestId,
+			event: {
+				type: 'turn_request',
+				instanceId: 'customer/123',
+				session: 'chat',
+				turnId: 'turn_1',
+				purpose: 'agent',
+				model: 'model',
+				provider: 'provider',
+				api: 'api',
+				input: { messages: [message] },
+			},
+		});
+		connection?.socket.message({
+			version: 1,
+			type: 'event',
+			requestId: request.requestId,
+			event: {
+				type: 'turn',
+				instanceId: 'customer/123',
+				session: 'chat',
+				turnId: 'turn_1',
+				purpose: 'agent',
+				durationMs: 1,
+				output,
+				isError: false,
+			},
+		});
+		connection?.socket.message({
+			version: 1,
+			type: 'result',
+			requestId: request.requestId,
+			result: 'done',
+		});
 
 		await expect(pending).resolves.toEqual({ result: 'done' });
 		expect(events).toEqual([
-			{ event: { type: 'agent_start', instanceId: 'customer/123', session: 'chat' }, context: { requestId: request.requestId } },
-			{ event: { type: 'turn_request', instanceId: 'customer/123', session: 'chat', turnId: 'turn_1', purpose: 'agent', model: 'model', provider: 'provider', api: 'api', input: { messages: [message] } }, context: { requestId: request.requestId } },
-			{ event: { type: 'turn', instanceId: 'customer/123', session: 'chat', turnId: 'turn_1', purpose: 'agent', durationMs: 1, output, isError: false }, context: { requestId: request.requestId } },
+			{
+				event: { type: 'agent_start', instanceId: 'customer/123', session: 'chat' },
+				context: { requestId: request.requestId },
+			},
+			{
+				event: {
+					type: 'turn_request',
+					instanceId: 'customer/123',
+					session: 'chat',
+					turnId: 'turn_1',
+					purpose: 'agent',
+					model: 'model',
+					provider: 'provider',
+					api: 'api',
+					input: { messages: [message] },
+				},
+				context: { requestId: request.requestId },
+			},
+			{
+				event: {
+					type: 'turn',
+					instanceId: 'customer/123',
+					session: 'chat',
+					turnId: 'turn_1',
+					purpose: 'agent',
+					durationMs: 1,
+					output,
+					isError: false,
+				},
+				context: { requestId: request.requestId },
+			},
 		]);
 	});
 
@@ -112,7 +201,13 @@ describe('WebSocket clients', () => {
 		const { client, sockets } = socketClient();
 		const agent = client.agents.connect('assistant', 'inst-1');
 		const socket = sockets[0]?.socket;
-		socket?.message({ version: 1, type: 'ready', target: 'agent', name: 'assistant', instanceId: 'inst-1' });
+		socket?.message({
+			version: 1,
+			type: 'ready',
+			target: 'agent',
+			name: 'assistant',
+			instanceId: 'inst-1',
+		});
 
 		const first = agent.prompt('first');
 		await Promise.resolve();
@@ -144,7 +239,13 @@ describe('WebSocket clients', () => {
 			const { client, sockets } = socketClient();
 			const agent = client.agents.connect('assistant', 'inst-1');
 			const socket = sockets[0]?.socket;
-			socket?.message({ version: 1, type: 'ready', target: 'agent', name: 'assistant', instanceId: 'inst-1' });
+			socket?.message({
+				version: 1,
+				type: 'ready',
+				target: 'agent',
+				name: 'assistant',
+				instanceId: 'inst-1',
+			});
 			const pending = agent.prompt('hello');
 			await Promise.resolve();
 			const request = JSON.parse(socket?.sent[0] ?? '{}') as { requestId: string };
@@ -158,7 +259,13 @@ describe('WebSocket clients', () => {
 		const { client, sockets } = socketClient();
 		const agent = client.agents.connect('assistant', 'inst-1');
 		const socket = sockets[0]?.socket;
-		socket?.message({ version: 1, type: 'ready', target: 'agent', name: 'assistant', instanceId: 'inst-1' });
+		socket?.message({
+			version: 1,
+			type: 'ready',
+			target: 'agent',
+			name: 'assistant',
+			instanceId: 'inst-1',
+		});
 		const pending = agent.prompt('fail');
 		await Promise.resolve();
 		const request = JSON.parse(socket?.sent[0] ?? '{}') as { requestId: string };
@@ -176,8 +283,18 @@ describe('WebSocket clients', () => {
 		const { client, sockets } = socketClient();
 		const agent = client.agents.connect('assistant', 'inst-1');
 		const socket = sockets[0]?.socket;
-		socket?.message({ version: 1, type: 'ready', target: 'agent', name: 'assistant', instanceId: 'inst-1' });
-		socket?.message({ version: 1, type: 'error', error: { type: 'PROTOCOL', message: 'bad frame', details: 'bad frame' } });
+		socket?.message({
+			version: 1,
+			type: 'ready',
+			target: 'agent',
+			name: 'assistant',
+			instanceId: 'inst-1',
+		});
+		socket?.message({
+			version: 1,
+			type: 'error',
+			error: { type: 'PROTOCOL', message: 'bad frame', details: 'bad frame' },
+		});
 		expect(socket?.closeCalls).toEqual([{ code: 1011, reason: 'WebSocket error' }]);
 		await expect(agent.prompt('after failure')).rejects.toBeInstanceOf(FlueSocketError);
 	});
@@ -194,10 +311,27 @@ describe('WebSocket clients', () => {
 		await Promise.resolve();
 		const request = JSON.parse(connection?.socket.sent[0] ?? '{}') as { requestId: string };
 		expect(request).toMatchObject({ version: 1, type: 'invoke', payload: { issue: 123 } });
-		connection?.socket.message({ version: 1, type: 'event', requestId: request.requestId, runId: 'run_workflow', event: { type: 'text_delta', text: 'working' } });
-		connection?.socket.message({ version: 1, type: 'result', requestId: request.requestId, runId: 'run_workflow', result: { ok: true } });
+		connection?.socket.message({
+			version: 1,
+			type: 'event',
+			requestId: request.requestId,
+			runId: 'run_workflow',
+			event: { type: 'text_delta', text: 'working' },
+		});
+		connection?.socket.message({
+			version: 1,
+			type: 'result',
+			requestId: request.requestId,
+			runId: 'run_workflow',
+			result: { ok: true },
+		});
 		await expect(pending).resolves.toEqual({ result: { ok: true }, runId: 'run_workflow' });
-		expect(events).toEqual([{ event: { type: 'text_delta', text: 'working' }, context: { requestId: request.requestId, runId: 'run_workflow' } }]);
+		expect(events).toEqual([
+			{
+				event: { type: 'text_delta', text: 'working' },
+				context: { requestId: request.requestId, runId: 'run_workflow' },
+			},
+		]);
 		await expect(workflow.invoke({ issue: 456 })).rejects.toThrow('only one invocation');
 	});
 
@@ -209,7 +343,12 @@ describe('WebSocket clients', () => {
 		const pending = workflow.invoke({ issue: 123 });
 		await Promise.resolve();
 		const request = JSON.parse(socket?.sent[0] ?? '{}') as { requestId: string };
-		socket?.message({ version: 1, type: 'result', requestId: request.requestId, result: { ok: true } });
+		socket?.message({
+			version: 1,
+			type: 'result',
+			requestId: request.requestId,
+			result: { ok: true },
+		});
 		await expect(pending).rejects.toThrow('invalid protocol message');
 		expect(socket?.closeCalls).toEqual([{ code: 1008, reason: 'Invalid protocol message' }]);
 	});
@@ -218,7 +357,13 @@ describe('WebSocket clients', () => {
 		const invalid = socketClient();
 		const invalidAgent = invalid.client.agents.connect('assistant', 'inst-1');
 		const invalidSocket = invalid.sockets[0]?.socket;
-		invalidSocket?.message({ version: 1, type: 'ready', target: 'agent', name: 'assistant', instanceId: 'inst-1' });
+		invalidSocket?.message({
+			version: 1,
+			type: 'ready',
+			target: 'agent',
+			name: 'assistant',
+			instanceId: 'inst-1',
+		});
 		const invalidPending = invalidAgent.prompt('hello');
 		await Promise.resolve();
 		invalidSocket?.message({ version: 1, type: 'event', requestId: 'request' });
@@ -228,7 +373,13 @@ describe('WebSocket clients', () => {
 		const disconnected = socketClient();
 		const disconnectedAgent = disconnected.client.agents.connect('assistant', 'inst-1');
 		const disconnectedSocket = disconnected.sockets[0]?.socket;
-		disconnectedSocket?.message({ version: 1, type: 'ready', target: 'agent', name: 'assistant', instanceId: 'inst-1' });
+		disconnectedSocket?.message({
+			version: 1,
+			type: 'ready',
+			target: 'agent',
+			name: 'assistant',
+			instanceId: 'inst-1',
+		});
 		const disconnectedPending = disconnectedAgent.prompt('hello');
 		await Promise.resolve();
 		disconnectedSocket?.closed();

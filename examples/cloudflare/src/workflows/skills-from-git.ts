@@ -15,13 +15,11 @@
  * `wrangler dev --remote` is the supported local path until Worker
  * Loader is supported in local-mode wrangler dev.
  */
-import { createAgent, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
+
 import { WorkspaceFileSystem } from '@cloudflare/shell';
 import { createGit } from '@cloudflare/shell/git';
-import {
-	getDefaultWorkspace,
-	getShellSandbox,
-} from '../connectors/cloudflare-shell';
+import { createAgent, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
+import { getDefaultWorkspace, getShellSandbox } from '../connectors/cloudflare-shell';
 
 export const route: WorkflowRouteHandler = async (_c, next) => next();
 

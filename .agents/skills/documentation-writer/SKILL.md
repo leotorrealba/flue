@@ -26,12 +26,12 @@ The human editor owns the product story: information architecture, page purpose,
 
 Flue uses the Diátaxis model to decide a page's primary job, not as a rigid questionnaire or a barrier to editing.
 
-| Document type | Primary user need | Writing posture |
-| --- | --- | --- |
-| Tutorial | Learn through a successful first experience | Guided, sequential, encouraging; defer exhaustive options. |
-| How-to guide | Understand or apply a product capability | Organize related tasks, configuration, and decisions into navigable topics; avoid implying a linear tutorial unless the task truly requires one. |
-| Reference | Look up the machinery accurately | Precise, structured, complete for its declared surface; avoid persuasive narrative. |
-| Explanation | Understand concepts and design choices | Editorial and conceptual; build a useful mental model without becoming an API inventory. |
+| Document type | Primary user need                           | Writing posture                                                                                                                                  |
+| ------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tutorial      | Learn through a successful first experience | Guided, sequential, encouraging; defer exhaustive options.                                                                                       |
+| How-to guide  | Understand or apply a product capability    | Organize related tasks, configuration, and decisions into navigable topics; avoid implying a linear tutorial unless the task truly requires one. |
+| Reference     | Look up the machinery accurately            | Precise, structured, complete for its declared surface; avoid persuasive narrative.                                                              |
+| Explanation   | Understand concepts and design choices      | Editorial and conceptual; build a useful mental model without becoming an API inventory.                                                         |
 
 A page may contain supporting material from another mode, but it should have one dominant purpose. If a page belongs in another section or URL, recommend or make that move when it is in scope.
 
@@ -65,8 +65,8 @@ The preferred exchange is:
 
 A useful outline format is:
 
-| Section | Purpose | Include | Exclude or link elsewhere |
-| --- | --- | --- | --- |
+| Section  | Purpose                                     | Include            | Exclude or link elsewhere                             |
+| -------- | ------------------------------------------- | ------------------ | ----------------------------------------------------- |
 | `## ...` | What the reader learns or accomplishes here | Key facts/examples | Content that would distract or duplicate another page |
 
 If the user has already supplied the outline and section-level guidance, do not ask them to approve it again. Confirm any ambiguity briefly and proceed.

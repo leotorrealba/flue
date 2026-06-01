@@ -124,15 +124,16 @@ function parseSseErrorMessage(data: string): string {
 		if (typeof value !== 'object' || value === null || !('error' in value)) throw new Error();
 		const error = value.error;
 		if (
-			typeof error !== 'object'
-			|| error === null
-			|| !('type' in error)
-			|| typeof error.type !== 'string'
-			|| !('message' in error)
-			|| typeof error.message !== 'string'
-			|| !('details' in error)
-			|| typeof error.details !== 'string'
-		) throw new Error();
+			typeof error !== 'object' ||
+			error === null ||
+			!('type' in error) ||
+			typeof error.type !== 'string' ||
+			!('message' in error) ||
+			typeof error.message !== 'string' ||
+			!('details' in error) ||
+			typeof error.details !== 'string'
+		)
+			throw new Error();
 		return error.message;
 	} catch {
 		return 'SSE stream failed.';

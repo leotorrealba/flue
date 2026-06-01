@@ -30,7 +30,10 @@ export class NodePlugin implements BuildPlugin {
 			.map((a, index) => `  ${JSON.stringify(a.name)}: ${agentVarName(a.name, index)},`)
 			.join('\n');
 		const workflowModuleEntries = workflows
-			.map((workflow, index) => `  ${JSON.stringify(workflow.name)}: ${workflowVarName(workflow.name, index)},`)
+			.map(
+				(workflow, index) =>
+					`  ${JSON.stringify(workflow.name)}: ${workflowVarName(workflow.name, index)},`,
+			)
 			.join('\n');
 
 		// User-supplied app.ts (if any). The generated entry imports the user's

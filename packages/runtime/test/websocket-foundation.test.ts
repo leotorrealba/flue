@@ -1,19 +1,19 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
-import { flue } from '../src/routing.ts';
 import {
 	configureFlueRuntime,
 	createFlueContext,
+	type FlueRuntime,
+	failRecoveredRun,
 	InMemoryRunRegistry,
 	InMemoryRunStore,
-	failRecoveredRun,
 	InMemorySessionStore,
-	invokeWorkflowAttached,
 	invokeDirectAttached,
+	invokeWorkflowAttached,
 	registeredAgentsForTransport,
 	registeredWorkflowsForTransport,
-	type FlueRuntime,
 } from '../src/internal.ts';
+import { flue } from '../src/routing.ts';
 import type { FlueEvent } from '../src/types.ts';
 
 describe('WebSocket transport foundation', () => {
@@ -37,7 +37,10 @@ describe('WebSocket transport foundation', () => {
 		expect(registeredAgentsForTransport(runtime, 'http')).toEqual(['http-only', 'dual']);
 		expect(registeredAgentsForTransport(runtime, 'websocket')).toEqual(['socket-only', 'dual']);
 		expect(registeredWorkflowsForTransport(runtime, 'http')).toEqual(['http-job', 'dual-job']);
-		expect(registeredWorkflowsForTransport(runtime, 'websocket')).toEqual(['socket-job', 'dual-job']);
+		expect(registeredWorkflowsForTransport(runtime, 'websocket')).toEqual([
+			'socket-job',
+			'dual-job',
+		]);
 	});
 
 	it('does not admit Node direct HTTP handlers without route exposure', () => {
@@ -56,14 +59,19 @@ describe('WebSocket transport foundation', () => {
 	it('does not admit WebSocket-only workflows through HTTP POST', async () => {
 		configureFlueRuntime({
 			target: 'node',
-			manifest: { agents: [], workflows: [{ name: 'socket-job', transports: { websocket: true } }] },
+			manifest: {
+				agents: [],
+				workflows: [{ name: 'socket-job', transports: { websocket: true } }],
+			},
 			workflowHandlers: { 'socket-job': async () => ({ ok: true }) },
 			createContext: createContext,
 		});
 		const app = new Hono();
 		app.route('/', flue());
 
-		const response = await app.fetch(new Request('http://localhost/workflows/socket-job', { method: 'POST' }));
+		const response = await app.fetch(
+			new Request('http://localhost/workflows/socket-job', { method: 'POST' }),
+		);
 
 		expect(response.status).toBe(404);
 		expect(await response.json()).toMatchObject({ error: { type: 'workflow_not_http' } });
@@ -96,10 +104,18 @@ describe('WebSocket transport foundation', () => {
 		app.route('/api', flue());
 		const upgrade = { method: 'GET', headers: { upgrade: 'websocket' } };
 
-		expect((await app.fetch(new Request('http://localhost/api/agents/assistant/one', upgrade))).status).toBe(200);
-		expect((await app.fetch(new Request('http://localhost/api/workflows/job', upgrade))).status).toBe(200);
-		expect((await app.fetch(new Request('http://localhost/api/agents/http-agent/one', upgrade))).status).toBe(404);
-		expect((await app.fetch(new Request('http://localhost/api/workflows/http-job', upgrade))).status).toBe(404);
+		expect(
+			(await app.fetch(new Request('http://localhost/api/agents/assistant/one', upgrade))).status,
+		).toBe(200);
+		expect(
+			(await app.fetch(new Request('http://localhost/api/workflows/job', upgrade))).status,
+		).toBe(200);
+		expect(
+			(await app.fetch(new Request('http://localhost/api/agents/http-agent/one', upgrade))).status,
+		).toBe(404);
+		expect(
+			(await app.fetch(new Request('http://localhost/api/workflows/http-job', upgrade))).status,
+		).toBe(404);
 		expect(forwarded[0]).toBe('/agents/assistant/one');
 		expect(forwarded[1]).toMatch(/^\/workflows\/job:workflow:job:/);
 	});
@@ -132,10 +148,24 @@ describe('WebSocket transport foundation', () => {
 		app.route('/', flue());
 		const upgrade = { method: 'GET', headers: { upgrade: 'websocket' } };
 
-		expect((await app.fetch(new Request('http://localhost/agents/assistant/one', { method: 'POST' }))).status).toBe(401);
-		expect((await app.fetch(new Request('http://localhost/agents/assistant/one?token=ok', { method: 'POST' }))).status).toBe(200);
-		expect((await app.fetch(new Request('http://localhost/agents/assistant/one', upgrade))).status).toBe(401);
-		expect((await app.fetch(new Request('http://localhost/agents/assistant/one?token=ok', upgrade))).status).toBe(200);
+		expect(
+			(await app.fetch(new Request('http://localhost/agents/assistant/one', { method: 'POST' })))
+				.status,
+		).toBe(401);
+		expect(
+			(
+				await app.fetch(
+					new Request('http://localhost/agents/assistant/one?token=ok', { method: 'POST' }),
+				)
+			).status,
+		).toBe(200);
+		expect(
+			(await app.fetch(new Request('http://localhost/agents/assistant/one', upgrade))).status,
+		).toBe(401);
+		expect(
+			(await app.fetch(new Request('http://localhost/agents/assistant/one?token=ok', upgrade)))
+				.status,
+		).toBe(200);
 		expect(forwarded).toEqual(['POST:/agents/assistant/one', 'GET:/agents/assistant/one']);
 	});
 
@@ -159,11 +189,13 @@ describe('WebSocket transport foundation', () => {
 		const app = new Hono();
 		app.route('/', flue());
 		const rawBody = JSON.stringify({ message: 'signed' });
-		const response = await app.fetch(new Request('http://localhost/agents/assistant/one', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: rawBody,
-		}));
+		const response = await app.fetch(
+			new Request('http://localhost/agents/assistant/one', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: rawBody,
+			}),
+		);
 
 		expect(response.status).toBe(200);
 		expect(verifiedBody).toBe(rawBody);
@@ -190,11 +222,13 @@ describe('WebSocket transport foundation', () => {
 		const app = new Hono();
 		app.route('/', flue());
 		const rawBody = JSON.stringify({ event: 'created' });
-		const response = await app.fetch(new Request('http://localhost/workflows/signed', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: rawBody,
-		}));
+		const response = await app.fetch(
+			new Request('http://localhost/workflows/signed', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: rawBody,
+			}),
+		);
 
 		expect(response.status).toBe(200);
 		expect(verifiedBody).toBe(rawBody);
@@ -220,7 +254,9 @@ describe('WebSocket transport foundation', () => {
 		const app = new Hono();
 		app.route('/', flue());
 
-		const response = await app.fetch(new Request('http://localhost/agents/assistant/one', { method: 'POST' }));
+		const response = await app.fetch(
+			new Request('http://localhost/agents/assistant/one', { method: 'POST' }),
+		);
 
 		expect(response.status).toBe(500);
 		expect(forwarded).toBe(1);
@@ -240,7 +276,9 @@ describe('WebSocket transport foundation', () => {
 		const app = new Hono();
 		app.route('/', flue());
 
-		const response = await app.fetch(new Request('http://localhost/agents/assistant/one', { method: 'POST' }));
+		const response = await app.fetch(
+			new Request('http://localhost/agents/assistant/one', { method: 'POST' }),
+		);
 
 		expect(response.status).toBe(500);
 		expect(forwarded).toBe(false);
@@ -264,7 +302,9 @@ describe('WebSocket transport foundation', () => {
 		const app = new Hono();
 		app.route('/', flue());
 
-		const response = await app.fetch(new Request('http://localhost/agents/assistant/one', { method: 'POST' }));
+		const response = await app.fetch(
+			new Request('http://localhost/agents/assistant/one', { method: 'POST' }),
+		);
 
 		expect(response.status).toBe(401);
 		expect(await response.text()).toBe('Assigned Unauthorized');
@@ -336,9 +376,14 @@ describe('WebSocket transport foundation', () => {
 		app.route('/api', flue());
 		const upgrade = { method: 'GET', headers: { upgrade: 'websocket' } };
 
-		expect((await app.fetch(new Request('http://localhost/api/agents/assistant/one', upgrade))).status).toBe(401);
+		expect(
+			(await app.fetch(new Request('http://localhost/api/agents/assistant/one', upgrade))).status,
+		).toBe(401);
 		expect(forwarded).toBe(false);
-		expect((await app.fetch(new Request('http://localhost/api/agents/assistant/one?token=ok', upgrade))).status).toBe(200);
+		expect(
+			(await app.fetch(new Request('http://localhost/api/agents/assistant/one?token=ok', upgrade)))
+				.status,
+		).toBe(200);
 		expect(forwarded).toBe(true);
 	});
 
@@ -361,10 +406,12 @@ describe('WebSocket transport foundation', () => {
 				return null;
 			},
 		});
-		await expect(invokeDirectAttached({
-			...base,
-			handler: async () => null,
-		})).rejects.toMatchObject({ details: 'This agent session already has an active prompt.' });
+		await expect(
+			invokeDirectAttached({
+				...base,
+				handler: async () => null,
+			}),
+		).rejects.toMatchObject({ details: 'This agent session already has an active prompt.' });
 		release?.();
 		await first;
 	});
@@ -378,19 +425,31 @@ describe('WebSocket transport foundation', () => {
 		});
 		const app = new Hono();
 		app.route('/', flue());
-		const response = await app.fetch(new Request('http://localhost/agents/assistant/user-1', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json', 'x-webhook': 'true' },
-			body: JSON.stringify({ message: 'first', session: 'chat' }),
-		}));
+		const response = await app.fetch(
+			new Request('http://localhost/agents/assistant/user-1', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', 'x-webhook': 'true' },
+				body: JSON.stringify({ message: 'first', session: 'chat' }),
+			}),
+		);
 		expect(response.status).toBe(400);
-		expect(await response.json()).toMatchObject({ error: { type: 'invalid_request', details: 'Direct agent prompts are attached interactions. Use dispatch(...) for asynchronous delivery.' } });
+		expect(await response.json()).toMatchObject({
+			error: {
+				type: 'invalid_request',
+				details:
+					'Direct agent prompts are attached interactions. Use dispatch(...) for asynchronous delivery.',
+			},
+		});
 	});
 
 	it('persists an errored terminal run when recovery cannot continue', async () => {
 		const runStore = new InMemoryRunStore();
 		const runRegistry = new InMemoryRunRegistry();
-		const owner = { kind: 'workflow' as const, workflowName: 'removed', instanceId: 'workflow:removed:one' };
+		const owner = {
+			kind: 'workflow' as const,
+			workflowName: 'removed',
+			instanceId: 'workflow:removed:one',
+		};
 		const runId = owner.instanceId;
 		const startedAt = new Date(Date.now() - 100).toISOString();
 		await runStore.createRun({ runId, owner, startedAt, payload: { message: 'hello' } });
@@ -424,11 +483,21 @@ describe('WebSocket transport foundation', () => {
 			id: runId,
 			runId,
 			payload: { day: 'today' },
-			request: new Request('http://localhost/workflows/daily-report', { headers: { upgrade: 'websocket' } }),
+			request: new Request('http://localhost/workflows/daily-report', {
+				headers: { upgrade: 'websocket' },
+			}),
 			createContext,
-			startWorkflowAdmission: async (_runId, run) => { admissions++; return run(); },
-			handler: async (ctx) => { ctx.log.info('running'); return { echoed: ctx.payload }; },
-			onEvent: (event) => { events.push(event); },
+			startWorkflowAdmission: async (_runId, run) => {
+				admissions++;
+				return run();
+			},
+			handler: async (ctx) => {
+				ctx.log.info('running');
+				return { echoed: ctx.payload };
+			},
+			onEvent: (event) => {
+				events.push(event);
+			},
 			emitIdleOnComplete: true,
 			runStore,
 			runRegistry,
@@ -437,7 +506,10 @@ describe('WebSocket transport foundation', () => {
 		expect(admissions).toBe(1);
 		expect(invocation).toEqual({ runId, result: { echoed: { day: 'today' } } });
 		expect(events.map((event) => event.type)).toEqual(['run_start', 'log', 'idle', 'run_end']);
-		expect(await runStore.getRun(runId)).toMatchObject({ status: 'completed', result: { echoed: { day: 'today' } } });
+		expect(await runStore.getRun(runId)).toMatchObject({
+			status: 'completed',
+			result: { echoed: { day: 'today' } },
+		});
 	});
 
 	it('emits a resume signal when durable terminalization continues an admitted workflow run', async () => {
@@ -445,8 +517,21 @@ describe('WebSocket transport foundation', () => {
 		const runStore = new InMemoryRunStore();
 		const runId = 'workflow:daily-report:terminal-recover';
 		const owner = { kind: 'workflow' as const, workflowName: 'daily-report', instanceId: runId };
-		await runStore.createRun({ runId, owner, startedAt: '2026-05-27T00:00:00.000Z', payload: undefined });
-		await runStore.appendEvent(runId, { type: 'run_start', runId, owner, instanceId: runId, workflowName: 'daily-report', startedAt: '2026-05-27T00:00:00.000Z', payload: { day: 'today' } });
+		await runStore.createRun({
+			runId,
+			owner,
+			startedAt: '2026-05-27T00:00:00.000Z',
+			payload: undefined,
+		});
+		await runStore.appendEvent(runId, {
+			type: 'run_start',
+			runId,
+			owner,
+			instanceId: runId,
+			workflowName: 'daily-report',
+			startedAt: '2026-05-27T00:00:00.000Z',
+			payload: { day: 'today' },
+		});
 
 		await failRecoveredRun({
 			owner,
@@ -456,7 +541,9 @@ describe('WebSocket transport foundation', () => {
 			createContext: (id, currentRunId, payload, request, initialEventIndex) => {
 				expect(payload).toEqual({ day: 'today' });
 				const ctx = createContext(id, currentRunId, payload, request, initialEventIndex);
-				ctx.subscribeEvent((event) => { events.push(event); });
+				ctx.subscribeEvent((event) => {
+					events.push(event);
+				});
 				return ctx;
 			},
 			error: new Error('interrupted'),
@@ -500,12 +587,21 @@ describe('WebSocket transport foundation', () => {
 		expect(events.map((event) => event.type)).toEqual(['run_start', 'log', 'idle', 'run_end']);
 		expect(events.every((event) => event.runId === runId)).toBe(true);
 		expect(events[0]).toMatchObject({ type: 'run_start' });
-		expect(await runStore.getRun(runId)).toMatchObject({ status: 'completed', result: { echoed: { day: 'today' } } });
+		expect(await runStore.getRun(runId)).toMatchObject({
+			status: 'completed',
+			result: { echoed: { day: 'today' } },
+		});
 		expect(await runRegistry.lookupRun(runId)).toMatchObject({ status: 'completed' });
 	});
 });
 
-function createContext(id: string, runId: string | undefined, payload: unknown, req: Request, initialEventIndex?: number) {
+function createContext(
+	id: string,
+	runId: string | undefined,
+	payload: unknown,
+	req: Request,
+	initialEventIndex?: number,
+) {
 	return createFlueContext({
 		id,
 		runId,

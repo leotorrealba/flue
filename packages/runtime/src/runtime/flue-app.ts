@@ -17,7 +17,14 @@ import {
 	validateAgentRequest,
 	validateWorkflowRequest,
 } from '../errors.ts';
-import type { AgentDispatchRequest, CreatedAgent, DispatchReceipt, NamedAgentDispatchRequest } from '../types.ts';
+import type {
+	AgentDispatchRequest,
+	CreatedAgent,
+	DispatchReceipt,
+	NamedAgentDispatchRequest,
+} from '../types.ts';
+import { enqueueDispatch } from './dispatch.ts';
+import type { DispatchQueue } from './dispatch-queue.ts';
 import {
 	type AgentHandler,
 	type CreateContextFn,
@@ -27,8 +34,6 @@ import {
 	type StartWorkflowAdmissionFn,
 	type WorkflowHandler,
 } from './handle-agent.ts';
-import type { DispatchQueue } from './dispatch-queue.ts';
-import { enqueueDispatch } from './dispatch.ts';
 import { type HandleRunRouteOptions, handleRunRouteRequest } from './handle-run-routes.ts';
 import { generateWorkflowRunId } from './ids.ts';
 import type { RunPointer, RunRegistry } from './run-registry.ts';
@@ -37,15 +42,15 @@ import type { RunSubscriberRegistry } from './run-subscribers.ts';
 import {
 	AgentInvocationResponseSchema,
 	AgentRouteParamSchema,
-	WorkflowInvocationQuerySchema,
-	WorkflowRouteParamSchema,
 	ErrorEnvelopeSchema,
 	RunEventListResponseSchema,
 	RunEventsQuerySchema,
 	RunIdParamSchema,
 	RunRecordSchema,
 	WorkflowAdmissionResponseSchema,
+	WorkflowInvocationQuerySchema,
 	WorkflowInvocationResponseSchema,
+	WorkflowRouteParamSchema,
 } from './schemas.ts';
 
 export interface FlueRuntime {
@@ -173,7 +178,10 @@ const RUN_ROUTES_BY_ID: ReadonlyArray<readonly [string, HandleRunRouteOptions['a
  * interruption. Cloudflare processing can therefore be at-least-once; design
  * external side effects to be idempotent.
  */
-export function dispatch(agent: CreatedAgent, request: AgentDispatchRequest): Promise<DispatchReceipt>;
+export function dispatch(
+	agent: CreatedAgent,
+	request: AgentDispatchRequest,
+): Promise<DispatchReceipt>;
 export function dispatch(request: NamedAgentDispatchRequest): Promise<DispatchReceipt>;
 export async function dispatch(
 	agentOrRequest: CreatedAgent | NamedAgentDispatchRequest,
@@ -187,7 +195,9 @@ export async function dispatch(
 		);
 	}
 	if (!rt.dispatchQueue) {
-		throw new Error('[flue] dispatch() cannot be accepted because no dispatch queue is configured.');
+		throw new Error(
+			'[flue] dispatch() cannot be accepted because no dispatch queue is configured.',
+		);
 	}
 	const request = isCreatedAgentValue(agentOrRequest)
 		? resolveCreatedAgentDispatchRequest(agentOrRequest, maybeRequest, rt)
@@ -195,8 +205,14 @@ export async function dispatch(
 	return enqueueDispatch({ request, dispatchQueue: rt.dispatchQueue, rt });
 }
 
-function isCreatedAgentValue(value: CreatedAgent | NamedAgentDispatchRequest): value is CreatedAgent {
-	return '__flueCreatedAgent' in value && value.__flueCreatedAgent === true && typeof value.initialize === 'function';
+function isCreatedAgentValue(
+	value: CreatedAgent | NamedAgentDispatchRequest,
+): value is CreatedAgent {
+	return (
+		'__flueCreatedAgent' in value &&
+		value.__flueCreatedAgent === true &&
+		typeof value.initialize === 'function'
+	);
 }
 
 function resolveCreatedAgentDispatchRequest(
@@ -207,7 +223,9 @@ function resolveCreatedAgentDispatchRequest(
 	if (!request) throw new Error('[flue] dispatch(agent, request) requires a dispatch request.');
 	const name = rt.resolveDispatchAgentName?.(agent);
 	if (!name) {
-		throw new Error('[flue] dispatch() target created agent is not a discovered default-exported agent in this built application.');
+		throw new Error(
+			'[flue] dispatch() target created agent is not a discovered default-exported agent in this built application.',
+		);
 	}
 	return { agent: name, id: request.id, session: request.session, input: request.input };
 }
@@ -389,7 +407,8 @@ function workflowRouteSpec() {
 		responses: {
 			202: jsonResponse(WorkflowAdmissionResponseSchema, 'Workflow run accepted.'),
 			200: {
-				description: 'Workflow result envelope or server-sent events stream, depending on the requested mode.',
+				description:
+					'Workflow result envelope or server-sent events stream, depending on the requested mode.',
 				content: {
 					'application/json': {
 						schema: resolver(WorkflowInvocationResponseSchema),
@@ -397,7 +416,8 @@ function workflowRouteSpec() {
 					'text/event-stream': {
 						schema: {
 							type: 'string',
-							description: 'SSE-framed FlueEvent values. A terminal stream-infrastructure event: error frame has data { error: { type, message, details, dev?, meta? } }.',
+							description:
+								'SSE-framed FlueEvent values. A terminal stream-infrastructure event: error frame has data { error: { type, message, details, dev?, meta? } }.',
 						},
 					},
 				},
@@ -433,7 +453,8 @@ function agentRouteSpec() {
 		},
 		responses: {
 			200: {
-				description: 'Attached prompt result or server-sent events stream, depending on the requested mode.',
+				description:
+					'Attached prompt result or server-sent events stream, depending on the requested mode.',
 				content: {
 					'application/json': {
 						schema: resolver(AgentInvocationResponseSchema),
@@ -441,7 +462,8 @@ function agentRouteSpec() {
 					'text/event-stream': {
 						schema: {
 							type: 'string',
-							description: 'SSE frames for attached agent events correlated by instanceId without workflow run identity. A terminal event: error frame has data { type: "error", instanceId, error: { type, message, details, dev?, meta? } }.',
+							description:
+								'SSE frames for attached agent events correlated by instanceId without workflow run identity. A terminal event: error frame has data { type: "error", instanceId, error: { type, message, details, dev?, meta? } }.',
 						},
 					},
 				},
@@ -461,12 +483,14 @@ function runRouteSpec(action: HandleRunRouteOptions['action']) {
 			summary: 'Stream workflow run events',
 			responses: {
 				200: {
-					description: 'Server-sent events stream of workflow run lifecycle and nested agent events.',
+					description:
+						'Server-sent events stream of workflow run lifecycle and nested agent events.',
 					content: {
 						'text/event-stream': {
 							schema: {
 								type: 'string',
-								description: 'SSE-framed workflow run FlueEvent values. A terminal stream-infrastructure event: error frame has data { error: { type, message, details, dev?, meta? } }.',
+								description:
+									'SSE-framed workflow run FlueEvent values. A terminal stream-infrastructure event: error frame has data { error: { type, message, details, dev?, meta? } }.',
 							},
 						},
 					},
@@ -499,14 +523,20 @@ const workflowSocketRouteHandler: MiddlewareHandler = async (c, next) => {
 	}
 	return runAttachedMiddleware(c, rt.workflowWebSocketMiddleware?.[name], async () => {
 		if (rt.target === 'node') {
-			if (!rt.nodeWebSocketWorkflowRoute) throw new Error('[flue] Node runtime is missing WebSocket workflow routing.');
+			if (!rt.nodeWebSocketWorkflowRoute)
+				throw new Error('[flue] Node runtime is missing WebSocket workflow routing.');
 			return (await rt.nodeWebSocketWorkflowRoute(c, next)) ?? undefined;
 		}
-		if (!rt.routeWorkflowRequest) throw new Error('[flue] Cloudflare runtime is missing workflow route forwarding.');
-		const response = await rt.routeWorkflowRequest(normalizeAttachedRequest(c.req.raw, `/workflows/${encodeURIComponent(name)}`), c.env, {
-			workflowName: name,
-			instanceId: generateWorkflowRunId(name),
-		});
+		if (!rt.routeWorkflowRequest)
+			throw new Error('[flue] Cloudflare runtime is missing workflow route forwarding.');
+		const response = await rt.routeWorkflowRequest(
+			normalizeAttachedRequest(c.req.raw, `/workflows/${encodeURIComponent(name)}`),
+			c.env,
+			{
+				workflowName: name,
+				instanceId: generateWorkflowRunId(name),
+			},
+		);
 		if (response) return response;
 		throw new RouteNotFoundError({ method: c.req.method, path: new URL(c.req.url).pathname });
 	});
@@ -522,11 +552,19 @@ const agentSocketRouteHandler: MiddlewareHandler = async (c, next) => {
 	}
 	return runAttachedMiddleware(c, rt.agentWebSocketMiddleware?.[name], async () => {
 		if (rt.target === 'node') {
-			if (!rt.nodeWebSocketAgentRoute) throw new Error('[flue] Node runtime is missing WebSocket agent routing.');
+			if (!rt.nodeWebSocketAgentRoute)
+				throw new Error('[flue] Node runtime is missing WebSocket agent routing.');
 			return (await rt.nodeWebSocketAgentRoute(c, next)) ?? undefined;
 		}
-		if (!rt.routeAgentRequest) throw new Error('[flue] Cloudflare runtime is missing agent route forwarding.');
-		const response = await rt.routeAgentRequest(normalizeAttachedRequest(c.req.raw, `/agents/${encodeURIComponent(name)}/${encodeURIComponent(id)}`), c.env);
+		if (!rt.routeAgentRequest)
+			throw new Error('[flue] Cloudflare runtime is missing agent route forwarding.');
+		const response = await rt.routeAgentRequest(
+			normalizeAttachedRequest(
+				c.req.raw,
+				`/agents/${encodeURIComponent(name)}/${encodeURIComponent(id)}`,
+			),
+			c.env,
+		);
 		if (response) return response;
 		throw new RouteNotFoundError({ method: c.req.method, path: new URL(c.req.url).pathname });
 	});
@@ -710,7 +748,10 @@ export async function handleRunById(opts: {
 	});
 }
 
-function lazyOpenApiRouteHandler(app: Hono, getOptions: () => ReturnType<typeof publicOpenApiOptions>): MiddlewareHandler {
+function lazyOpenApiRouteHandler(
+	app: Hono,
+	getOptions: () => ReturnType<typeof publicOpenApiOptions>,
+): MiddlewareHandler {
 	return (c, next) => openAPIRouteHandler(app, getOptions())(c, next);
 }
 
@@ -756,7 +797,9 @@ async function runAttachedMiddleware(
 	});
 	if (response) return response;
 	if (continued || (c.finalized && (!finalizedBefore || c.res !== responseBefore))) return c.res;
-	throw new Error('Context is not finalized. Did you forget to return a Response object or await next()?');
+	throw new Error(
+		'Context is not finalized. Did you forget to return a Response object or await next()?',
+	);
 }
 
 function isWebSocketUpgrade(request: Request): boolean {
@@ -769,13 +812,19 @@ function normalizeAttachedRequest(request: Request, pathname: string): Request {
 	return new Request(url, request);
 }
 
-export function registeredAgentsForTransport(rt: FlueRuntime, transport: ExposedTransport): readonly string[] {
+export function registeredAgentsForTransport(
+	rt: FlueRuntime,
+	transport: ExposedTransport,
+): readonly string[] {
 	return (rt.manifest?.agents ?? [])
 		.filter((agent) => agent.transports[transport] === true)
 		.map((agent) => agent.name);
 }
 
-export function registeredWorkflowsForTransport(rt: FlueRuntime, transport: ExposedTransport): readonly string[] {
+export function registeredWorkflowsForTransport(
+	rt: FlueRuntime,
+	transport: ExposedTransport,
+): readonly string[] {
 	return (rt.manifest?.workflows ?? [])
 		.filter((workflow) => workflow.transports[transport] === true)
 		.map((workflow) => workflow.name);

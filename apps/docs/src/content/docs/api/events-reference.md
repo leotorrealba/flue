@@ -31,14 +31,14 @@ Runtime-emitted events receive a per-context `eventIndex` and `timestamp`. Appli
 
 ### Lifecycle events
 
-| Event         | Meaning                                                                                   |
-| ------------- | ----------------------------------------------------------------------------------------- |
-| `run_start`   | Workflow run started. Includes workflow ownership, payload, and optional legacy restart linkage. |
+| Event         | Meaning                                                                                                         |
+| ------------- | --------------------------------------------------------------------------------------------------------------- |
+| `run_start`   | Workflow run started. Includes workflow ownership, payload, and optional legacy restart linkage.                |
 | `run_resume`  | Recovery continued handling an admitted workflow run after interruption. Workflow code did not resume or retry. |
-| `run_end`     | Workflow run ended. Includes result or error state and duration.                          |
-| `agent_start` | Agent loop started.                                                                       |
-| `agent_end`   | Agent loop ended.                                                                         |
-| `idle`        | Agent activity became idle.                                                               |
+| `run_end`     | Workflow run ended. Includes result or error state and duration.                                                |
+| `agent_start` | Agent loop started.                                                                                             |
+| `agent_end`   | Agent loop ended.                                                                                               |
+| `idle`        | Agent activity became idle.                                                                                     |
 
 ### Agent operations
 

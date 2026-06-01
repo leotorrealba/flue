@@ -11,10 +11,7 @@
  * `./local-env.ts`.
  */
 import type { SandboxFactory } from '../types.ts';
-import {
-	createLocalSessionEnv,
-	type LocalSessionEnvOptions,
-} from './local-env.ts';
+import { createLocalSessionEnv, type LocalSessionEnvOptions } from './local-env.ts';
 
 export type LocalSandboxOptions = LocalSessionEnvOptions;
 

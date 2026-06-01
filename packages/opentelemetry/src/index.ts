@@ -1,12 +1,23 @@
 import type { FlueEvent, FlueEventSubscriber } from '@flue/runtime';
-import { context, SpanKind, SpanStatusCode, trace, type Attributes, type Context, type Span, type Tracer } from '@opentelemetry/api';
+import {
+	type Attributes,
+	type Context,
+	context,
+	type Span,
+	SpanKind,
+	SpanStatusCode,
+	type Tracer,
+	trace,
+} from '@opentelemetry/api';
 
 export interface OpenTelemetryObserverOptions {
 	tracer?: Tracer;
 	captureContent?: boolean;
 }
 
-export function createOpenTelemetryObserver(options: OpenTelemetryObserverOptions = {}): FlueEventSubscriber {
+export function createOpenTelemetryObserver(
+	options: OpenTelemetryObserverOptions = {},
+): FlueEventSubscriber {
 	const tracer = options.tracer ?? trace.getTracer('@flue/opentelemetry');
 	const captureContent = options.captureContent === true;
 	const runs = new Map<string, Span>();
@@ -20,99 +31,135 @@ export function createOpenTelemetryObserver(options: OpenTelemetryObserverOption
 	return (event) => {
 		const time = timestamp(event);
 		if (event.type === 'run_start') {
-			runs.set(event.runId, tracer.startSpan(`flue.workflow ${event.workflowName}`, {
-				root: true,
-				kind: SpanKind.INTERNAL,
-				startTime: new Date(event.startedAt),
-				attributes: {
-					...identifiers(event),
-					'flue.workflow.name': event.workflowName,
-					...(event.restartedFromRunId ? { 'flue.workflow.restarted_from_run_id': event.restartedFromRunId } : {}),
-					...(captureContent ? contentAttribute('flue.workflow.payload', event.payload) : {}),
-				},
-			}));
+			runs.set(
+				event.runId,
+				tracer.startSpan(`flue.workflow ${event.workflowName}`, {
+					root: true,
+					kind: SpanKind.INTERNAL,
+					startTime: new Date(event.startedAt),
+					attributes: {
+						...identifiers(event),
+						'flue.workflow.name': event.workflowName,
+						...(event.restartedFromRunId
+							? { 'flue.workflow.restarted_from_run_id': event.restartedFromRunId }
+							: {}),
+						...(captureContent ? contentAttribute('flue.workflow.payload', event.payload) : {}),
+					},
+				}),
+			);
 			return;
 		}
 		if (event.type === 'run_resume') {
 			const interrupted = runs.get(event.runId);
 			if (interrupted) {
-				interrupted.setStatus({ code: SpanStatusCode.ERROR, message: 'Workflow execution was interrupted before recovery continued run handling.' });
+				interrupted.setStatus({
+					code: SpanStatusCode.ERROR,
+					message: 'Workflow execution was interrupted before recovery continued run handling.',
+				});
 				interrupted.end(time);
 			}
 			recoveryHandledRuns.add(event.runId);
-			runs.set(event.runId, tracer.startSpan(`flue.workflow ${event.workflowName}`, {
-				root: true,
-				kind: SpanKind.INTERNAL,
-				startTime: time,
-				attributes: {
-					...identifiers(event),
-					'flue.workflow.name': event.workflowName,
-					'flue.workflow.recovery_handling': true,
-					'flue.workflow.resumed': true,
-					'flue.workflow.started_at': event.startedAt,
-				},
-			}));
+			runs.set(
+				event.runId,
+				tracer.startSpan(`flue.workflow ${event.workflowName}`, {
+					root: true,
+					kind: SpanKind.INTERNAL,
+					startTime: time,
+					attributes: {
+						...identifiers(event),
+						'flue.workflow.name': event.workflowName,
+						'flue.workflow.recovery_handling': true,
+						'flue.workflow.resumed': true,
+						'flue.workflow.started_at': event.startedAt,
+					},
+				}),
+			);
 			return;
 		}
 		if (event.type === 'operation_start') {
 			const parent = event.taskId ? tasks.get(event.taskId) : workflowSpan(event, runs);
-			operations.set(event.operationId, startSpan(tracer, `flue.operation ${event.operationKind}`, parent, {
-				startTime: time,
-				attributes: { ...identifiers(event), 'flue.operation.kind': event.operationKind },
-			}));
+			operations.set(
+				event.operationId,
+				startSpan(tracer, `flue.operation ${event.operationKind}`, parent, {
+					startTime: time,
+					attributes: { ...identifiers(event), 'flue.operation.kind': event.operationKind },
+				}),
+			);
 			return;
 		}
 		if (event.type === 'task_start') {
 			const parent = operationSpan(event, operations) ?? workflowSpan(event, runs);
-			tasks.set(event.taskId, startSpan(tracer, event.agent ? `flue.task ${event.agent}` : 'flue.task', parent, {
-				startTime: time,
-				attributes: {
-					...identifiers(event),
-					...(event.agent ? { 'flue.task.agent': event.agent } : {}),
-					...(captureContent && event.cwd ? { 'flue.task.cwd': event.cwd } : {}),
-					...(captureContent ? { 'flue.task.prompt': event.prompt } : {}),
-				},
-			}));
+			tasks.set(
+				event.taskId,
+				startSpan(tracer, event.agent ? `flue.task ${event.agent}` : 'flue.task', parent, {
+					startTime: time,
+					attributes: {
+						...identifiers(event),
+						...(event.agent ? { 'flue.task.agent': event.agent } : {}),
+						...(captureContent && event.cwd ? { 'flue.task.cwd': event.cwd } : {}),
+						...(captureContent ? { 'flue.task.prompt': event.prompt } : {}),
+					},
+				}),
+			);
 			return;
 		}
 		if (event.type === 'compaction_start') {
 			const parent = operationSpan(event, operations) ?? workflowSpan(event, runs);
-			compactions.set(compactionKey(event), startSpan(tracer, 'flue.compaction', parent, {
-				startTime: time,
-				attributes: { ...identifiers(event), 'flue.compaction.reason': event.reason, 'flue.compaction.estimated_tokens': event.estimatedTokens },
-			}));
+			compactions.set(
+				compactionKey(event),
+				startSpan(tracer, 'flue.compaction', parent, {
+					startTime: time,
+					attributes: {
+						...identifiers(event),
+						'flue.compaction.reason': event.reason,
+						'flue.compaction.estimated_tokens': event.estimatedTokens,
+					},
+				}),
+			);
 			return;
 		}
 		if (event.type === 'turn_request') {
-			const parent = event.purpose === 'agent'
-				? operationSpan(event, operations) ?? workflowSpan(event, runs)
-				: compactions.get(compactionKey(event)) ?? operationSpan(event, operations) ?? workflowSpan(event, runs);
-			turns.set(event.turnId, startSpan(tracer, 'gen_ai.generate', parent, {
-				startTime: time,
-				attributes: {
-					...identifiers(event),
-					'flue.turn.purpose': event.purpose,
-					'gen_ai.operation.name': 'chat',
-					'gen_ai.provider.name': event.provider,
-					'gen_ai.request.model': event.model,
-					'flue.provider.api': event.api,
-					...(event.reasoning ? { 'flue.reasoning': event.reasoning } : {}),
-					...(captureContent ? contentAttribute('flue.turn.input', event.input) : {}),
-				},
-			}));
+			const parent =
+				event.purpose === 'agent'
+					? (operationSpan(event, operations) ?? workflowSpan(event, runs))
+					: (compactions.get(compactionKey(event)) ??
+						operationSpan(event, operations) ??
+						workflowSpan(event, runs));
+			turns.set(
+				event.turnId,
+				startSpan(tracer, 'gen_ai.generate', parent, {
+					startTime: time,
+					attributes: {
+						...identifiers(event),
+						'flue.turn.purpose': event.purpose,
+						'gen_ai.operation.name': 'chat',
+						'gen_ai.provider.name': event.provider,
+						'gen_ai.request.model': event.model,
+						'flue.provider.api': event.api,
+						...(event.reasoning ? { 'flue.reasoning': event.reasoning } : {}),
+						...(captureContent ? contentAttribute('flue.turn.input', event.input) : {}),
+					},
+				}),
+			);
 			return;
 		}
 		if (event.type === 'tool_start') {
-			const parent = (event.turnId ? turns.get(event.turnId) : undefined) ?? operationSpan(event, operations) ?? workflowSpan(event, runs);
-			tools.set(toolKey(event), startSpan(tracer, `flue.tool ${event.toolName}`, parent, {
-				startTime: time,
-				attributes: {
-					...identifiers(event),
-					'flue.tool.name': event.toolName,
-					'flue.tool.call_id': event.toolCallId,
-					...(captureContent ? contentAttribute('flue.tool.arguments', event.args) : {}),
-				},
-			}));
+			const parent =
+				(event.turnId ? turns.get(event.turnId) : undefined) ??
+				operationSpan(event, operations) ??
+				workflowSpan(event, runs);
+			tools.set(
+				toolKey(event),
+				startSpan(tracer, `flue.tool ${event.toolName}`, parent, {
+					startTime: time,
+					attributes: {
+						...identifiers(event),
+						'flue.tool.name': event.toolName,
+						'flue.tool.call_id': event.toolCallId,
+						...(captureContent ? contentAttribute('flue.tool.arguments', event.args) : {}),
+					},
+				}),
+			);
 			return;
 		}
 		if (event.type === 'tool_call') {
@@ -158,30 +205,53 @@ export function createOpenTelemetryObserver(options: OpenTelemetryObserverOption
 			if (!span) return;
 			span.setAttribute('flue.duration_ms', event.durationMs);
 			if (captureContent) setContentAttribute(span, 'flue.task.result', event.result);
-			complete(span, event.isError, event.isError ? (captureContent ? event.result : 'Task failed.') : undefined, time);
+			complete(
+				span,
+				event.isError,
+				event.isError ? (captureContent ? event.result : 'Task failed.') : undefined,
+				time,
+			);
 			tasks.delete(event.taskId);
 			return;
 		}
 		if (event.type === 'log') {
-			const span = (event.turnId ? turns.get(event.turnId) : undefined) ?? operationSpan(event, operations) ?? workflowSpan(event, runs);
+			const span =
+				(event.turnId ? turns.get(event.turnId) : undefined) ??
+				operationSpan(event, operations) ??
+				workflowSpan(event, runs);
 			if (!span) return;
-			span.addEvent('flue.log', {
-				'flue.log.level': event.level,
-				...(captureContent ? { 'flue.log.message': event.message, ...contentAttribute('flue.log.attributes', event.attributes) } : {}),
-			}, time);
+			span.addEvent(
+				'flue.log',
+				{
+					'flue.log.level': event.level,
+					...(captureContent
+						? {
+								'flue.log.message': event.message,
+								...contentAttribute('flue.log.attributes', event.attributes),
+							}
+						: {}),
+				},
+				time,
+			);
 			return;
 		}
 		if (event.type === 'operation') {
 			const span = operations.get(event.operationId);
 			if (!span) return;
-			span.setAttributes({ 'flue.duration_ms': event.durationMs, ...usageAttributes(event.usage, 'flue.operation.usage') });
+			span.setAttributes({
+				'flue.duration_ms': event.durationMs,
+				...usageAttributes(event.usage, 'flue.operation.usage'),
+			});
 			if (captureContent) setContentAttribute(span, 'flue.operation.result', event.result);
 			complete(span, event.isError, event.error, time);
 			operations.delete(event.operationId);
 			const key = compactionKey(event);
 			const compaction = compactions.get(key);
 			if (compaction) {
-				compaction.setStatus({ code: SpanStatusCode.ERROR, message: 'Operation ended without a terminal compaction event.' });
+				compaction.setStatus({
+					code: SpanStatusCode.ERROR,
+					message: 'Operation ended without a terminal compaction event.',
+				});
 				compaction.end(time);
 				compactions.delete(key);
 			}
@@ -190,7 +260,12 @@ export function createOpenTelemetryObserver(options: OpenTelemetryObserverOption
 		if (event.type === 'run_end') {
 			const span = runs.get(event.runId);
 			if (!span) return;
-			span.setAttribute(recoveryHandledRuns.has(event.runId) ? 'flue.workflow.total_duration_ms' : 'flue.duration_ms', event.durationMs);
+			span.setAttribute(
+				recoveryHandledRuns.has(event.runId)
+					? 'flue.workflow.total_duration_ms'
+					: 'flue.duration_ms',
+				event.durationMs,
+			);
 			if (captureContent) setContentAttribute(span, 'flue.workflow.result', event.result);
 			complete(span, event.isError, event.error, time);
 			runs.delete(event.runId);
@@ -199,7 +274,12 @@ export function createOpenTelemetryObserver(options: OpenTelemetryObserverOption
 	};
 }
 
-function startSpan(tracer: Tracer, name: string, parent: Span | undefined, options: { startTime: Date; attributes: Attributes }): Span {
+function startSpan(
+	tracer: Tracer,
+	name: string,
+	parent: Span | undefined,
+	options: { startTime: Date; attributes: Attributes },
+): Span {
 	return tracer.startSpan(name, { ...options, root: parent === undefined }, parentContext(parent));
 }
 
@@ -224,20 +304,25 @@ function toolKey(event: FlueEvent & { toolCallId: string }): string {
 }
 
 function identifiers(event: FlueEvent): Attributes {
-	return Object.fromEntries(Object.entries({
-		'flue.run_id': event.runId,
-		'flue.instance_id': event.instanceId,
-		'flue.dispatch_id': event.dispatchId,
-		'flue.harness.name': event.harness,
-		'flue.session.name': event.session,
-		'flue.parent_session.name': event.parentSession,
-		'flue.operation.id': event.operationId,
-		'flue.task.id': event.taskId,
-		'flue.turn.id': event.turnId,
-	}).filter((entry): entry is [string, string] => entry[1] !== undefined));
+	return Object.fromEntries(
+		Object.entries({
+			'flue.run_id': event.runId,
+			'flue.instance_id': event.instanceId,
+			'flue.dispatch_id': event.dispatchId,
+			'flue.harness.name': event.harness,
+			'flue.session.name': event.session,
+			'flue.parent_session.name': event.parentSession,
+			'flue.operation.id': event.operationId,
+			'flue.task.id': event.taskId,
+			'flue.turn.id': event.turnId,
+		}).filter((entry): entry is [string, string] => entry[1] !== undefined),
+	);
 }
 
-function usageAttributes(usage: Extract<FlueEvent, { type: 'turn' }>['usage'], prefix = 'gen_ai.usage'): Attributes {
+function usageAttributes(
+	usage: Extract<FlueEvent, { type: 'turn' }>['usage'],
+	prefix = 'gen_ai.usage',
+): Attributes {
 	if (!usage) return {};
 	return {
 		[`${prefix}.input_tokens`]: usage.input,
@@ -270,7 +355,8 @@ function complete(span: Span, isError: boolean, error: unknown, time: Date): voi
 
 function errorMessage(error: unknown): string | undefined {
 	if (typeof error === 'string') return error;
-	if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') return error.message;
+	if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string')
+		return error.message;
 	return error === undefined ? undefined : safeJson(error);
 }
 

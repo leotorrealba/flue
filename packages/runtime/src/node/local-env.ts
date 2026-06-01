@@ -106,10 +106,7 @@ export function createLocalSessionEnv(options: LocalSessionEnvOptions = {}): Ses
 	const resolvePath = (p: string): string => (path.isAbsolute(p) ? p : path.resolve(cwd, p));
 
 	return {
-		async exec(
-			command,
-			opts,
-		): Promise<ShellResult> {
+		async exec(command, opts): Promise<ShellResult> {
 			const signal = opts?.signal;
 			if (signal?.aborted) throw abortErrorFor(signal);
 
@@ -117,9 +114,7 @@ export function createLocalSessionEnv(options: LocalSessionEnvOptions = {}): Ses
 			// callers still observe deadlines and signal-aware ones can abort
 			// mid-flight. Mirrors the bashFactory adapter's behavior.
 			const timeoutSignal =
-				typeof opts?.timeout === 'number'
-					? AbortSignal.timeout(opts.timeout * 1000)
-					: undefined;
+				typeof opts?.timeout === 'number' ? AbortSignal.timeout(opts.timeout * 1000) : undefined;
 			const mergedSignal =
 				signal && timeoutSignal
 					? AbortSignal.any([signal, timeoutSignal])

@@ -27,12 +27,7 @@ describe('mergeFlueAdditions', () => {
 		};
 
 		const bindings = merged.durable_objects.bindings;
-		expect(bindings.map((b) => b.name)).toEqual([
-			'CUSTOM',
-			'SANDBOX',
-			'Hello',
-			'FLUE_REGISTRY',
-		]);
+		expect(bindings.map((b) => b.name)).toEqual(['CUSTOM', 'SANDBOX', 'Hello', 'FLUE_REGISTRY']);
 		const registry = bindings.find((b) => b.name === 'FLUE_REGISTRY');
 		expect(registry?.class_name).toBe('FlueRegistry');
 	});
@@ -92,43 +87,61 @@ describe('mergeFlueAdditions', () => {
 			{ tag: 'v1', new_sqlite_classes: ['Hello', 'FlueRegistry'] },
 			{ tag: 'v2', renamed_classes: [{ from: 'Hello', to: 'Support' }] },
 		];
-		const merged = mergeFlueAdditions({ migrations }, {
-			defaultName: 'x',
-			main: '_entry.ts',
-			doBindings: [{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' }],
-		});
+		const merged = mergeFlueAdditions(
+			{ migrations },
+			{
+				defaultName: 'x',
+				main: '_entry.ts',
+				doBindings: [{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' }],
+			},
+		);
 
 		expect(merged.migrations).toBe(migrations);
 	});
 
 	it('does not create migrations when the user omitted them', () => {
-		const merged = mergeFlueAdditions({}, {
-			defaultName: 'x',
-			main: '_entry.ts',
-			doBindings: [{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' }],
-		});
+		const merged = mergeFlueAdditions(
+			{},
+			{
+				defaultName: 'x',
+				main: '_entry.ts',
+				doBindings: [{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' }],
+			},
+		);
 
 		expect(merged).not.toHaveProperty('migrations');
 	});
 
 	it('preserves named environments and their authored migrations', () => {
 		const migrations = [{ tag: 'user-existing' }];
-		const merged = mergeFlueAdditions({
-			name: 'support-seal-flue',
-			env: { staging: { name: 'support-seal-flue-staging', migrations } },
-		}, {
-			defaultName: 'x',
-			main: '_entry.ts',
-			doBindings: [{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' }],
-		}) as {
+		const merged = mergeFlueAdditions(
+			{
+				name: 'support-seal-flue',
+				env: { staging: { name: 'support-seal-flue-staging', migrations } },
+			},
+			{
+				defaultName: 'x',
+				main: '_entry.ts',
+				doBindings: [{ class_name: 'FlueRegistry', name: 'FLUE_REGISTRY' }],
+			},
+		) as {
 			name: string;
-			env: { staging: { name: string; main: string; durable_objects: { bindings: Array<{ name: string }> }; migrations: Array<{ tag: string }> } };
+			env: {
+				staging: {
+					name: string;
+					main: string;
+					durable_objects: { bindings: Array<{ name: string }> };
+					migrations: Array<{ tag: string }>;
+				};
+			};
 		};
 
 		expect(merged.name).toBe('support-seal-flue');
 		expect(merged.env.staging.name).toBe('support-seal-flue-staging');
 		expect(merged.env.staging.main).toBe('_entry.ts');
-		expect(merged.env.staging.durable_objects.bindings.map((binding) => binding.name)).toContain('FLUE_REGISTRY');
+		expect(merged.env.staging.durable_objects.bindings.map((binding) => binding.name)).toContain(
+			'FLUE_REGISTRY',
+		);
 		expect(merged.env.staging.migrations).toBe(migrations);
 	});
 });

@@ -101,11 +101,11 @@ event from every workflow run handled by the current isolate in this example.
 The bridge in `app.ts` is a single `observe(...)` call that filters for
 two event shapes:
 
-| Flue event | Sentry call | Severity |
-|---|---|---|
-| `run_end` with `isError: true` | `captureException` (reconstructed Error) | `error` |
-| `log` with `level: 'error'` and `attributes.error` | `captureException` (reconstructed Error) | `error` |
-| `log` with `level: 'error'` and no `error` attribute | `captureMessage` | `error` |
+| Flue event                                           | Sentry call                              | Severity |
+| ---------------------------------------------------- | ---------------------------------------- | -------- |
+| `run_end` with `isError: true`                       | `captureException` (reconstructed Error) | `error`  |
+| `log` with `level: 'error'` and `attributes.error`   | `captureException` (reconstructed Error) | `error`  |
+| `log` with `level: 'error'` and no `error` attribute | `captureMessage`                         | `error`  |
 
 Every capture is enclosed in `Sentry.withScope(...)` so the Flue tags
 do not leak into unrelated events captured by Sentry's auto-instrumentation
@@ -126,7 +126,7 @@ target:
   DO. `app.ts` is evaluated once per isolate. That means
   `Sentry.init` and `observe(...)` execute independently inside each
   DO. Every isolate has its own Sentry client and captures its own
-  events. This is the only thing that *can* work on Cloudflare — there
+  events. This is the only thing that _can_ work on Cloudflare — there
   is no shared module state across isolates — and it is the right
   shape: no cross-isolate RPC for every event, each agent
   independently reports its own errors.

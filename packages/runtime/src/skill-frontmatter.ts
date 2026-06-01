@@ -15,10 +15,15 @@ export interface ParseSkillMarkdownOptions {
 	path: string;
 }
 
-export function parseSkillMarkdown(content: string, options: ParseSkillMarkdownOptions): ParsedSkillMarkdown {
+export function parseSkillMarkdown(
+	content: string,
+	options: ParseSkillMarkdownOptions,
+): ParsedSkillMarkdown {
 	const match = content.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)([\s\S]*)$/);
 	if (!match) {
-		throw new Error(`[flue] Skill ${options.path} is missing YAML frontmatter. Start SKILL.md with "---", include "name" and "description", then close the block with "---".`);
+		throw new Error(
+			`[flue] Skill ${options.path} is missing YAML frontmatter. Start SKILL.md with "---", include "name" and "description", then close the block with "---".`,
+		);
 	}
 
 	let raw: unknown;
@@ -36,7 +41,9 @@ export function parseSkillMarkdown(content: string, options: ParseSkillMarkdownO
 	validateSkillName(name, options);
 	const description = requireString(raw.description, options.path, 'description');
 	if (description.length > 1024) {
-		throw new Error(`[flue] Skill ${options.path} frontmatter description exceeds the 1024-character Agent Skills limit. Shorten "description" to a concise one-line summary.`);
+		throw new Error(
+			`[flue] Skill ${options.path} frontmatter description exceeds the 1024-character Agent Skills limit. Shorten "description" to a concise one-line summary.`,
+		);
 	}
 
 	const license = optionalString(raw.license, options.path, 'license');
@@ -82,7 +89,9 @@ function requireString(value: unknown, path: string, field: string): string {
 function optionalString(value: unknown, path: string, field: string): string | undefined {
 	if (value === undefined || value === null) return undefined;
 	if (typeof value !== 'string' || value.trim().length === 0) {
-		throw new Error(`[flue] Skill ${path} frontmatter ${field} must be a non-empty string when provided.`);
+		throw new Error(
+			`[flue] Skill ${path} frontmatter ${field} must be a non-empty string when provided.`,
+		);
 	}
 	return value.trim();
 }
@@ -90,7 +99,9 @@ function optionalString(value: unknown, path: string, field: string): string | u
 function parseMetadata(value: unknown, path: string): Record<string, string> | undefined {
 	if (value === undefined || value === null) return undefined;
 	if (!isRecord(value)) {
-		throw new Error(`[flue] Skill ${path} frontmatter metadata must be a string-to-string mapping.`);
+		throw new Error(
+			`[flue] Skill ${path} frontmatter metadata must be a string-to-string mapping.`,
+		);
 	}
 	const entries = Object.entries(value);
 	if (entries.some(([, metadataValue]) => typeof metadataValue !== 'string')) {
@@ -104,7 +115,9 @@ function parseMetadata(value: unknown, path: string): Record<string, string> | u
 function parseAllowedTools(value: unknown, path: string): string[] | undefined {
 	if (value === undefined || value === null) return undefined;
 	if (typeof value !== 'string') {
-		throw new Error(`[flue] Skill ${path} frontmatter allowed-tools must be a string when provided.`);
+		throw new Error(
+			`[flue] Skill ${path} frontmatter allowed-tools must be a string when provided.`,
+		);
 	}
 	const tools = value.trim().split(/\s+/).filter(Boolean);
 	return tools.length > 0 ? tools : undefined;

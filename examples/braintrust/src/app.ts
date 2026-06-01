@@ -1,4 +1,4 @@
-import { observe, type FlueEvent } from '@flue/runtime';
+import { type FlueEvent, observe } from '@flue/runtime';
 import { flue } from '@flue/runtime/routing';
 import { initLogger, type Span } from 'braintrust';
 import { Hono } from 'hono';
@@ -22,12 +22,15 @@ observe((event) => {
 	if (!logger) return;
 	const at = timestamp(event);
 	if (event.type === 'run_start') {
-		runs.set(event.runId, logger.startSpan({
-			name: `workflow:${event.workflowName}`,
-			type: 'task',
-			startTime: seconds(event.startedAt),
-			event: { input: event.payload, metadata: identifiers(event) },
-		}));
+		runs.set(
+			event.runId,
+			logger.startSpan({
+				name: `workflow:${event.workflowName}`,
+				type: 'task',
+				startTime: seconds(event.startedAt),
+				event: { input: event.payload, metadata: identifiers(event) },
+			}),
+		);
 		return;
 	}
 	if (event.type === 'operation_start') {
@@ -57,7 +60,13 @@ observe((event) => {
 			name: `compaction:${event.reason}`,
 			type: 'task' as const,
 			startTime: at,
-			event: { metadata: { ...identifiers(event), reason: event.reason, estimatedTokens: event.estimatedTokens } },
+			event: {
+				metadata: {
+					...identifiers(event),
+					reason: event.reason,
+					estimatedTokens: event.estimatedTokens,
+				},
+			},
 		};
 		const parent = operationSpan(event) ?? workflowSpan(event);
 		compactions.set(compactionKey(event), parent ? parent.startSpan(args) : logger.startSpan(args));
@@ -82,9 +91,10 @@ observe((event) => {
 				},
 			},
 		};
-		const parent = event.purpose === 'agent'
-			? operationSpan(event) ?? workflowSpan(event)
-			: compactions.get(compactionKey(event)) ?? operationSpan(event) ?? workflowSpan(event);
+		const parent =
+			event.purpose === 'agent'
+				? (operationSpan(event) ?? workflowSpan(event))
+				: (compactions.get(compactionKey(event)) ?? operationSpan(event) ?? workflowSpan(event));
 		turns.set(event.turnId, parent ? parent.startSpan(args) : logger.startSpan(args));
 		return;
 	}
@@ -95,7 +105,10 @@ observe((event) => {
 			startTime: at,
 			event: { input: event.args, metadata: identifiers(event) },
 		};
-		const parent = (event.turnId ? turns.get(event.turnId) : undefined) ?? operationSpan(event) ?? workflowSpan(event);
+		const parent =
+			(event.turnId ? turns.get(event.turnId) : undefined) ??
+			operationSpan(event) ??
+			workflowSpan(event);
 		tools.set(toolKey(event), parent ? parent.startSpan(args) : logger.startSpan(args));
 		return;
 	}
@@ -103,7 +116,11 @@ observe((event) => {
 		const key = toolKey(event);
 		const span = tools.get(key);
 		if (!span) return;
-		span.log({ output: event.result, error: event.isError ? event.result : undefined, metrics: { duration_ms: event.durationMs } });
+		span.log({
+			output: event.result,
+			error: event.isError ? event.result : undefined,
+			metrics: { duration_ms: event.durationMs },
+		});
 		span.end({ endTime: at });
 		tools.delete(key);
 		return;
@@ -114,7 +131,12 @@ observe((event) => {
 		span.log({
 			output: event.output,
 			error: event.isError ? event.error : undefined,
-			metadata: { model: event.model, provider: event.provider, api: event.api, stopReason: event.stopReason },
+			metadata: {
+				model: event.model,
+				provider: event.provider,
+				api: event.api,
+				stopReason: event.stopReason,
+			},
 			metrics: usageMetrics(event),
 		});
 		span.end({ endTime: at });
@@ -124,7 +146,14 @@ observe((event) => {
 	if (event.type === 'compaction') {
 		const span = compactions.get(compactionKey(event));
 		if (!span) return;
-		span.log({ metadata: { usage: event.usage }, metrics: { messages_before: event.messagesBefore, messages_after: event.messagesAfter, duration_ms: event.durationMs } });
+		span.log({
+			metadata: { usage: event.usage },
+			metrics: {
+				messages_before: event.messagesBefore,
+				messages_after: event.messagesAfter,
+				duration_ms: event.durationMs,
+			},
+		});
 		span.end({ endTime: at });
 		compactions.delete(compactionKey(event));
 		return;
@@ -132,7 +161,11 @@ observe((event) => {
 	if (event.type === 'task') {
 		const span = tasks.get(event.taskId);
 		if (!span) return;
-		span.log({ output: event.result, error: event.isError ? event.result : undefined, metrics: { duration_ms: event.durationMs } });
+		span.log({
+			output: event.result,
+			error: event.isError ? event.result : undefined,
+			metrics: { duration_ms: event.durationMs },
+		});
 		span.end({ endTime: at });
 		tasks.delete(event.taskId);
 		return;
@@ -140,12 +173,21 @@ observe((event) => {
 	if (event.type === 'operation') {
 		const span = operations.get(event.operationId);
 		if (!span) return;
-		span.log({ output: event.result, error: event.isError ? event.error : undefined, metadata: { usage: event.usage }, metrics: { duration_ms: event.durationMs } });
+		span.log({
+			output: event.result,
+			error: event.isError ? event.error : undefined,
+			metadata: { usage: event.usage },
+			metrics: { duration_ms: event.durationMs },
+		});
 		span.end({ endTime: at });
 		operations.delete(event.operationId);
 		const compaction = compactions.get(compactionKey(event));
 		if (compaction) {
-			compaction.log({ error: event.isError ? event.error : 'Compaction operation completed without a terminal compaction event.' });
+			compaction.log({
+				error: event.isError
+					? event.error
+					: 'Compaction operation completed without a terminal compaction event.',
+			});
 			compaction.end({ endTime: at });
 			compactions.delete(compactionKey(event));
 		}
@@ -154,7 +196,11 @@ observe((event) => {
 	if (event.type === 'run_end') {
 		const span = runs.get(event.runId);
 		if (!span) return;
-		span.log({ output: event.result, error: event.isError ? event.error : undefined, metrics: { duration_ms: event.durationMs } });
+		span.log({
+			output: event.result,
+			error: event.isError ? event.error : undefined,
+			metrics: { duration_ms: event.durationMs },
+		});
 		span.end({ endTime: at });
 		runs.delete(event.runId);
 	}
@@ -177,30 +223,44 @@ function toolKey(event: FlueEvent & { toolCallId: string }): string {
 }
 
 function identifiers(event: FlueEvent): Record<string, string> {
-	return Object.fromEntries(Object.entries({
-		runId: event.runId,
-		instanceId: event.instanceId,
-		dispatchId: event.dispatchId,
-		harness: event.harness,
-		session: event.session,
-		parentSession: event.parentSession,
-		operationId: event.operationId,
-		taskId: event.taskId,
-		turnId: event.turnId,
-	}).filter((entry): entry is [string, string] => entry[1] !== undefined));
+	return Object.fromEntries(
+		Object.entries({
+			runId: event.runId,
+			instanceId: event.instanceId,
+			dispatchId: event.dispatchId,
+			harness: event.harness,
+			session: event.session,
+			parentSession: event.parentSession,
+			operationId: event.operationId,
+			taskId: event.taskId,
+			turnId: event.turnId,
+		}).filter((entry): entry is [string, string] => entry[1] !== undefined),
+	);
 }
 
-function usageMetrics(event: { usage?: { input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number; cost: { total: number } }; durationMs?: number }): Record<string, number> {
+function usageMetrics(event: {
+	usage?: {
+		input: number;
+		output: number;
+		cacheRead: number;
+		cacheWrite: number;
+		totalTokens: number;
+		cost: { total: number };
+	};
+	durationMs?: number;
+}): Record<string, number> {
 	const usage = event.usage;
-	return Object.fromEntries(Object.entries({
-		prompt_tokens: usage?.input,
-		completion_tokens: usage?.output,
-		prompt_cached_tokens: usage?.cacheRead,
-		prompt_cache_creation_tokens: usage?.cacheWrite,
-		tokens: usage?.totalTokens,
-		estimated_cost: usage?.cost.total,
-		duration_ms: event.durationMs,
-	}).filter((entry): entry is [string, number] => entry[1] !== undefined));
+	return Object.fromEntries(
+		Object.entries({
+			prompt_tokens: usage?.input,
+			completion_tokens: usage?.output,
+			prompt_cached_tokens: usage?.cacheRead,
+			prompt_cache_creation_tokens: usage?.cacheWrite,
+			tokens: usage?.totalTokens,
+			estimated_cost: usage?.cost.total,
+			duration_ms: event.durationMs,
+		}).filter((entry): entry is [string, number] => entry[1] !== undefined),
+	);
 }
 
 function timestamp(event: FlueEvent): number {

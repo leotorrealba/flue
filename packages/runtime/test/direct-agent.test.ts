@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
-import { flue } from '../src/routing.ts';
+import { createAgent } from '../src/agent-definition.ts';
 import {
 	configureFlueRuntime,
 	createDirectAgentHandler,
@@ -11,8 +11,14 @@ import {
 	InMemoryRunStore,
 	InMemorySessionStore,
 } from '../src/internal.ts';
-import { createAgent } from '../src/agent-definition.ts';
-import type { FlueHarness, FlueSession, SessionData, SessionEnv, SessionStore } from '../src/types.ts';
+import { flue } from '../src/routing.ts';
+import type {
+	FlueHarness,
+	FlueSession,
+	SessionData,
+	SessionEnv,
+	SessionStore,
+} from '../src/types.ts';
 
 describe('direct attached agent delivery', () => {
 	it('routes direct HTTP through init and the default session without dispatch', async () => {
@@ -62,7 +68,9 @@ describe('direct attached agent delivery', () => {
 		);
 
 		expect(res.status).toBe(200);
-		expect((await res.json()) as unknown).toEqual({ result: { text: 'reply:hello', usage: {}, model: { provider: 'test-provider', id: 'test' } } });
+		expect((await res.json()) as unknown).toEqual({
+			result: { text: 'reply:hello', usage: {}, model: { provider: 'test-provider', id: 'test' } },
+		});
 		expect(res.headers.get('x-flue-run-id')).toBeNull();
 		expect(initCalls).toEqual(['inst-1:undefined']);
 		expect(prompts).toEqual([{ session: 'default', message: 'hello' }]);
@@ -87,11 +95,13 @@ describe('direct attached agent delivery', () => {
 		const app = new Hono();
 		app.route('/', flue());
 		const rawBody = JSON.stringify({ message: 'signed' });
-		const response = await app.fetch(new Request('http://localhost/agents/assistant/inst-1', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: rawBody,
-		}));
+		const response = await app.fetch(
+			new Request('http://localhost/agents/assistant/inst-1', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: rawBody,
+			}),
+		);
 
 		expect(response.status).toBe(200);
 		expect(verifiedBody).toBe(rawBody);
@@ -111,14 +121,25 @@ describe('direct attached agent delivery', () => {
 		const app = new Hono();
 		app.route('/', flue());
 		const spec = (await (await app.fetch(new Request('http://localhost/openapi.json'))).json()) as {
-			paths: Record<string, { post?: { requestBody?: { required?: boolean; content?: Record<string, { schema?: unknown }> }; responses?: Record<string, { content?: Record<string, unknown> }> } }>;
+			paths: Record<
+				string,
+				{
+					post?: {
+						requestBody?: { required?: boolean; content?: Record<string, { schema?: unknown }> };
+						responses?: Record<string, { content?: Record<string, unknown> }>;
+					};
+				}
+			>;
 		};
 		const operation = spec.paths['/agents/{name}/{id}']?.post;
 		expect(operation?.requestBody?.required).toBe(true);
 		expect(operation?.requestBody?.content?.['application/json']?.schema).toMatchObject({
 			type: 'object',
 			required: ['message'],
-			properties: { message: { type: 'string' }, session: { type: 'string', minLength: 1, pattern: '.*\\S.*' } },
+			properties: {
+				message: { type: 'string' },
+				session: { type: 'string', minLength: 1, pattern: '.*\\S.*' },
+			},
 		});
 		expect(operation?.responses?.['200']?.content?.['application/json']).toBeDefined();
 		expect(operation?.responses?.['200']?.content?.['text/event-stream']).toBeDefined();
@@ -195,17 +216,23 @@ describe('direct attached agent delivery', () => {
 		configureFlueRuntime({
 			target: 'node',
 			manifest: { agents: [{ name: 'assistant', transports: { http: true }, created: true }] },
-			handlers: { assistant: async () => { throw new Error('do not leak'); } },
+			handlers: {
+				assistant: async () => {
+					throw new Error('do not leak');
+				},
+			},
 			createContext: createTestContext,
 		});
 
 		const app = new Hono();
 		app.route('/', flue());
-		const res = await app.fetch(new Request('http://localhost/agents/assistant/inst-1', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-			body: JSON.stringify({ message: 'hello' }),
-		}));
+		const res = await app.fetch(
+			new Request('http://localhost/agents/assistant/inst-1', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
+				body: JSON.stringify({ message: 'hello' }),
+			}),
+		);
 		const stream = await res.text();
 		expect(stream).toContain('event: error');
 		expect(stream).toContain('"type":"error"');
@@ -250,17 +277,19 @@ describe('direct attached agent delivery', () => {
 				agents: [{ name: 'assistant', transports: { http: true }, created: true }],
 			},
 			handlers: {
-				assistant: createDirectAgentHandler(createAgent(() => ({
-					profile: { model: false },
-					cwd: '/workspace',
-					persist: store,
-					sandbox: {
-						async createSessionEnv(options) {
-							sandboxCalls.push(options);
-							return fakeEnv();
+				assistant: createDirectAgentHandler(
+					createAgent(() => ({
+						profile: { model: false },
+						cwd: '/workspace',
+						persist: store,
+						sandbox: {
+							async createSessionEnv(options) {
+								sandboxCalls.push(options);
+								return fakeEnv();
+							},
 						},
-					},
-				}))),
+					})),
+				),
 			},
 			createContext: createTestContext,
 		});
@@ -293,18 +322,40 @@ function fakeHarness(prompts: Array<{ session: string; message: string }>): Flue
 	};
 }
 
-function fakeSession(session: string, prompts: Array<{ session: string; message: string }>): FlueSession & { processDirectInput(input: { message: string }): PromiseLike<unknown> } {
+function fakeSession(
+	session: string,
+	prompts: Array<{ session: string; message: string }>,
+): FlueSession & { processDirectInput(input: { message: string }): PromiseLike<unknown> } {
 	return {
 		name: session,
-		prompt: (() => Promise.resolve({ text: '', usage: {}, model: { provider: 'test-provider', id: 'test' } })) as never,
+		prompt: (() =>
+			Promise.resolve({
+				text: '',
+				usage: {},
+				model: { provider: 'test-provider', id: 'test' },
+			})) as never,
 		processDirectInput: ({ message }: { message: string }) => {
 			prompts.push({ session, message });
-			return Promise.resolve({ text: `reply:${message}`, usage: {}, model: { provider: 'test-provider', id: 'test' } });
+			return Promise.resolve({
+				text: `reply:${message}`,
+				usage: {},
+				model: { provider: 'test-provider', id: 'test' },
+			});
 		},
 		shell: (() => Promise.resolve({ stdout: '', stderr: '', exitCode: 0 })) as never,
 		fs: {} as never,
-		skill: (() => Promise.resolve({ text: '', usage: {}, model: { provider: 'test-provider', id: 'test' } })) as never,
-		task: (() => Promise.resolve({ text: '', usage: {}, model: { provider: 'test-provider', id: 'test' } })) as never,
+		skill: (() =>
+			Promise.resolve({
+				text: '',
+				usage: {},
+				model: { provider: 'test-provider', id: 'test' },
+			})) as never,
+		task: (() =>
+			Promise.resolve({
+				text: '',
+				usage: {},
+				model: { provider: 'test-provider', id: 'test' },
+			})) as never,
 		compact: async () => {},
 		delete: async () => {},
 	};
@@ -345,7 +396,13 @@ function fakeEnv(): SessionEnv {
 		readFile: async () => '',
 		readFileBuffer: async () => new Uint8Array(),
 		writeFile: async () => {},
-		stat: async () => ({ isFile: true, isDirectory: false, isSymbolicLink: false, size: 0, mtime: new Date() }),
+		stat: async () => ({
+			isFile: true,
+			isDirectory: false,
+			isSymbolicLink: false,
+			size: 0,
+			mtime: new Date(),
+		}),
 		readdir: async () => [],
 		exists: async () => false,
 		mkdir: async () => {},

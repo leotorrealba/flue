@@ -18,7 +18,10 @@ beforeAll(() => {
 	testRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'flue-packed-copy-release-'));
 	const tarballs = path.join(testRoot, 'tarballs');
 	fs.mkdirSync(tarballs);
-	execFileSync('pnpm', ['pack', '--pack-destination', tarballs], { cwd: runtimeRoot, stdio: 'pipe' });
+	execFileSync('pnpm', ['pack', '--pack-destination', tarballs], {
+		cwd: runtimeRoot,
+		stdio: 'pipe',
+	});
 	execFileSync('pnpm', ['pack', '--pack-destination', tarballs], { cwd: cliRoot, stdio: 'pipe' });
 	runtimeTarball = path.join(tarballs, requiredTarball(tarballs, 'flue-runtime-'));
 	cliTarball = path.join(tarballs, requiredTarball(tarballs, 'flue-cli-'));
@@ -32,13 +35,30 @@ describe('packed example release shape', () => {
 	it('runs the imported skill example on Node and Cloudflare without application just-bash', async () => {
 		const root = createPackedExample('default-sandbox', false);
 		writeDeterministicSkillWorkflow(root);
-		fs.writeFileSync(path.join(root, '.env'), 'RELEASE_TARGET=node\nRELEASE_MARKER=packed-node-env\nRELEASE_OUTPUT=dist-auto\n');
-		fs.writeFileSync(path.join(root, '.build.env'), 'RELEASE_TARGET=node\nRELEASE_OUTPUT=dist-explicit\n');
-		fs.writeFileSync(path.join(root, '.cloudflare.env'), 'RELEASE_OUTPUT=dist-cloudflare-cli\nCLI_ONLY=not-a-worker-binding\n');
-		fs.writeFileSync(path.join(root, 'flue.config.ts'), `import { defineConfig } from '@flue/cli/config';\nexport default defineConfig({ target: process.env.RELEASE_TARGET === 'node' ? 'node' : undefined, output: process.env.RELEASE_OUTPUT });\n`);
-		const wranglerConfig = JSON.parse(fs.readFileSync(path.join(root, 'wrangler.jsonc'), 'utf8')) as Record<string, unknown>;
+		fs.writeFileSync(
+			path.join(root, '.env'),
+			'RELEASE_TARGET=node\nRELEASE_MARKER=packed-node-env\nRELEASE_OUTPUT=dist-auto\n',
+		);
+		fs.writeFileSync(
+			path.join(root, '.build.env'),
+			'RELEASE_TARGET=node\nRELEASE_OUTPUT=dist-explicit\n',
+		);
+		fs.writeFileSync(
+			path.join(root, '.cloudflare.env'),
+			'RELEASE_OUTPUT=dist-cloudflare-cli\nCLI_ONLY=not-a-worker-binding\n',
+		);
+		fs.writeFileSync(
+			path.join(root, 'flue.config.ts'),
+			`import { defineConfig } from '@flue/cli/config';\nexport default defineConfig({ target: process.env.RELEASE_TARGET === 'node' ? 'node' : undefined, output: process.env.RELEASE_OUTPUT });\n`,
+		);
+		const wranglerConfig = JSON.parse(
+			fs.readFileSync(path.join(root, 'wrangler.jsonc'), 'utf8'),
+		) as Record<string, unknown>;
 		wranglerConfig.secrets = { required: ['CLI_ONLY'] };
-		fs.writeFileSync(path.join(root, 'wrangler.jsonc'), `${JSON.stringify(wranglerConfig, null, '\t')}\n`);
+		fs.writeFileSync(
+			path.join(root, 'wrangler.jsonc'),
+			`${JSON.stringify(wranglerConfig, null, '\t')}\n`,
+		);
 		installFixture(root);
 
 		const nodeOutput = runFlue(root, ['run', 'with-imported-skill']);
@@ -48,27 +68,48 @@ describe('packed example release shape', () => {
 
 		const nodeDev = await startNodeDevWorkflow(root, 'with-imported-skill');
 		try {
-			expect(await nodeDev.waitForMarker('packed-node-env')).toMatchObject({ result: { marker: 'packed-node-env' } });
-			fs.writeFileSync(path.join(root, '.env.tmp'), 'RELEASE_TARGET=node\nRELEASE_MARKER=packed-node-reloaded\nRELEASE_OUTPUT=dist-auto\n');
+			expect(await nodeDev.waitForMarker('packed-node-env')).toMatchObject({
+				result: { marker: 'packed-node-env' },
+			});
+			fs.writeFileSync(
+				path.join(root, '.env.tmp'),
+				'RELEASE_TARGET=node\nRELEASE_MARKER=packed-node-reloaded\nRELEASE_OUTPUT=dist-auto\n',
+			);
 			fs.renameSync(path.join(root, '.env.tmp'), path.join(root, '.env'));
-			expect(await nodeDev.waitForMarker('packed-node-reloaded')).toMatchObject({ result: { marker: 'packed-node-reloaded' } });
+			expect(await nodeDev.waitForMarker('packed-node-reloaded')).toMatchObject({
+				result: { marker: 'packed-node-reloaded' },
+			});
 			fs.rmSync(path.join(root, '.env'));
 			const deletedEnvResult = await nodeDev.waitForMarker(undefined);
 			expect(deletedEnvResult.result).not.toHaveProperty('marker');
-			fs.writeFileSync(path.join(root, '.env'), 'RELEASE_TARGET=node\nRELEASE_MARKER=packed-node-created\nRELEASE_OUTPUT=dist-auto\n');
-			expect(await nodeDev.waitForMarker('packed-node-created')).toMatchObject({ result: { marker: 'packed-node-created' } });
+			fs.writeFileSync(
+				path.join(root, '.env'),
+				'RELEASE_TARGET=node\nRELEASE_MARKER=packed-node-created\nRELEASE_OUTPUT=dist-auto\n',
+			);
+			expect(await nodeDev.waitForMarker('packed-node-created')).toMatchObject({
+				result: { marker: 'packed-node-created' },
+			});
 		} finally {
 			await nodeDev.stop();
 		}
 
 		runFlue(root, ['build', '--env', '.build.env']);
 		expect(fs.existsSync(path.join(root, 'dist-explicit', 'server.mjs'))).toBe(true);
-		const builtServerResponse = await runNodeServerWorkflow(root, path.join(root, 'dist-explicit', 'server.mjs'), 'with-imported-skill') as { result?: Record<string, unknown> };
+		const builtServerResponse = (await runNodeServerWorkflow(
+			root,
+			path.join(root, 'dist-explicit', 'server.mjs'),
+			'with-imported-skill',
+		)) as { result?: Record<string, unknown> };
 		expect(builtServerResponse.result).not.toHaveProperty('marker');
 
 		runFlue(root, ['build', '--target', 'cloudflare']);
-		const response = await runCloudflareWorkflow(root, 'with-imported-skill', ['--env', '.cloudflare.env']) as { result?: Record<string, unknown> };
-		expect(response).toMatchObject({ result: { text: 'Confirm the answer is direct, accurate, and complete.\n', hasBody: false } });
+		const response = (await runCloudflareWorkflow(root, 'with-imported-skill', [
+			'--env',
+			'.cloudflare.env',
+		])) as { result?: Record<string, unknown> };
+		expect(response).toMatchObject({
+			result: { text: 'Confirm the answer is direct, accurate, and complete.\n', hasBody: false },
+		});
 		expect(response.result).not.toHaveProperty('marker');
 		expect(fs.existsSync(path.join(root, 'dist-cloudflare-cli'))).toBe(true);
 	}, 240000);
@@ -87,7 +128,9 @@ describe('packed example release shape', () => {
 		fs.writeFileSync(path.join(root, '.first.env'), 'FIRST=true\n');
 		fs.writeFileSync(path.join(root, '.second.env'), 'SECOND=true\n');
 		installFixture(root);
-		expect(() => runFlue(root, ['build', '--target', 'node', '--env', '.first.env', '--env', '.second.env'])).toThrow(/`--env` accepts one file/);
+		expect(() =>
+			runFlue(root, ['build', '--target', 'node', '--env', '.first.env', '--env', '.second.env']),
+		).toThrow(/`--env` accepts one file/);
 	}, 240000);
 });
 
@@ -97,7 +140,11 @@ function createPackedExample(name: string, keepCustomBash: boolean): string {
 		recursive: true,
 		filter: (source) => {
 			const basename = path.basename(source);
-			return !['node_modules', 'dist', '.flue-vite', '.flue-vite.wrangler.jsonc', '.wrangler'].includes(basename) && !basename.startsWith('dist-');
+			return (
+				!['node_modules', 'dist', '.flue-vite', '.flue-vite.wrangler.jsonc', '.wrangler'].includes(
+					basename,
+				) && !basename.startsWith('dist-')
+			);
 		},
 	});
 	const packagePath = path.join(root, 'package.json');
@@ -108,14 +155,22 @@ function createPackedExample(name: string, keepCustomBash: boolean): string {
 	packageJson.dependencies['@flue/runtime'] = `file:${runtimeTarball}`;
 	packageJson.devDependencies['@flue/cli'] = `file:${cliTarball}`;
 	const wranglerPath = path.join(root, 'wrangler.jsonc');
-	const wranglerConfig = JSON.parse(fs.readFileSync(wranglerPath, 'utf8')) as { migrations: unknown[] };
+	const wranglerConfig = JSON.parse(fs.readFileSync(wranglerPath, 'utf8')) as {
+		migrations: unknown[];
+	};
 	if (keepCustomBash) {
 		fs.rmSync(path.join(root, 'src', 'workflows', 'with-imported-skill.ts'));
-		wranglerConfig.migrations.push({ tag: 'fixture-delete-WithImportedSkillWorkflow', deleted_classes: ['WithImportedSkillWorkflow'] });
+		wranglerConfig.migrations.push({
+			tag: 'fixture-delete-WithImportedSkillWorkflow',
+			deleted_classes: ['WithImportedSkillWorkflow'],
+		});
 	} else {
 		delete packageJson.dependencies['just-bash'];
 		fs.rmSync(path.join(root, 'src', 'workflows', 'with-custom-bash.ts'));
-		wranglerConfig.migrations.push({ tag: 'fixture-delete-WithCustomBashWorkflow', deleted_classes: ['WithCustomBashWorkflow'] });
+		wranglerConfig.migrations.push({
+			tag: 'fixture-delete-WithCustomBashWorkflow',
+			deleted_classes: ['WithCustomBashWorkflow'],
+		});
 	}
 	fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, '\t')}\n`);
 	fs.writeFileSync(wranglerPath, `${JSON.stringify(wranglerConfig, null, '\t')}\n`);
@@ -137,84 +192,40 @@ function installFixture(root: string): void {
 	execFileSync('pnpm', ['install'], { cwd: root, stdio: 'inherit', timeout: 120000 });
 	const appResolverPath = path.join(root, '__resolve-runtime.mjs');
 	const cliResolverPath = path.join(root, 'node_modules', '@flue', 'cli', '__resolve-runtime.mjs');
-	const resolveRuntimeScript = "import { realpathSync } from 'node:fs'; import { fileURLToPath } from 'node:url'; console.log(realpathSync(fileURLToPath(import.meta.resolve('@flue/runtime'))));\n";
+	const resolveRuntimeScript =
+		"import { realpathSync } from 'node:fs'; import { fileURLToPath } from 'node:url'; console.log(realpathSync(fileURLToPath(import.meta.resolve('@flue/runtime'))));\n";
 	fs.writeFileSync(appResolverPath, resolveRuntimeScript);
 	fs.writeFileSync(cliResolverPath, resolveRuntimeScript);
-	const directRuntime = execFileSync('node', [appResolverPath], { cwd: root, encoding: 'utf8' }).trim();
-	const cliRuntime = execFileSync('node', [cliResolverPath], { cwd: root, encoding: 'utf8' }).trim();
+	const directRuntime = execFileSync('node', [appResolverPath], {
+		cwd: root,
+		encoding: 'utf8',
+	}).trim();
+	const cliRuntime = execFileSync('node', [cliResolverPath], {
+		cwd: root,
+		encoding: 'utf8',
+	}).trim();
 	expect(directRuntime).toBe(cliRuntime);
 	expect(directRuntime).toContain('@flue+runtime@file+');
 }
 
 function runFlue(root: string, args: string[]): string {
-	return execFileSync('pnpm', ['exec', 'flue', ...args], { cwd: root, encoding: 'utf8', timeout: 120000 });
+	return execFileSync('pnpm', ['exec', 'flue', ...args], {
+		cwd: root,
+		encoding: 'utf8',
+		timeout: 120000,
+	});
 }
 
-async function runNodeServerWorkflow(root: string, serverPath: string, workflow: string): Promise<Record<string, unknown>> {
+async function runNodeServerWorkflow(
+	root: string,
+	serverPath: string,
+	workflow: string,
+): Promise<Record<string, unknown>> {
 	const port = await availablePort();
 	const child = spawn('node', [serverPath], {
 		cwd: root,
 		stdio: ['ignore', 'pipe', 'pipe'],
 		env: { ...process.env, PORT: String(port), FLUE_MODE: 'local' },
-	});
-	let output = '';
-	child.stdout?.on('data', (chunk) => { output += String(chunk); });
-	child.stderr?.on('data', (chunk) => { output += String(chunk); });
-	try {
-		const deadline = Date.now() + 60000;
-		while (Date.now() < deadline) {
-			if (child.exitCode !== null) throw new Error(`Node server exited early.\n${output}`);
-			try {
-				const response = await fetch(`http://127.0.0.1:${port}/workflows/${workflow}?wait=result`, { method: 'POST' });
-				if (response.ok) return (await response.json()) as Record<string, unknown>;
-			} catch {
-			}
-			await new Promise((resolve) => setTimeout(resolve, 250));
-		}
-		throw new Error(`Timed out waiting for Node server.\n${output}`);
-	} finally {
-		await terminateChild(child);
-	}
-}
-
-async function startNodeDevWorkflow(root: string, workflow: string): Promise<{
-	waitForMarker(marker: string | undefined): Promise<{ result?: { marker?: string } }>;
-	stop(): Promise<void>;
-}> {
-	const port = await availablePort();
-	const child = spawn('pnpm', ['exec', 'flue', 'dev', '--target', 'node', '--port', String(port)], {
-		cwd: root,
-		stdio: ['ignore', 'pipe', 'pipe'],
-	});
-	let output = '';
-	child.stdout?.on('data', (chunk) => { output += String(chunk); });
-	child.stderr?.on('data', (chunk) => { output += String(chunk); });
-	return {
-		async waitForMarker(marker) {
-			const deadline = Date.now() + 60000;
-			while (Date.now() < deadline) {
-				if (child.exitCode !== null) throw new Error(`Node dev server exited early.\n${output}`);
-				try {
-					const response = await fetch(`http://127.0.0.1:${port}/workflows/${workflow}?wait=result`, { method: 'POST' });
-					if (response.ok) {
-						const result = (await response.json()) as { result?: { marker?: string } };
-						if (result.result?.marker === marker) return result;
-					}
-				} catch {
-				}
-				await new Promise((resolve) => setTimeout(resolve, 250));
-			}
-			throw new Error(`Timed out waiting for Node env marker ${String(marker)}.\n${output}`);
-		},
-		stop: () => terminateChild(child),
-	};
-}
-
-async function runCloudflareWorkflow(root: string, workflow: string, extraArgs: string[] = []): Promise<Record<string, unknown>> {
-	const port = await availablePort();
-	const child = spawn('pnpm', ['exec', 'flue', 'dev', '--target', 'cloudflare', '--port', String(port), ...extraArgs], {
-		cwd: root,
-		stdio: ['ignore', 'pipe', 'pipe'],
 	});
 	let output = '';
 	child.stdout?.on('data', (chunk) => {
@@ -226,13 +237,101 @@ async function runCloudflareWorkflow(root: string, workflow: string, extraArgs: 
 	try {
 		const deadline = Date.now() + 60000;
 		while (Date.now() < deadline) {
-			if (child.exitCode !== null) throw new Error(`Cloudflare dev server exited early.\n${output}`);
+			if (child.exitCode !== null) throw new Error(`Node server exited early.\n${output}`);
 			try {
-				const response = await fetch(`http://127.0.0.1:${port}/workflows/${workflow}?wait=result`, { method: 'POST' });
-				if (!response.ok) throw new Error(`Cloudflare workflow failed with ${response.status}: ${await response.text()}\n${output}`);
+				const response = await fetch(`http://127.0.0.1:${port}/workflows/${workflow}?wait=result`, {
+					method: 'POST',
+				});
+				if (response.ok) return (await response.json()) as Record<string, unknown>;
+			} catch {}
+			await new Promise((resolve) => setTimeout(resolve, 250));
+		}
+		throw new Error(`Timed out waiting for Node server.\n${output}`);
+	} finally {
+		await terminateChild(child);
+	}
+}
+
+async function startNodeDevWorkflow(
+	root: string,
+	workflow: string,
+): Promise<{
+	waitForMarker(marker: string | undefined): Promise<{ result?: { marker?: string } }>;
+	stop(): Promise<void>;
+}> {
+	const port = await availablePort();
+	const child = spawn('pnpm', ['exec', 'flue', 'dev', '--target', 'node', '--port', String(port)], {
+		cwd: root,
+		stdio: ['ignore', 'pipe', 'pipe'],
+	});
+	let output = '';
+	child.stdout?.on('data', (chunk) => {
+		output += String(chunk);
+	});
+	child.stderr?.on('data', (chunk) => {
+		output += String(chunk);
+	});
+	return {
+		async waitForMarker(marker) {
+			const deadline = Date.now() + 60000;
+			while (Date.now() < deadline) {
+				if (child.exitCode !== null) throw new Error(`Node dev server exited early.\n${output}`);
+				try {
+					const response = await fetch(
+						`http://127.0.0.1:${port}/workflows/${workflow}?wait=result`,
+						{ method: 'POST' },
+					);
+					if (response.ok) {
+						const result = (await response.json()) as { result?: { marker?: string } };
+						if (result.result?.marker === marker) return result;
+					}
+				} catch {}
+				await new Promise((resolve) => setTimeout(resolve, 250));
+			}
+			throw new Error(`Timed out waiting for Node env marker ${String(marker)}.\n${output}`);
+		},
+		stop: () => terminateChild(child),
+	};
+}
+
+async function runCloudflareWorkflow(
+	root: string,
+	workflow: string,
+	extraArgs: string[] = [],
+): Promise<Record<string, unknown>> {
+	const port = await availablePort();
+	const child = spawn(
+		'pnpm',
+		['exec', 'flue', 'dev', '--target', 'cloudflare', '--port', String(port), ...extraArgs],
+		{
+			cwd: root,
+			stdio: ['ignore', 'pipe', 'pipe'],
+		},
+	);
+	let output = '';
+	child.stdout?.on('data', (chunk) => {
+		output += String(chunk);
+	});
+	child.stderr?.on('data', (chunk) => {
+		output += String(chunk);
+	});
+	try {
+		const deadline = Date.now() + 60000;
+		while (Date.now() < deadline) {
+			if (child.exitCode !== null)
+				throw new Error(`Cloudflare dev server exited early.\n${output}`);
+			try {
+				const response = await fetch(`http://127.0.0.1:${port}/workflows/${workflow}?wait=result`, {
+					method: 'POST',
+				});
+				if (!response.ok)
+					throw new Error(
+						`Cloudflare workflow failed with ${response.status}: ${await response.text()}\n${output}`,
+					);
 				return (await response.json()) as Record<string, unknown>;
 			} catch (error) {
-				if (error instanceof Error && error.message.startsWith('Cloudflare workflow failed')) throw error;
+				if (error instanceof Error && error.message.startsWith('Cloudflare workflow failed'))
+					throw error;
 			}
 			await new Promise((resolve) => setTimeout(resolve, 250));
 		}
@@ -255,7 +354,9 @@ async function terminateChild(child: ChildProcess): Promise<void> {
 }
 
 function requiredTarball(directory: string, prefix: string): string {
-	const tarball = fs.readdirSync(directory).find((filename) => filename.startsWith(prefix) && filename.endsWith('.tgz'));
+	const tarball = fs
+		.readdirSync(directory)
+		.find((filename) => filename.startsWith(prefix) && filename.endsWith('.tgz'));
 	if (!tarball) throw new Error(`Missing packed tarball with prefix ${prefix}.`);
 	return tarball;
 }

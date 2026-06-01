@@ -1,35 +1,78 @@
 import { InvalidRequestError, toPublicError } from '../errors.ts';
-import type { AgentWebSocketClientMessage, WebSocketErrorMessage, WorkflowWebSocketClientMessage, WorkflowWebSocketServerMessage } from '../types.ts';
+import type {
+	AgentWebSocketClientMessage,
+	WebSocketErrorMessage,
+	WorkflowWebSocketClientMessage,
+	WorkflowWebSocketServerMessage,
+} from '../types.ts';
 
 export function parseAgentWebSocketMessage(raw: string): AgentWebSocketClientMessage {
 	const value = parseObject(raw);
 	if (value.version !== 1 || (value.type !== 'prompt' && value.type !== 'ping')) {
-		throw new InvalidRequestError({ reason: 'Agent WebSocket messages must use protocol version 1 and type "prompt" or "ping".' });
+		throw new InvalidRequestError({
+			reason: 'Agent WebSocket messages must use protocol version 1 and type "prompt" or "ping".',
+		});
 	}
 	if (value.type === 'ping') {
 		if (value.requestId !== undefined && typeof value.requestId !== 'string') {
-			throw new InvalidRequestError({ reason: 'Agent WebSocket ping requestId must be a string when provided.' });
+			throw new InvalidRequestError({
+				reason: 'Agent WebSocket ping requestId must be a string when provided.',
+			});
 		}
 		return { version: 1, type: 'ping', requestId: value.requestId as string | undefined };
 	}
-	if (typeof value.requestId !== 'string' || value.requestId === '' || typeof value.message !== 'string') {
-		throw new InvalidRequestError({ reason: 'Agent WebSocket prompt messages require string requestId and message values.' });
+	if (
+		typeof value.requestId !== 'string' ||
+		value.requestId === '' ||
+		typeof value.message !== 'string'
+	) {
+		throw new InvalidRequestError({
+			reason: 'Agent WebSocket prompt messages require string requestId and message values.',
+		});
 	}
-	if (value.session !== undefined && (typeof value.session !== 'string' || value.session.trim() === '')) {
-		throw new InvalidRequestError({ reason: 'Agent WebSocket prompt session must be a non-empty string when provided.' });
+	if (
+		value.session !== undefined &&
+		(typeof value.session !== 'string' || value.session.trim() === '')
+	) {
+		throw new InvalidRequestError({
+			reason: 'Agent WebSocket prompt session must be a non-empty string when provided.',
+		});
 	}
-	return { version: 1, type: 'prompt', requestId: value.requestId, message: value.message, session: value.session as string | undefined };
+	return {
+		version: 1,
+		type: 'prompt',
+		requestId: value.requestId,
+		message: value.message,
+		session: value.session as string | undefined,
+	};
 }
 
 export function parseWorkflowWebSocketMessage(raw: string): WorkflowWebSocketClientMessage {
 	const value = parseObject(raw);
-	if (value.version !== 1 || value.type !== 'invoke' || typeof value.requestId !== 'string' || value.requestId === '') {
-		throw new InvalidRequestError({ reason: 'Workflow WebSocket messages require protocol version 1, type "invoke", and a string requestId.' });
+	if (
+		value.version !== 1 ||
+		value.type !== 'invoke' ||
+		typeof value.requestId !== 'string' ||
+		value.requestId === ''
+	) {
+		throw new InvalidRequestError({
+			reason:
+				'Workflow WebSocket messages require protocol version 1, type "invoke", and a string requestId.',
+		});
 	}
-	return { version: 1, type: 'invoke', requestId: value.requestId, payload: value.payload === undefined ? {} : value.payload };
+	return {
+		version: 1,
+		type: 'invoke',
+		requestId: value.requestId,
+		payload: value.payload === undefined ? {} : value.payload,
+	};
 }
 
-export function createWebSocketErrorMessage(error: unknown, requestId?: string, runId?: string): WebSocketErrorMessage | Extract<WorkflowWebSocketServerMessage, { type: 'error' }> {
+export function createWebSocketErrorMessage(
+	error: unknown,
+	requestId?: string,
+	runId?: string,
+): WebSocketErrorMessage | Extract<WorkflowWebSocketServerMessage, { type: 'error' }> {
 	return runId === undefined
 		? { version: 1, type: 'error', requestId, error: toPublicError(error) }
 		: { version: 1, type: 'error', requestId, runId, error: toPublicError(error) };

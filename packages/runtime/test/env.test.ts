@@ -35,7 +35,10 @@ describe('CLI environment file', () => {
 		const envFile = path.join(root, '.env');
 		process.env.FLUE_ENV_TEST_SHELL = 'shell';
 		delete process.env.FLUE_ENV_TEST_REMOVED;
-		fs.writeFileSync(envFile, 'FLUE_ENV_TEST_SHELL=file\nFLUE_ENV_TEST_REMOVED=before\nFLUE_ENV_TEST_FILE=runtime\n');
+		fs.writeFileSync(
+			envFile,
+			'FLUE_ENV_TEST_SHELL=file\nFLUE_ENV_TEST_REMOVED=before\nFLUE_ENV_TEST_FILE=runtime\n',
+		);
 		const loader = createEnvLoader(envFile);
 		loader.apply();
 		expect(process.env.FLUE_ENV_TEST_SHELL).toBe('shell');

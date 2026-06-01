@@ -1,9 +1,28 @@
 /** Shared per-agent HTTP dispatcher for the Node and Cloudflare targets. */
 
 import type { FlueContextInternal } from '../client.ts';
-import { InvalidRequestError, parseJsonBody, RunEventTooLargeError, RunStoreUnavailableError, toHttpResponse, toPublicError } from '../errors.ts';
-import type { AttachedAgentEvent, AttachedAgentEventCallback, CreatedAgent, DirectAgentPayload, DispatchReceipt, FlueEvent, FlueEventCallback } from '../types.ts';
-import { assertCurrentDispatchInput, type DispatchInput, type DispatchProcessor } from './dispatch-queue.ts';
+import {
+	InvalidRequestError,
+	parseJsonBody,
+	RunEventTooLargeError,
+	RunStoreUnavailableError,
+	toHttpResponse,
+	toPublicError,
+} from '../errors.ts';
+import type {
+	AttachedAgentEvent,
+	AttachedAgentEventCallback,
+	CreatedAgent,
+	DirectAgentPayload,
+	DispatchReceipt,
+	FlueEvent,
+	FlueEventCallback,
+} from '../types.ts';
+import {
+	assertCurrentDispatchInput,
+	type DispatchInput,
+	type DispatchProcessor,
+} from './dispatch-queue.ts';
 import { streamActiveRunEvents } from './handle-run-routes.ts';
 import { generateWorkflowRunId } from './ids.ts';
 import type { RunOwner, RunRegistry } from './run-registry.ts';
@@ -36,10 +55,21 @@ export function createAgentDispatchProcessor(options: {
 		async process(input) {
 			assertCurrentDispatchInput(input);
 			const agent = options.agents[input.agent];
-			if (!agent) throw new Error(`[flue] dispatch target agent "${input.agent}" has no created agent.`);
-			const releaseSessionLock = await reserveDispatchAgentSession({ agentName: input.agent, instanceId: input.id }, input);
+			if (!agent)
+				throw new Error(`[flue] dispatch target agent "${input.agent}" has no created agent.`);
+			const releaseSessionLock = await reserveDispatchAgentSession(
+				{ agentName: input.agent, instanceId: input.id },
+				input,
+			);
 			try {
-				const ctx = options.createContext(input.id, undefined, input, dispatchRequest(), undefined, input.dispatchId);
+				const ctx = options.createContext(
+					input.id,
+					undefined,
+					input,
+					dispatchRequest(),
+					undefined,
+					input.dispatchId,
+				);
 				await createDispatchAgentHandler(agent, input)(ctx);
 			} finally {
 				releaseSessionLock();
@@ -52,14 +82,20 @@ export interface ValidateAgentDispatchAdmissionOptions {
 	input: DispatchInput;
 }
 
-export async function validateAgentDispatchAdmission(options: ValidateAgentDispatchAdmissionOptions): Promise<DispatchReceipt> {
+export async function validateAgentDispatchAdmission(
+	options: ValidateAgentDispatchAdmissionOptions,
+): Promise<DispatchReceipt> {
 	const { input } = options;
 	assertCurrentDispatchInput(input);
-	if (!isDispatchInput(input)) throw new Error('[flue] Internal dispatch admission received an invalid payload.');
+	if (!isDispatchInput(input))
+		throw new Error('[flue] Internal dispatch admission received an invalid payload.');
 	return { dispatchId: input.dispatchId, acceptedAt: input.acceptedAt };
 }
 
-export function createDispatchAgentHandler(agent: CreatedAgentHandler, input: DispatchInput): AgentHandler {
+export function createDispatchAgentHandler(
+	agent: CreatedAgentHandler,
+	input: DispatchInput,
+): AgentHandler {
 	return (ctx) => processAgentDispatch(ctx, agent, input);
 }
 
@@ -70,7 +106,11 @@ export async function reserveDispatchAgentSession(
 	return waitForAgentSessionLock(target, payload);
 }
 
-async function processAgentDispatch(ctx: FlueContextInternal, agent: CreatedAgentHandler, input: DispatchInput): Promise<unknown> {
+async function processAgentDispatch(
+	ctx: FlueContextInternal,
+	agent: CreatedAgentHandler,
+	input: DispatchInput,
+): Promise<unknown> {
 	const harness = await ctx.initializeCreatedAgent(agent, undefined);
 	const session = await harness.session(input.session);
 	if (!isDispatchSession(session)) {
@@ -82,12 +122,19 @@ async function processAgentDispatch(ctx: FlueContextInternal, agent: CreatedAgen
 function isDispatchInput(value: unknown): value is DispatchInput {
 	if (!value || typeof value !== 'object') return false;
 	const input = value as Partial<DispatchInput>;
-	return typeof input.dispatchId === 'string' && input.dispatchId.trim() !== ''
-		&& typeof input.agent === 'string' && input.agent.trim() !== ''
-		&& typeof input.id === 'string' && input.id.trim() !== ''
-		&& typeof input.session === 'string' && input.session.trim() !== ''
-		&& input.input !== undefined
-		&& typeof input.acceptedAt === 'string' && input.acceptedAt.trim() !== '';
+	return (
+		typeof input.dispatchId === 'string' &&
+		input.dispatchId.trim() !== '' &&
+		typeof input.agent === 'string' &&
+		input.agent.trim() !== '' &&
+		typeof input.id === 'string' &&
+		input.id.trim() !== '' &&
+		typeof input.session === 'string' &&
+		input.session.trim() !== '' &&
+		input.input !== undefined &&
+		typeof input.acceptedAt === 'string' &&
+		input.acceptedAt.trim() !== ''
+	);
 }
 
 function dispatchRequest(): Request {
@@ -95,7 +142,11 @@ function dispatchRequest(): Request {
 }
 
 function isDispatchSession(value: unknown): value is DispatchSession {
-	return !!value && typeof value === 'object' && typeof (value as DispatchSession).processDispatchInput === 'function';
+	return (
+		!!value &&
+		typeof value === 'object' &&
+		typeof (value as DispatchSession).processDispatchInput === 'function'
+	);
 }
 
 export function createDirectAgentHandler(agent: CreatedAgentHandler): AgentHandler {
@@ -111,11 +162,16 @@ export function createDirectAgentHandler(agent: CreatedAgentHandler): AgentHandl
 }
 
 function isDirectRequestSession(value: unknown): value is DirectRequestSession {
-	return !!value && typeof value === 'object' && typeof (value as DirectRequestSession).processDirectInput === 'function';
+	return (
+		!!value &&
+		typeof value === 'object' &&
+		typeof (value as DirectRequestSession).processDirectInput === 'function'
+	);
 }
 
 function parseDirectAgentPayload(payload: unknown): DirectAgentPayload {
-	const expected = 'Direct agent requests must use JSON object body { "message": string, "session"?: string }.';
+	const expected =
+		'Direct agent requests must use JSON object body { "message": string, "session"?: string }.';
 	if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
 		throw new InvalidRequestError({ reason: expected });
 	}
@@ -123,8 +179,13 @@ function parseDirectAgentPayload(payload: unknown): DirectAgentPayload {
 	if (typeof value.message !== 'string') {
 		throw new InvalidRequestError({ reason: expected });
 	}
-	if (value.session !== undefined && (typeof value.session !== 'string' || value.session.trim() === '')) {
-		throw new InvalidRequestError({ reason: 'Direct agent request "session" must be a non-empty string when provided.' });
+	if (
+		value.session !== undefined &&
+		(typeof value.session !== 'string' || value.session.trim() === '')
+	) {
+		throw new InvalidRequestError({
+			reason: 'Direct agent request "session" must be a non-empty string when provided.',
+		});
 	}
 	return { message: value.message, session: value.session };
 }
@@ -153,7 +214,10 @@ export type CreateContextFn = (
  * The caller is responsible for any logging on completion/error; this wrapper
  * starts durably admitted workflow execution for any supported observation mode.
  */
-export type StartWorkflowAdmissionFn = (runId: string, run: () => Promise<unknown>) => Promise<unknown>;
+export type StartWorkflowAdmissionFn = (
+	runId: string,
+	run: () => Promise<unknown>,
+) => Promise<unknown>;
 
 /**
  * Direct-agent foreground execution wrapper. Wraps the call to `handler(ctx)`
@@ -203,7 +267,10 @@ export async function handleAgentRequest(opts: HandleAgentOptions): Promise<Resp
 	try {
 		const rawPayload = await parseJsonBody(request);
 		if (request.headers.get('x-webhook') === 'true') {
-			throw new InvalidRequestError({ reason: 'Direct agent prompts are attached interactions. Use dispatch(...) for asynchronous delivery.' });
+			throw new InvalidRequestError({
+				reason:
+					'Direct agent prompts are attached interactions. Use dispatch(...) for asynchronous delivery.',
+			});
 		}
 		const payload = parseDirectAgentPayload(rawPayload);
 		const directOptions: DirectAttachedOptions = {
@@ -225,7 +292,8 @@ export async function handleAgentRequest(opts: HandleAgentOptions): Promise<Resp
 }
 
 export async function handleWorkflowRequest(opts: HandleWorkflowOptions): Promise<Response> {
-	const { request, workflowName, handler, createContext, runStore, runSubscribers, runRegistry } = opts;
+	const { request, workflowName, handler, createContext, runStore, runSubscribers, runRegistry } =
+		opts;
 	const startWorkflowAdmission = opts.startWorkflowAdmission ?? defaultStartWorkflowAdmission;
 	const runId = opts.runId ?? generateWorkflowRunId(workflowName);
 	const instanceId = runId;
@@ -236,7 +304,8 @@ export async function handleWorkflowRequest(opts: HandleWorkflowOptions): Promis
 		const isSSE = accept.includes('text/event-stream');
 		const wait = new URL(request.url).searchParams.get('wait');
 		const owner = { kind: 'workflow' as const, workflowName, instanceId };
-		if (isSSE && wait !== 'result' && !runSubscribers) throw new Error('[flue] Workflow SSE requires a run subscriber registry.');
+		if (isSSE && wait !== 'result' && !runSubscribers)
+			throw new Error('[flue] Workflow SSE requires a run subscriber registry.');
 
 		const execution = await prepareWorkflowExecution({
 			owner,
@@ -312,12 +381,21 @@ export interface FailRecoveredRunOptions {
 
 const activeAttachedAgentSessions = new Map<string, symbol>();
 
-async function waitForAgentSessionLock(target: AgentSessionTarget, payload: unknown): Promise<() => void> {
+async function waitForAgentSessionLock(
+	target: AgentSessionTarget,
+	payload: unknown,
+): Promise<() => void> {
 	while (true) {
 		try {
-			return acquireDirectAgentSessionLock(target.agentName, target.instanceId, payload) ?? (() => {});
+			return (
+				acquireDirectAgentSessionLock(target.agentName, target.instanceId, payload) ?? (() => {})
+			);
 		} catch (error) {
-			if (!(error instanceof InvalidRequestError) || error.details !== 'This agent session already has an active prompt.') throw error;
+			if (
+				!(error instanceof InvalidRequestError) ||
+				error.details !== 'This agent session already has an active prompt.'
+			)
+				throw error;
 			await new Promise<void>((resolve) => setTimeout(resolve, 0));
 		}
 	}
@@ -353,7 +431,9 @@ interface AdmittedWorkflowExecution {
 	completion?: Promise<unknown>;
 }
 
-async function prepareWorkflowExecution(opts: WorkflowAdmissionOptions): Promise<AdmittedWorkflowExecution> {
+async function prepareWorkflowExecution(
+	opts: WorkflowAdmissionOptions,
+): Promise<AdmittedWorkflowExecution> {
 	const {
 		owner,
 		id,
@@ -383,12 +463,23 @@ async function prepareWorkflowExecution(opts: WorkflowAdmissionOptions): Promise
 		runRegistry,
 		requirePersistedAdmission: true,
 	});
-	return { runId, runStore, runSubscribers, lifecycle, startWorkflowAdmission, handler, onAdmitted, onEvent, emitIdleOnComplete };
+	return {
+		runId,
+		runStore,
+		runSubscribers,
+		lifecycle,
+		startWorkflowAdmission,
+		handler,
+		onAdmitted,
+		onEvent,
+		emitIdleOnComplete,
+	};
 }
 
 function startWorkflowExecution(execution: AdmittedWorkflowExecution): Promise<unknown> {
 	if (execution.completion) return execution.completion;
-	const { runId, lifecycle, handler, startWorkflowAdmission, onEvent, emitIdleOnComplete } = execution;
+	const { runId, lifecycle, handler, startWorkflowAdmission, onEvent, emitIdleOnComplete } =
+		execution;
 	let didRun = false;
 	let didEmitIdle = false;
 	if (onEvent || emitIdleOnComplete) {
@@ -417,7 +508,9 @@ function startWorkflowExecution(execution: AdmittedWorkflowExecution): Promise<u
 		scheduled = startWorkflowAdmission(runId, run);
 	} catch (error) {
 		lifecycle.ctx.setEventCallback(undefined);
-		execution.completion = emitRunEnd(lifecycle, { isError: true, error }).then(() => Promise.reject(error));
+		execution.completion = emitRunEnd(lifecycle, { isError: true, error }).then(() =>
+			Promise.reject(error),
+		);
 		execution.completion.catch(() => undefined);
 		throw error;
 	}
@@ -452,11 +545,14 @@ export async function failRecoveredRun(opts: FailRecoveredRunOptions): Promise<v
 		await reconcileTerminalRun(opts, run, terminalEvent, events);
 		return;
 	}
-	if (run) await safeRegistry('recordRunStart(recovery)', () => opts.runRegistry?.recordRunStart({
-		runId: opts.runId,
-		owner: run.owner,
-		startedAt: run.startedAt,
-	}));
+	if (run)
+		await safeRegistry('recordRunStart(recovery)', () =>
+			opts.runRegistry?.recordRunStart({
+				runId: opts.runId,
+				owner: run.owner,
+				startedAt: run.startedAt,
+			}),
+		);
 	const initialEventIndex = nextEventIndex(events);
 	const startedAt = run?.startedAt ?? new Date().toISOString();
 	const startedAtMs = Date.parse(startedAt);
@@ -514,24 +610,30 @@ async function reconcileTerminalRun(
 			error,
 		});
 	}
-	await safeRegistry('recordRunStart(recovery)', () => opts.runRegistry?.recordRunStart({
-		runId: opts.runId,
-		owner: run?.owner ?? opts.owner,
-		startedAt: run?.startedAt ?? endedAt,
-	}));
-	await safeRegistry('recordRunEnd(recovery)', () => opts.runRegistry?.recordRunEnd({
-		runId: opts.runId,
-		endedAt,
-		durationMs,
-		isError,
-	}));
+	await safeRegistry('recordRunStart(recovery)', () =>
+		opts.runRegistry?.recordRunStart({
+			runId: opts.runId,
+			owner: run?.owner ?? opts.owner,
+			startedAt: run?.startedAt ?? endedAt,
+		}),
+	);
+	await safeRegistry('recordRunEnd(recovery)', () =>
+		opts.runRegistry?.recordRunEnd({
+			runId: opts.runId,
+			endedAt,
+			durationMs,
+			isError,
+		}),
+	);
 	opts.runSubscribers?.complete(opts.runId);
 }
 
-function findTerminalRunEvent(events: FlueEvent[]): Extract<FlueEvent, { type: 'run_end' }> | undefined {
-	return [...events].reverse().find(
-		(event): event is Extract<FlueEvent, { type: 'run_end' }> => event.type === 'run_end',
-	);
+function findTerminalRunEvent(
+	events: FlueEvent[],
+): Extract<FlueEvent, { type: 'run_end' }> | undefined {
+	return [...events]
+		.reverse()
+		.find((event): event is Extract<FlueEvent, { type: 'run_end' }> => event.type === 'run_end');
 }
 
 function nextEventIndex(events: FlueEvent[]): number {
@@ -548,7 +650,13 @@ function runDirectSseMode(opts: DirectAttachedOptions): Response {
 	const writeSSE = async (data: unknown, eventType: string): Promise<void> => {
 		if (closed) return;
 		const eventIndex = getEventIndex(data) ?? 0;
-		const lines = [`event: ${eventType}`, `id: ${eventIndex}`, `data: ${typeof data === 'string' ? data : JSON.stringify(data)}`, '', ''];
+		const lines = [
+			`event: ${eventType}`,
+			`id: ${eventIndex}`,
+			`data: ${typeof data === 'string' ? data : JSON.stringify(data)}`,
+			'',
+			'',
+		];
 		try {
 			await writer.write(encoder.encode(lines.join('\n')));
 		} catch {}
@@ -558,7 +666,11 @@ function runDirectSseMode(opts: DirectAttachedOptions): Response {
 	}, SSE_HEARTBEAT_MS);
 	(async () => {
 		try {
-			await invokeDirectAttached({ ...opts, onEvent: (event) => writeSSE(event, event.type), emitIdleOnComplete: true });
+			await invokeDirectAttached({
+				...opts,
+				onEvent: (event) => writeSSE(event, event.type),
+				emitIdleOnComplete: true,
+			});
 		} catch (error) {
 			await writeSSE({ type: 'error', instanceId: opts.id, error: toPublicError(error) }, 'error');
 		} finally {
@@ -570,7 +682,11 @@ function runDirectSseMode(opts: DirectAttachedOptions): Response {
 		}
 	})();
 	return new Response(readable, {
-		headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' },
+		headers: {
+			'content-type': 'text/event-stream',
+			'cache-control': 'no-cache',
+			connection: 'keep-alive',
+		},
 	});
 }
 
@@ -613,8 +729,13 @@ export async function invokeDirectAttached(opts: DirectAttachedOptions): Promise
 }
 
 async function runSseMode(execution: AdmittedWorkflowExecution): Promise<Response> {
-	if (!execution.runSubscribers) throw new Error('[flue] Workflow SSE requires a run subscriber registry.');
-	const response = streamActiveRunEvents(execution.runStore, execution.runSubscribers, execution.runId);
+	if (!execution.runSubscribers)
+		throw new Error('[flue] Workflow SSE requires a run subscriber registry.');
+	const response = streamActiveRunEvents(
+		execution.runStore,
+		execution.runSubscribers,
+		execution.runId,
+	);
 	response.headers.set('X-Flue-Run-Id', execution.runId);
 	try {
 		startWorkflowExecution(execution);
@@ -635,12 +756,17 @@ async function runSyncMode(execution: AdmittedWorkflowExecution): Promise<Respon
 		throw error;
 	}
 	return new Response(
-		JSON.stringify({ result: result === undefined ? null : result, _meta: { runId: execution.runId } }),
+		JSON.stringify({
+			result: result === undefined ? null : result,
+			_meta: { runId: execution.runId },
+		}),
 		{ headers: { 'content-type': 'application/json', 'X-Flue-Run-Id': execution.runId } },
 	);
 }
 
-export async function invokeWorkflowAttached(opts: InvokeWorkflowAttachedOptions): Promise<WorkflowAttachedInvocationResult> {
+export async function invokeWorkflowAttached(
+	opts: InvokeWorkflowAttachedOptions,
+): Promise<WorkflowAttachedInvocationResult> {
 	if (!opts.startWorkflowAdmission) return invokeWorkflowAttachedUnlocked(opts);
 	const execution = await prepareWorkflowExecution({
 		owner: opts.owner,
@@ -668,7 +794,9 @@ export async function invokeWorkflowAttached(opts: InvokeWorkflowAttachedOptions
 	return { runId: opts.runId, result };
 }
 
-async function invokeWorkflowAttachedUnlocked(opts: InvokeWorkflowAttachedOptions): Promise<WorkflowAttachedInvocationResult> {
+async function invokeWorkflowAttachedUnlocked(
+	opts: InvokeWorkflowAttachedOptions,
+): Promise<WorkflowAttachedInvocationResult> {
 	const lifecycle = await createWorkflowRunLifecycle({
 		owner: opts.owner,
 		id: opts.id,
@@ -702,9 +830,16 @@ async function invokeWorkflowAttachedUnlocked(opts: InvokeWorkflowAttachedOption
 	}
 }
 
-function acquireDirectAgentSessionLock(agentName: string, instanceId: string, input: unknown): (() => void) | undefined {
+function acquireDirectAgentSessionLock(
+	agentName: string,
+	instanceId: string,
+	input: unknown,
+): (() => void) | undefined {
 	const payload = input as { session?: unknown } | null;
-	const session = typeof payload?.session === 'string' && payload.session.trim() !== '' ? payload.session : 'default';
+	const session =
+		typeof payload?.session === 'string' && payload.session.trim() !== ''
+			? payload.session
+			: 'default';
 	const key = `${agentName}\0${instanceId}\0${session}`;
 	if (activeAttachedAgentSessions.has(key)) {
 		throw new InvalidRequestError({ reason: 'This agent session already has an active prompt.' });
@@ -737,7 +872,9 @@ interface WorkflowRunLifecycle extends WorkflowRunLifecycleOptions {
 	startedAtMs: number;
 }
 
-async function createWorkflowRunLifecycle(options: WorkflowRunLifecycleOptions): Promise<WorkflowRunLifecycle> {
+async function createWorkflowRunLifecycle(
+	options: WorkflowRunLifecycleOptions,
+): Promise<WorkflowRunLifecycle> {
 	const startedAtMs = Date.now();
 	const startedAt = new Date(startedAtMs).toISOString();
 	const ctx = options.createContext(options.id, options.runId, options.payload, options.request);
@@ -747,25 +884,35 @@ async function createWorkflowRunLifecycle(options: WorkflowRunLifecycleOptions):
 	try {
 		didCreateRun = runStore
 			? await persistRunAdmission('createRun', options.requirePersistedAdmission === true, () =>
-				runStore.createRun({
-					runId: options.runId,
-					owner,
-					startedAt,
-					payload: options.payload,
-				}),
-			)
+					runStore.createRun({
+						runId: options.runId,
+						owner,
+						startedAt,
+						payload: options.payload,
+					}),
+				)
 			: false;
 	} catch (error) {
-		console.error('[flue] Workflow admission error:', { workflowName: owner.workflowName, runId: options.runId, operation: 'createRun', outcome: 'admission_failed' }, error);
+		console.error(
+			'[flue] Workflow admission error:',
+			{
+				workflowName: owner.workflowName,
+				runId: options.runId,
+				operation: 'createRun',
+				outcome: 'admission_failed',
+			},
+			error,
+		);
 		throw error;
 	}
-	if (didCreateRun) await safeRegistry('recordRunStart', () =>
-		options.runRegistry?.recordRunStart({
-			runId: options.runId,
-			owner,
-			startedAt,
-		}),
-	);
+	if (didCreateRun)
+		await safeRegistry('recordRunStart', () =>
+			options.runRegistry?.recordRunStart({
+				runId: options.runId,
+				owner,
+				startedAt,
+			}),
+		);
 	return { ...options, ctx, startedAt, startedAtMs };
 }
 
@@ -860,25 +1007,26 @@ async function emitRunEnd(
 
 	const didEndRun = runStore
 		? await safeRunStore('endRun', () =>
-			runStore.endRun({
-				runId,
-				endedAt,
-				isError: input.isError,
-				durationMs,
-				result,
-				error,
-			}),
-		)
+				runStore.endRun({
+					runId,
+					endedAt,
+					isError: input.isError,
+					durationMs,
+					result,
+					error,
+				}),
+			)
 		: false;
 
-	if (didEndRun) await safeRegistry('recordRunEnd', () =>
-		runRegistry?.recordRunEnd({
-			runId,
-			endedAt,
-			durationMs,
-			isError: input.isError,
-		}),
-	);
+	if (didEndRun)
+		await safeRegistry('recordRunEnd', () =>
+			runRegistry?.recordRunEnd({
+				runId,
+				endedAt,
+				durationMs,
+				isError: input.isError,
+			}),
+		);
 
 	runSubscribers?.complete(runId);
 	if (appendError) throw appendError;
@@ -914,7 +1062,10 @@ async function fanOutEvent(
 	runSubscribers?.publish(runId, event);
 }
 
-async function persistRunEvent(label: string, fn: () => Promise<void> | undefined): Promise<boolean> {
+async function persistRunEvent(
+	label: string,
+	fn: () => Promise<void> | undefined,
+): Promise<boolean> {
 	try {
 		await fn();
 		return true;
@@ -925,7 +1076,11 @@ async function persistRunEvent(label: string, fn: () => Promise<void> | undefine
 	}
 }
 
-async function persistRunAdmission(label: string, required: boolean, fn: () => Promise<void> | undefined): Promise<boolean> {
+async function persistRunAdmission(
+	label: string,
+	required: boolean,
+	fn: () => Promise<void> | undefined,
+): Promise<boolean> {
 	try {
 		await fn();
 		return true;
@@ -969,7 +1124,8 @@ function getEventIndex(data: unknown): number | undefined {
  * target overrides this with a `runFiber` wrapper for crash-recoverable
  * execution across DO hibernation.
  */
-const defaultStartWorkflowAdmission: StartWorkflowAdmissionFn = (_runId, run) => Promise.resolve().then(run);
+const defaultStartWorkflowAdmission: StartWorkflowAdmissionFn = (_runId, run) =>
+	Promise.resolve().then(run);
 
 /**
  * Default direct-agent foreground handler runner: invoke directly. Used by the

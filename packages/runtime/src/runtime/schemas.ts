@@ -13,7 +13,11 @@ export const ErrorEnvelopeSchema = v.object({
 	}),
 });
 
-const RunOwnerSchema = v.object({ kind: v.literal('workflow'), workflowName: v.string(), instanceId: v.string() });
+const RunOwnerSchema = v.object({
+	kind: v.literal('workflow'),
+	workflowName: v.string(),
+	instanceId: v.string(),
+});
 
 export const RunRecordSchema = v.object({
 	runId: v.string(),
@@ -117,7 +121,11 @@ const LlmToolResultMessageSchema = v.object({
 	isError: v.boolean(),
 });
 
-const LlmMessageSchema = v.union([LlmUserMessageSchema, LlmAssistantMessageSchema, LlmToolResultMessageSchema]);
+const LlmMessageSchema = v.union([
+	LlmUserMessageSchema,
+	LlmAssistantMessageSchema,
+	LlmToolResultMessageSchema,
+]);
 
 const LlmToolSchema = v.object({
 	name: v.string(),
@@ -161,7 +169,11 @@ const FlueEventSchema = v.union([
 	flueEvent({
 		type: v.literal('run_start'),
 		runId: v.string(),
-		owner: v.object({ kind: v.literal('workflow'), workflowName: v.string(), instanceId: v.string() }),
+		owner: v.object({
+			kind: v.literal('workflow'),
+			workflowName: v.string(),
+			instanceId: v.string(),
+		}),
 		instanceId: v.string(),
 		workflowName: v.string(),
 		startedAt: v.string(),
@@ -171,14 +183,22 @@ const FlueEventSchema = v.union([
 	flueEvent({
 		type: v.literal('run_resume'),
 		runId: v.string(),
-		owner: v.object({ kind: v.literal('workflow'), workflowName: v.string(), instanceId: v.string() }),
+		owner: v.object({
+			kind: v.literal('workflow'),
+			workflowName: v.string(),
+			instanceId: v.string(),
+		}),
 		instanceId: v.string(),
 		workflowName: v.string(),
 		startedAt: v.string(),
 	}),
 	flueEvent({ type: v.literal('agent_start') }),
 	flueEvent({ type: v.literal('agent_end'), messages: v.array(v.any()) }),
-	flueEvent({ type: v.literal('turn_start'), turnId: v.string(), purpose: v.picklist(['agent', 'compaction', 'compaction_prefix']) }),
+	flueEvent({
+		type: v.literal('turn_start'),
+		turnId: v.string(),
+		purpose: v.picklist(['agent', 'compaction', 'compaction_prefix']),
+	}),
 	flueEvent({
 		type: v.literal('turn_request'),
 		turnId: v.string(),
@@ -193,13 +213,40 @@ const FlueEventSchema = v.union([
 		}),
 		reasoning: v.optional(v.string()),
 	}),
-	flueEvent({ type: v.literal('turn_end'), turnId: v.string(), purpose: v.picklist(['agent', 'compaction', 'compaction_prefix']), message: v.any(), toolResults: v.array(v.any()) }),
+	flueEvent({
+		type: v.literal('turn_end'),
+		turnId: v.string(),
+		purpose: v.picklist(['agent', 'compaction', 'compaction_prefix']),
+		message: v.any(),
+		toolResults: v.array(v.any()),
+	}),
 	flueEvent({ type: v.literal('message_start'), message: v.any() }),
-	flueEvent({ type: v.literal('message_update'), message: v.any(), assistantMessageEvent: v.unknown() }),
+	flueEvent({
+		type: v.literal('message_update'),
+		message: v.any(),
+		assistantMessageEvent: v.unknown(),
+	}),
 	flueEvent({ type: v.literal('message_end'), message: v.any() }),
-	flueEvent({ type: v.literal('tool_execution_start'), toolCallId: v.string(), toolName: v.string(), args: v.unknown() }),
-	flueEvent({ type: v.literal('tool_execution_update'), toolCallId: v.string(), toolName: v.string(), args: v.unknown(), partialResult: v.unknown() }),
-	flueEvent({ type: v.literal('tool_execution_end'), toolCallId: v.string(), toolName: v.string(), result: v.unknown(), isError: v.boolean() }),
+	flueEvent({
+		type: v.literal('tool_execution_start'),
+		toolCallId: v.string(),
+		toolName: v.string(),
+		args: v.unknown(),
+	}),
+	flueEvent({
+		type: v.literal('tool_execution_update'),
+		toolCallId: v.string(),
+		toolName: v.string(),
+		args: v.unknown(),
+		partialResult: v.unknown(),
+	}),
+	flueEvent({
+		type: v.literal('tool_execution_end'),
+		toolCallId: v.string(),
+		toolName: v.string(),
+		result: v.unknown(),
+		isError: v.boolean(),
+	}),
 	flueEvent({ type: v.literal('text_delta'), text: v.string() }),
 	flueEvent({ type: v.literal('thinking_start') }),
 	flueEvent({ type: v.literal('thinking_delta'), delta: v.string() }),
@@ -291,7 +338,8 @@ const FlueEventSchema = v.union([
 	}),
 ]);
 
-type _EventSchemaAssignableToRuntime = v.InferOutput<typeof FlueEventSchema> extends FlueEvent ? true : never;
+type _EventSchemaAssignableToRuntime =
+	v.InferOutput<typeof FlueEventSchema> extends FlueEvent ? true : never;
 const _eventSchemaTypeCheck: _EventSchemaAssignableToRuntime = true;
 void _eventSchemaTypeCheck;
 

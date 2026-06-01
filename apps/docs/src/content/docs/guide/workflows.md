@@ -167,14 +167,14 @@ Use structured results when later application code depends on specific fields, i
 
 A `runId` lets you inspect a workflow independently of the command, HTTP request, or WebSocket connection that started it. This is useful for background work, live progress, debugging, and operational tooling.
 
-| Surface | Use it for |
-| --- | --- |
-| `flue logs <runId>` | Inspect or follow events for a workflow run from the command line. |
-| `GET /runs/<runId>` | Read one run's status and its completed result or error when available. |
-| `GET /runs/<runId>/events` | Read persisted lifecycle, log, and nested agent-operation events. |
-| `GET /runs/<runId>/stream` | Replay persisted events and follow an active run through completion. |
-| `client.runs.get()`, `.events()`, and `.stream()` | Build application tooling around a known workflow run. |
-| `client.admin.runs.list()` | List workflow runs for protected administrative tooling. |
+| Surface                                           | Use it for                                                              |
+| ------------------------------------------------- | ----------------------------------------------------------------------- |
+| `flue logs <runId>`                               | Inspect or follow events for a workflow run from the command line.      |
+| `GET /runs/<runId>`                               | Read one run's status and its completed result or error when available. |
+| `GET /runs/<runId>/events`                        | Read persisted lifecycle, log, and nested agent-operation events.       |
+| `GET /runs/<runId>/stream`                        | Replay persisted events and follow an active run through completion.    |
+| `client.runs.get()`, `.events()`, and `.stream()` | Build application tooling around a known workflow run.                  |
+| `client.admin.runs.list()`                        | List workflow runs for protected administrative tooling.                |
 
 Administrative run listing can reveal workflow payloads, results, model activity, and application logs. Only publish an administrative listing surface behind an authorization boundary appropriate for that data.
 

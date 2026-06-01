@@ -20,19 +20,16 @@ export async function run({ init }: FlueContext) {
 	// Test 1: prompt() with AbortSignal.timeout
 	let timeoutAborted = false;
 	try {
-		await session.prompt(
-			'Run `sleep 30` via the bash tool, then describe what happened.',
-			{ signal: AbortSignal.timeout(2_000) },
-		);
+		await session.prompt('Run `sleep 30` via the bash tool, then describe what happened.', {
+			signal: AbortSignal.timeout(2_000),
+		});
 	} catch (err) {
 		timeoutAborted = isAbortError(err);
 		console.log('[abort] timeout case:', timeoutAborted ? 'PASS' : 'FAIL', formatError(err));
 	}
 
 	// Test 2: handle.abort() with reason
-	const handle = session.prompt(
-		'Run `sleep 30` via the bash tool, then describe what happened.',
-	);
+	const handle = session.prompt('Run `sleep 30` via the bash tool, then describe what happened.');
 	setTimeout(() => handle.abort('user-cancel'), 1_000);
 	let manualAborted = false;
 	let manualReason: unknown;

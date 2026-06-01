@@ -55,37 +55,68 @@ async function* invokeStream(
 	for await (const frame of readSse(response.body)) {
 		const event = JSON.parse(frame.data) as unknown;
 		if (frame.event === 'error') {
-			if (!isAttachedAgentStreamError(event, instanceId)) throw new Error('Agent invocation stream received an invalid error event.');
+			if (!isAttachedAgentStreamError(event, instanceId))
+				throw new Error('Agent invocation stream received an invalid error event.');
 			throw new Error(event.error.message);
 		}
-		if (!isAttachedAgentEvent(event, instanceId)) throw new Error('Agent invocation stream received an invalid event.');
+		if (!isAttachedAgentEvent(event, instanceId))
+			throw new Error('Agent invocation stream received an invalid event.');
 		yield event;
 	}
 }
 
 const ATTACHED_AGENT_EVENT_TYPES = new Set([
-	'agent_start', 'agent_end', 'turn_start', 'turn_request', 'turn_end', 'message_start', 'message_update', 'message_end',
-	'tool_execution_start', 'tool_execution_update', 'tool_execution_end', 'text_delta', 'thinking_start',
-	'thinking_delta', 'thinking_end', 'tool_start', 'tool_call', 'turn', 'task_start', 'task',
-	'compaction_start', 'compaction', 'operation_start', 'operation', 'log', 'idle',
+	'agent_start',
+	'agent_end',
+	'turn_start',
+	'turn_request',
+	'turn_end',
+	'message_start',
+	'message_update',
+	'message_end',
+	'tool_execution_start',
+	'tool_execution_update',
+	'tool_execution_end',
+	'text_delta',
+	'thinking_start',
+	'thinking_delta',
+	'thinking_end',
+	'tool_start',
+	'tool_call',
+	'turn',
+	'task_start',
+	'task',
+	'compaction_start',
+	'compaction',
+	'operation_start',
+	'operation',
+	'log',
+	'idle',
 ]);
 
 function isAttachedAgentEvent(value: unknown, instanceId: string): value is AttachedAgentEvent {
-	return isRecord(value)
-		&& typeof value.type === 'string'
-		&& ATTACHED_AGENT_EVENT_TYPES.has(value.type)
-		&& value.instanceId === instanceId
-		&& value.runId === undefined;
+	return (
+		isRecord(value) &&
+		typeof value.type === 'string' &&
+		ATTACHED_AGENT_EVENT_TYPES.has(value.type) &&
+		value.instanceId === instanceId &&
+		value.runId === undefined
+	);
 }
 
-function isAttachedAgentStreamError(value: unknown, instanceId: string): value is AttachedAgentStreamError {
-	return isRecord(value)
-		&& value.type === 'error'
-		&& value.instanceId === instanceId
-		&& isRecord(value.error)
-		&& typeof value.error.type === 'string'
-		&& typeof value.error.message === 'string'
-		&& typeof value.error.details === 'string';
+function isAttachedAgentStreamError(
+	value: unknown,
+	instanceId: string,
+): value is AttachedAgentStreamError {
+	return (
+		isRecord(value) &&
+		value.type === 'error' &&
+		value.instanceId === instanceId &&
+		isRecord(value.error) &&
+		typeof value.error.type === 'string' &&
+		typeof value.error.message === 'string' &&
+		typeof value.error.details === 'string'
+	);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

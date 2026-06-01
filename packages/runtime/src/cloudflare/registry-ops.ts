@@ -32,10 +32,7 @@ export function createRegistryOps(sql: SqlStorage): RegistryOps {
 	return new SqlRegistryOps(sql);
 }
 
-export async function handleRegistryRequest(
-	ops: RegistryOps,
-	request: Request,
-): Promise<Response> {
+export async function handleRegistryRequest(ops: RegistryOps, request: Request): Promise<Response> {
 	const url = new URL(request.url);
 	const segments = url.pathname.split('/').filter(Boolean);
 	try {
@@ -46,14 +43,24 @@ export async function handleRegistryRequest(
 			if (!pointer) return new Response(null, { status: 404 });
 			return jsonResponse(pointer);
 		}
-		if (request.method === 'POST' && segments[0] === 'pointers' && segments[2] === 'start' && segments.length === 3) {
+		if (
+			request.method === 'POST' &&
+			segments[0] === 'pointers' &&
+			segments[2] === 'start' &&
+			segments.length === 3
+		) {
 			const runId = decodeURIComponent(segments[1] ?? '');
 			if (!runId) return new Response('Missing runId.', { status: 404 });
 			const body = (await request.json()) as Omit<RecordRunStartInput, 'runId'>;
 			ops.recordRunStart({ ...body, runId });
 			return new Response(null, { status: 204 });
 		}
-		if (request.method === 'POST' && segments[0] === 'pointers' && segments[2] === 'end' && segments.length === 3) {
+		if (
+			request.method === 'POST' &&
+			segments[0] === 'pointers' &&
+			segments[2] === 'end' &&
+			segments.length === 3
+		) {
 			const runId = decodeURIComponent(segments[1] ?? '');
 			if (!runId) return new Response('Missing runId.', { status: 404 });
 			const body = (await request.json()) as Omit<RecordRunEndInput, 'runId'>;
@@ -63,10 +70,15 @@ export async function handleRegistryRequest(
 		if (request.method === 'GET' && segments[0] === 'pointers' && segments.length === 1) {
 			return jsonResponse(ops.listRuns(parseListRunsOpts(url.searchParams)));
 		}
-		return new Response(`Unknown registry endpoint: ${request.method} ${url.pathname}`, { status: 404 });
+		return new Response(`Unknown registry endpoint: ${request.method} ${url.pathname}`, {
+			status: 404,
+		});
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
-		return new Response(JSON.stringify({ error: message }), { status: 500, headers: jsonHeaders() });
+		return new Response(JSON.stringify({ error: message }), {
+			status: 500,
+			headers: jsonHeaders(),
+		});
 	}
 }
 
@@ -75,7 +87,9 @@ class SqlRegistryOps implements RegistryOps {
 
 	recordRunStart(input: RecordRunStartInput): void {
 		if (input.owner.instanceId !== input.runId) {
-			throw new Error('[flue] Workflow run owners must use the same instanceId as the pointer runId.');
+			throw new Error(
+				'[flue] Workflow run owners must use the same instanceId as the pointer runId.',
+			);
 		}
 		this.sql.exec(
 			`INSERT OR IGNORE INTO flue_registry_runs
@@ -102,7 +116,9 @@ class SqlRegistryOps implements RegistryOps {
 	}
 
 	lookupRun(runId: string): RunPointer | null {
-		const row = this.sql.exec("SELECT * FROM flue_registry_runs WHERE run_id = ? AND owner_kind = 'workflow'", runId).toArray()[0];
+		const row = this.sql
+			.exec("SELECT * FROM flue_registry_runs WHERE run_id = ? AND owner_kind = 'workflow'", runId)
+			.toArray()[0];
 		return row ? rowToRunPointer(row) : null;
 	}
 
@@ -123,12 +139,14 @@ class SqlRegistryOps implements RegistryOps {
 			wheres.push('(started_at < ? OR (started_at = ? AND run_id < ?))');
 			bindings.push(cursor.startedAt, cursor.startedAt, cursor.runId);
 		}
-		const rows = this.sql.exec(
-			`SELECT * FROM flue_registry_runs WHERE ${wheres.join(' AND ')}
+		const rows = this.sql
+			.exec(
+				`SELECT * FROM flue_registry_runs WHERE ${wheres.join(' AND ')}
 			 ORDER BY started_at DESC, run_id DESC LIMIT ?`,
-			...bindings,
-			limit + 1,
-		).toArray();
+				...bindings,
+				limit + 1,
+			)
+			.toArray();
 		const hasMore = rows.length > limit;
 		const page = (hasMore ? rows.slice(0, limit) : rows).map(rowToRunPointer);
 		const last = page.at(-1);
@@ -153,8 +171,12 @@ function ensureRegistryTables(sql: SqlStorage): void {
 	);
 	ensureColumn(sql, 'flue_registry_runs', 'owner_kind', "TEXT NOT NULL DEFAULT 'agent'");
 	ensureColumn(sql, 'flue_registry_runs', 'workflow_name', 'TEXT');
-	sql.exec('CREATE INDEX IF NOT EXISTS flue_registry_status_started_idx ON flue_registry_runs (status, started_at DESC)');
-	sql.exec('CREATE INDEX IF NOT EXISTS flue_registry_workflow_started_idx ON flue_registry_runs (owner_kind, workflow_name, started_at DESC)');
+	sql.exec(
+		'CREATE INDEX IF NOT EXISTS flue_registry_status_started_idx ON flue_registry_runs (status, started_at DESC)',
+	);
+	sql.exec(
+		'CREATE INDEX IF NOT EXISTS flue_registry_workflow_started_idx ON flue_registry_runs (owner_kind, workflow_name, started_at DESC)',
+	);
 }
 
 function rowToRunPointer(row: SqlRow): RunPointer {
@@ -170,7 +192,8 @@ function rowToRunPointer(row: SqlRow): RunPointer {
 		startedAt: String(row.started_at),
 		endedAt: typeof row.ended_at === 'string' ? row.ended_at : undefined,
 		durationMs: typeof row.duration_ms === 'number' ? row.duration_ms : undefined,
-		isError: row.is_error === null || row.is_error === undefined ? undefined : Boolean(row.is_error),
+		isError:
+			row.is_error === null || row.is_error === undefined ? undefined : Boolean(row.is_error),
 	};
 }
 
@@ -188,7 +211,12 @@ function parseListRunsOpts(params: URLSearchParams): ListRunsOpts {
 }
 
 function ensureColumn(sql: SqlStorage, table: string, column: string, definition: string): void {
-	const columns = new Set(sql.exec(`PRAGMA table_info(${table})`).toArray().map((row) => String(row.name)));
+	const columns = new Set(
+		sql
+			.exec(`PRAGMA table_info(${table})`)
+			.toArray()
+			.map((row) => String(row.name)),
+	);
 	if (!columns.has(column)) sql.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 

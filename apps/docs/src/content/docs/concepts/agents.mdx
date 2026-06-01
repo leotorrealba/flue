@@ -6,7 +6,7 @@ lastReviewedAt: 2026-05-29
 
 Ask ten people what an "AI agent" is and you'll get ten answers: a chatbot, a clever prompt, a workflow, a model with tools. But none of these fully capture it.
 
-**Our preferred definition of an agent is: a large language model (LLM) running inside a harness.**  The model is the part that you're probably already familiar with: GPT 5.5, Opus 4.8, etc. So let's spend some time on the other half of the equation.
+**Our preferred definition of an agent is: a large language model (LLM) running inside a harness.** The model is the part that you're probably already familiar with: GPT 5.5, Opus 4.8, etc. So let's spend some time on the other half of the equation.
 
 **The harness is what the LLM uses to navigate the world and complete tasks.** The harness is what makes a model useful for real work, and the industry now recognizes it as [essential](https://www.langchain.com/blog/the-anatomy-of-an-agent-harness) to building autonomous agents and workflows.
 
@@ -20,25 +20,25 @@ A language model does just one thing: it takes text (and sometimes images) in an
 
 Each piece of the harness exists to give the agent new abilities and focus:
 
-- **We want the agent to keep its work** — so we give it a *filesystem.*
-- **We want the agent to act, not just describe** — so we give it *tools.*
-- **We want the agent to act safely** — so those actions run in a *sandbox.*
-- **We want the agent to stay sharp across long work** — so we give it *context.*
-- **We want the agent to do more than one thing at a time** — so we created  *subagents.*
+- **We want the agent to keep its work** — so we give it a _filesystem._
+- **We want the agent to act, not just describe** — so we give it _tools._
+- **We want the agent to act safely** — so those actions run in a _sandbox._
+- **We want the agent to stay sharp across long work** — so we give it _context._
+- **We want the agent to do more than one thing at a time** — so we created _subagents._
 
 Flue's built-in agent harness gives you all of these pieces in TypeScript, ready to power your agents and run on the deployment target of your choice:
 
-```ts 
+```ts
 // Example: .flue/agents/triage.ts
 import { createAgent } from '@flue/runtime';
 import { local } from '@flue/runtime/node';
 
 export default createAgent(() => ({
-  model: 'anthropic/claude-sonnet-4-6',
-  instructions,      // who the agent is and how it works
-  tools,             // what it can do
-  skills,            // expertise it can load on demand
-  sandbox: local(),  // where it runs, safely
+	model: 'anthropic/claude-sonnet-4-6',
+	instructions, // who the agent is and how it works
+	tools, // what it can do
+	skills, // expertise it can load on demand
+	sandbox: local(), // where it runs, safely
 }));
 ```
 
@@ -52,7 +52,7 @@ Tools like Claude Code and Codex flipped that around. You don't write the steps 
 
 So when people say "agent" today, they usually mean this: a model given enough of a harness to pursue a goal by itself.
 
-For the people building these systems, that inverts the job. You're no longer writing the solution — you're setting the stage for one. You give the agent the context around a problem, connect it to the tools and data it's allowed to use, check that the caller is who they say they are, and then hand the problem over. The answer comes from the model's intelligence working over the context you gave it, not from logic you wrote in advance. After years of spelling out every step by hand, trusting a system to work out the *how* on its own still feels genuinely new.
+For the people building these systems, that inverts the job. You're no longer writing the solution — you're setting the stage for one. You give the agent the context around a problem, connect it to the tools and data it's allowed to use, check that the caller is who they say they are, and then hand the problem over. The answer comes from the model's intelligence working over the context you gave it, not from logic you wrote in advance. After years of spelling out every step by hand, trusting a system to work out the _how_ on its own still feels genuinely new.
 
 ## Going headless
 
@@ -61,9 +61,9 @@ Some of the most popular agent harnesses today were designed for coding. Flue is
 ```ts
 // Compose the agent: its model, capabilities, and environment.
 const agent = createAgent(() => ({
-  model: 'anthropic/claude-sonnet-4-6',
-  tools,
-  skills,
+	model: 'anthropic/claude-sonnet-4-6',
+	tools,
+	skills,
 }));
 
 // Then drive it from your own code.

@@ -28,24 +28,18 @@ class CloudflareRunRegistry implements RunRegistry {
 
 	async recordRunStart(input: RecordRunStartInput): Promise<void> {
 		const { runId, ...body } = input;
-		await this.callExpectingNoContent(
-			`/pointers/${encodeURIComponent(runId)}/start`,
-			'POST',
-			body,
-		);
+		await this.callExpectingNoContent(`/pointers/${encodeURIComponent(runId)}/start`, 'POST', body);
 	}
 
 	async recordRunEnd(input: RecordRunEndInput): Promise<void> {
 		const { runId, ...body } = input;
-		await this.callExpectingNoContent(
-			`/pointers/${encodeURIComponent(runId)}/end`,
-			'POST',
-			body,
-		);
+		await this.callExpectingNoContent(`/pointers/${encodeURIComponent(runId)}/end`, 'POST', body);
 	}
 
 	async lookupRun(runId: string): Promise<RunPointer | null> {
-		const response = await this.stub().fetch(new Request(`${SYNTHETIC_BASE}/pointers/${encodeURIComponent(runId)}`, { method: 'GET' }));
+		const response = await this.stub().fetch(
+			new Request(`${SYNTHETIC_BASE}/pointers/${encodeURIComponent(runId)}`, { method: 'GET' }),
+		);
 		if (response.status === 404) return null;
 		if (!response.ok) {
 			throw new Error(
@@ -62,7 +56,9 @@ class CloudflareRunRegistry implements RunRegistry {
 		if (opts.limit !== undefined) params.set('limit', String(opts.limit));
 		if (opts.cursor) params.set('cursor', opts.cursor);
 		const qs = params.toString();
-		const response = await this.stub().fetch(new Request(`${SYNTHETIC_BASE}/pointers${qs ? `?${qs}` : ''}`, { method: 'GET' }));
+		const response = await this.stub().fetch(
+			new Request(`${SYNTHETIC_BASE}/pointers${qs ? `?${qs}` : ''}`, { method: 'GET' }),
+		);
 		if (!response.ok) {
 			throw new Error(
 				`[flue] FlueRegistry listRuns failed: ${response.status} ${await response.text()}`,

@@ -18,12 +18,12 @@ The generated connector expects your application to create and own the boxd VM. 
 
 ## Requirements
 
-| Requirement | Value |
-| --- | --- |
-| Provider package | `@boxd-sh/sdk` |
-| Credential | `BOXD_API_KEY`, or provider-supported short-lived `BOXD_TOKEN` |
-| Execution shape | Linux VM adapted to `SandboxFactory` |
-| Lifecycle ownership | Your application owns creation, reuse, and deletion |
+| Requirement         | Value                                                          |
+| ------------------- | -------------------------------------------------------------- |
+| Provider package    | `@boxd-sh/sdk`                                                 |
+| Credential          | `BOXD_API_KEY`, or provider-supported short-lived `BOXD_TOKEN` |
+| Execution shape     | Linux VM adapted to `SandboxFactory`                           |
+| Lifecycle ownership | Your application owns creation, reuse, and deletion            |
 
 ## Use it when
 

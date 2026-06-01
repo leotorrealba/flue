@@ -7,7 +7,6 @@
  * 2. Overflow — LLM returned context overflow. Compact, then auto-retry.
  */
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
-import { completeSimple, isContextOverflow } from '@earendil-works/pi-ai';
 import type {
 	AssistantMessage,
 	Context,
@@ -18,8 +17,9 @@ import type {
 	Usage,
 	UserMessage,
 } from '@earendil-works/pi-ai';
-import { addUsage, fromProviderUsage } from './usage.ts';
+import { completeSimple, isContextOverflow } from '@earendil-works/pi-ai';
 import type { PromptUsage } from './types.ts';
+import { addUsage, fromProviderUsage } from './usage.ts';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -54,7 +54,8 @@ export function deriveCompactionDefaults(input: {
 }): CompactionSettings {
 	// When `maxTokens` is unknown (e.g. HTTP providers without declared
 	// metadata), fall back to the static reserve.
-	const reserveCap = input.maxTokens > 0 ? input.maxTokens : DEFAULT_COMPACTION_SETTINGS.reserveTokens;
+	const reserveCap =
+		input.maxTokens > 0 ? input.maxTokens : DEFAULT_COMPACTION_SETTINGS.reserveTokens;
 	let reserveTokens = Math.min(DEFAULT_COMPACTION_SETTINGS.reserveTokens, reserveCap);
 	// Safety floor for tiny-window models: reserve must leave room for at
 	// least some meaningful context. If reserve would consume half or more
@@ -707,7 +708,14 @@ export async function compact(
 						observer,
 					)
 				: Promise.resolve({ text: 'No prior history.', usage: undefined }),
-			generateTurnPrefixSummary(turnPrefixMessages, model, settings.reserveTokens, apiKey, signal, observer),
+			generateTurnPrefixSummary(
+				turnPrefixMessages,
+				model,
+				settings.reserveTokens,
+				apiKey,
+				signal,
+				observer,
+			),
 		]);
 		addCallUsage(historyResult.usage);
 		addCallUsage(turnPrefixResult.usage);

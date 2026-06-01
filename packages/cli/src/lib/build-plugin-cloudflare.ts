@@ -61,11 +61,15 @@ export class CloudflarePlugin implements BuildPlugin {
 			})
 			.join('\n');
 		const workflowModuleEntries = workflows
-			.map((workflow, index) => `  ${JSON.stringify(workflow.name)}: ${workflowVarName(workflow.name, index)},`)
+			.map(
+				(workflow, index) =>
+					`  ${JSON.stringify(workflow.name)}: ${workflowVarName(workflow.name, index)},`,
+			)
 			.join('\n');
 
 		const agentClasses = agents
-			.map((agent) => `export class ${agentClassName(agent.name)} extends Agent {
+			.map(
+				(agent) => `export class ${agentClassName(agent.name)} extends Agent {
   async onRequest(request) {
     return dispatchAgent(request, this, ${JSON.stringify(agent.name)}, directHandlers[${JSON.stringify(agent.name)}]);
   }
@@ -107,11 +111,13 @@ export class CloudflarePlugin implements BuildPlugin {
       return super.onFiberRecovered(ctx);
     }
   }
-}`)
+}`,
+			)
 			.join('\n\n');
 
 		const workflowClasses = workflows
-			.map((workflow) => `export class ${workflowClassName(workflow.name)} extends Agent {
+			.map(
+				(workflow) => `export class ${workflowClassName(workflow.name)} extends Agent {
   async onRequest(request) {
     return dispatchWorkflow(request, this, ${JSON.stringify(workflow.name)});
   }
@@ -150,14 +156,21 @@ export class CloudflarePlugin implements BuildPlugin {
       return super.onFiberRecovered(ctx);
     }
   }
-}`)
+}`,
+			)
 			.join('\n\n');
 
 		const agentClassMapEntries = agents
-			.map((agent) => `  ${JSON.stringify(agent.name)}: ${JSON.stringify(agentClassName(agent.name))},`)
+			.map(
+				(agent) =>
+					`  ${JSON.stringify(agent.name)}: ${JSON.stringify(agentClassName(agent.name))},`,
+			)
 			.join('\n');
 		const workflowClassMapEntries = workflows
-			.map((workflow) => `  ${JSON.stringify(workflow.name)}: ${JSON.stringify(workflowClassName(workflow.name))},`)
+			.map(
+				(workflow) =>
+					`  ${JSON.stringify(workflow.name)}: ${JSON.stringify(workflowClassName(workflow.name))},`,
+			)
 			.join('\n');
 
 		const { effectiveConfig } = await this.getUserConfig(ctx.root);
@@ -166,9 +179,7 @@ export class CloudflarePlugin implements BuildPlugin {
 			.map((name) => `export { Sandbox as ${name} } from '@cloudflare/sandbox';`)
 			.join('\n');
 
-		const userAppImport = appEntry
-			? `import userApp from '${appEntry.replace(/\\/g, '/')}';`
-			: '';
+		const userAppImport = appEntry ? `import userApp from '${appEntry.replace(/\\/g, '/')}';` : '';
 		const packagedSkillsImport = `import { getPackagedSkills } from 'virtual:flue/packaged-skills';`;
 		const packagedSkillsValue = 'getPackagedSkills()';
 		const builtModuleNormalizationSource = generateBuiltModuleNormalizationSource();
@@ -856,9 +867,11 @@ export default {
 		// lives at the project root and is never modified; the composed Vite
 		// input config is also written at the project root so official local
 		// variable discovery continues to find `.dev.vars` and `.env` files.
-		const { config: userConfig, effectiveConfig, path: userConfigPath } = await this.getUserConfig(
-			ctx.root,
-		);
+		const {
+			config: userConfig,
+			effectiveConfig,
+			path: userConfigPath,
+		} = await this.getUserConfig(ctx.root);
 		if (userConfigPath) {
 			console.log(`[flue] Merging with user wrangler config: ${userConfigPath}`);
 		}
@@ -922,14 +935,18 @@ function validateCloudflareAgentNames(ctx: BuildContext): void {
 	// classes and bindings, so both need to round-trip through the kebab-case
 	// → PascalCase converter and through the FLUE_WORKFLOW_<NAME> binding
 	// name. Validate together with a shared message.
-	const invalidAgents = ctx.agents.filter((agent) => !CLOUDFLARE_AGENT_NAME_PATTERN.test(agent.name));
+	const invalidAgents = ctx.agents.filter(
+		(agent) => !CLOUDFLARE_AGENT_NAME_PATTERN.test(agent.name),
+	);
 	const invalidWorkflows = ctx.workflows.filter(
 		(workflow) => !CLOUDFLARE_AGENT_NAME_PATTERN.test(workflow.name),
 	);
 	if (invalidAgents.length === 0 && invalidWorkflows.length === 0) return;
 
 	const invalidList = [
-		...invalidAgents.map((agent) => `${path.relative(ctx.root, agent.filePath)} (agent: ${agent.name})`),
+		...invalidAgents.map(
+			(agent) => `${path.relative(ctx.root, agent.filePath)} (agent: ${agent.name})`,
+		),
 		...invalidWorkflows.map(
 			(workflow) => `${path.relative(ctx.root, workflow.filePath)} (workflow: ${workflow.name})`,
 		),

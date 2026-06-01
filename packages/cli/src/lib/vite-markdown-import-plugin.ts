@@ -34,7 +34,9 @@ export function markdownImportPlugin(): Plugin {
 					throw new Error(`[flue] Unable to resolve markdown import: ${declaration.specifier}`);
 				}
 				if (isSkillMarkdownPath(resolved.id)) {
-					throw new Error(`[flue] SKILL.md imports must use an import attribute: with { type: 'skill' }.`);
+					throw new Error(
+						`[flue] SKILL.md imports must use an import attribute: with { type: 'skill' }.`,
+					);
 				}
 				transformed = `${transformed.slice(0, declaration.start)}${JSON.stringify(`${MARKDOWN_MODULE_PREFIX}${resolved.id}`)}${transformed.slice(declaration.end)}`;
 			}
@@ -73,7 +75,12 @@ function collectAttributedMarkdownImports(ast: ModuleAst): AttributedMarkdownImp
 	const imports: AttributedMarkdownImport[] = [];
 	for (const entry of ast.body) {
 		const declaration = entry as AstNode;
-		if (declaration.type !== 'ImportDeclaration' && declaration.type !== 'ExportNamedDeclaration' && declaration.type !== 'ExportAllDeclaration') continue;
+		if (
+			declaration.type !== 'ImportDeclaration' &&
+			declaration.type !== 'ExportNamedDeclaration' &&
+			declaration.type !== 'ExportAllDeclaration'
+		)
+			continue;
 		const specifier = declaration.source?.value;
 		if (typeof specifier !== 'string') continue;
 		const markdownAttribute = declaration.attributes?.some((attribute) => {
@@ -82,7 +89,9 @@ function collectAttributedMarkdownImports(ast: ModuleAst): AttributedMarkdownImp
 		});
 		if (!markdownAttribute) continue;
 		if (isSkillMarkdownPath(specifier)) {
-			throw new Error(`[flue] SKILL.md imports must use an import attribute: with { type: 'skill' }.`);
+			throw new Error(
+				`[flue] SKILL.md imports must use an import attribute: with { type: 'skill' }.`,
+			);
 		}
 		if (!/\.md$/i.test(specifier)) {
 			throw new Error(`[flue] Markdown imports must target a .md file: ${specifier}`);

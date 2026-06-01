@@ -25,7 +25,7 @@
 		}
 	],
 	"ai": {
-		"binding": "AI",
+		"binding": "AI"
 	},
 	// Worker Loader binding (beta) required by the cf-shell `code` tool.
 	// See examples in this directory: skills-from-r2.ts, skills-from-git.ts.
@@ -42,7 +42,7 @@
 		{
 			"binding": "KNOWLEDGE_BASE",
 			"bucket_name": "flue-example-knowledge-base",
-			"preview_bucket_name": "flue-example-knowledge-base-dev",
-		},
-	],
+			"preview_bucket_name": "flue-example-knowledge-base-dev"
+		}
+	]
 }

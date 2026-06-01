@@ -2,17 +2,26 @@ import { HttpClient, type HttpClientOptions, type RequestHeaders } from './http.
 import { invokeAgent, type SyncInvokeResult } from './public/invoke.ts';
 import { type StreamOptions, streamRunEvents } from './public/stream.ts';
 import {
+	type AgentSocket,
 	connectAgentSocket,
 	connectWorkflowSocket,
 	defaultWebSocketFactory,
-	type AgentSocket,
 	type WebSocketFactory,
 	type WebSocketTarget,
 	type WebSocketUrlTransform,
-	webSocketUrl,
 	type WorkflowSocket,
+	webSocketUrl,
 } from './public/websocket.ts';
-import type { AgentManifestEntry, AttachedAgentEvent, DirectAgentPayload, FlueEvent, ListResponse, RunPointer, RunRecord, RunStatus } from './types.ts';
+import type {
+	AgentManifestEntry,
+	AttachedAgentEvent,
+	DirectAgentPayload,
+	FlueEvent,
+	ListResponse,
+	RunPointer,
+	RunRecord,
+	RunStatus,
+} from './types.ts';
 
 export type { RequestHeaders };
 
@@ -35,16 +44,27 @@ export interface FlueClient {
 		/** Retrieves one workflow-run record. */
 		get(runId: string): Promise<RunRecord>;
 		/** Retrieves recorded workflow-run events. */
-		events(runId: string, options?: { after?: number; types?: string[]; limit?: number }): Promise<{ events: FlueEvent[] }>;
+		events(
+			runId: string,
+			options?: { after?: number; types?: string[]; limit?: number },
+		): Promise<{ events: FlueEvent[] }>;
 		/** Streams workflow-run events until `run_end`, cancellation, or an unrecoverable error. */
 		stream(runId: string, options?: StreamOptions): AsyncIterable<import('./types.ts').FlueEvent>;
 	};
 	/** Direct interactions with persistent agent instances. */
 	agents: {
 		/** Streams events for one agent prompt. */
-		invoke(name: string, id: string, options: { mode: 'stream'; payload: DirectAgentPayload; signal?: AbortSignal }): AsyncIterable<AttachedAgentEvent>;
+		invoke(
+			name: string,
+			id: string,
+			options: { mode: 'stream'; payload: DirectAgentPayload; signal?: AbortSignal },
+		): AsyncIterable<AttachedAgentEvent>;
 		/** Resolves the terminal result for one agent prompt. */
-		invoke(name: string, id: string, options: { mode: 'sync'; payload: DirectAgentPayload; signal?: AbortSignal }): Promise<SyncInvokeResult>;
+		invoke(
+			name: string,
+			id: string,
+			options: { mode: 'sync'; payload: DirectAgentPayload; signal?: AbortSignal },
+		): Promise<SyncInvokeResult>;
 		/** Opens a reusable WebSocket connection to an agent instance. */
 		connect(name: string, id: string): AgentSocket;
 	};
@@ -101,14 +121,22 @@ export function createFlueClient(options: CreateFlueClientOptions): FlueClient {
 			connect: (name, id) =>
 				connectAgentSocket(
 					websocket,
-					websocketEndpoint(`/agents/${encodeURIComponent(name)}/${encodeURIComponent(id)}`, { target: 'agent', name, instanceId: id }),
+					websocketEndpoint(`/agents/${encodeURIComponent(name)}/${encodeURIComponent(id)}`, {
+						target: 'agent',
+						name,
+						instanceId: id,
+					}),
 					name,
 					id,
 				),
 		},
 		workflows: {
 			connect: (name) =>
-				connectWorkflowSocket(websocket, websocketEndpoint(`/workflows/${encodeURIComponent(name)}`, { target: 'workflow', name }), name),
+				connectWorkflowSocket(
+					websocket,
+					websocketEndpoint(`/workflows/${encodeURIComponent(name)}`, { target: 'workflow', name }),
+					name,
+				),
 		},
 		admin: {
 			agents: {
@@ -128,7 +156,11 @@ function normalizeBasePath(path: string): string {
 	return `/${trimmed.replace(/^\/+|\/+$/g, '')}`;
 }
 
-function createWebSocketEndpoint(http: HttpClient, basePath: string, transform: WebSocketUrlTransform | undefined) {
+function createWebSocketEndpoint(
+	http: HttpClient,
+	basePath: string,
+	transform: WebSocketUrlTransform | undefined,
+) {
 	return (path: string, target: WebSocketTarget): string => {
 		const url = new URL(webSocketUrl(http.url(`${basePath}${path}`)));
 		return String(transform?.(url, target) ?? url);
