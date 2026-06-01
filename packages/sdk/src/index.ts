@@ -1,5 +1,6 @@
 export type { CreateFlueClientOptions, FlueClient, RequestHeaders } from './client.ts';
 export { createFlueClient } from './client.ts';
+export { FlueApiError } from './http.ts';
 export type {
 	AgentSocket,
 	AgentSocketEventContext,

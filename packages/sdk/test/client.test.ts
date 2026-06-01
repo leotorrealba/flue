@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	type AttachedAgentEvent,
 	createFlueClient,
+	FlueApiError,
 	type LlmAssistantMessage,
 	type LlmMessage,
 } from '../src/index.ts';
@@ -28,6 +29,44 @@ describe('createFlueClient', () => {
 		expect(new URL(seen[0]?.url ?? '').pathname).toBe('/agents/hello/inst-1');
 		expect(seen[0]?.method).toBe('POST');
 		expect(await seen[0]?.json()).toEqual({ message: 'Hello', session: 'chat' });
+	});
+
+	it('exposes structured HTTP API errors', async () => {
+		const body = {
+			error: {
+				type: 'agent_not_found',
+				message: 'Agent not found.',
+				details: 'No exposed agent named hello exists.',
+			},
+		};
+		const client = createFlueClient({
+			baseUrl: 'https://flue.test',
+			fetch: async () => Response.json(body, { status: 404 }),
+		});
+
+		const error = await client.agents
+			.invoke('hello', 'inst-1', { mode: 'sync', payload: { message: 'Hello' } })
+			.catch((error: unknown) => error);
+
+		expect(error).toBeInstanceOf(FlueApiError);
+		if (!(error instanceof FlueApiError)) throw error;
+		expect(error.name).toBe('FlueApiError');
+		expect(error.status).toBe(404);
+		expect(error.body).toEqual(body);
+		expect(error.message).toBe('Flue API error 404 [agent_not_found]: Agent not found.');
+	});
+
+	it('preserves parsed null HTTP API error bodies', async () => {
+		const client = createFlueClient({
+			baseUrl: 'https://flue.test',
+			fetch: async () => Response.json(null, { status: 500 }),
+		});
+
+		const error = await client.runs.get('run-1').catch((error: unknown) => error);
+
+		expect(error).toBeInstanceOf(FlueApiError);
+		if (!(error instanceof FlueApiError)) throw error;
+		expect(error.body).toBeNull();
 	});
 
 	it('streams attached agent events without workflow identity', async () => {

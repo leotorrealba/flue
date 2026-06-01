@@ -23,8 +23,11 @@ export interface JsonRequestOptions {
 	signal?: AbortSignal;
 }
 
-class FlueApiError extends Error {
+/** Failed SDK HTTP JSON request. */
+export class FlueApiError extends Error {
+	/** HTTP response status. */
 	readonly status: number;
+	/** Parsed response body when available; otherwise the response text. */
 	readonly body: unknown;
 
 	constructor(status: number, body: unknown) {
@@ -84,7 +87,7 @@ export class HttpClient {
 async function parseJsonResponse<T>(response: Response): Promise<T> {
 	const text = await response.text();
 	const body = text ? safeJsonParse(text) : undefined;
-	if (!response.ok) throw new FlueApiError(response.status, body ?? text);
+	if (!response.ok) throw new FlueApiError(response.status, text ? body : text);
 	return body as T;
 }
 
