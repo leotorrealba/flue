@@ -22,7 +22,9 @@ chat.close();
 
 const summarize = client.workflows.connect('summarize');
 await summarize.ready;
-console.log(await summarize.invoke({ text: 'Flue agents can be reached over WebSockets.' }));
+const completion = summarize.invoke({ text: 'Flue agents can be reached over WebSockets.' });
+console.log('admitted run', await summarize.runId);
+console.log(await completion);
 ```
 
 Agent sockets remain open for sequential prompts; workflow sockets accept one invocation and close after their result. Exported `websocket` middleware can authenticate each socket endpoint; for centralized authentication or a mounted prefix, add `src/app.ts`, apply ordinary Hono middleware to exposed agent/workflow socket paths, and mount `flue()` beneath that prefix.

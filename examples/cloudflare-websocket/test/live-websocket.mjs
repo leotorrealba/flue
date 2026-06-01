@@ -61,9 +61,12 @@ async function assertWorkflow() {
 		const socket = client.workflows.connect('live-smoke');
 		try {
 			await withTimeout(socket.ready);
-			const output = await withTimeout(socket.invoke({ marker: 'sdk-websocket' }));
+			const completion = socket.invoke({ marker: 'sdk-websocket' });
+			const runId = await withTimeout(socket.runId);
+			assert.equal(typeof runId, 'string');
+			const output = await withTimeout(completion);
 			assert.deepEqual(output.result, { echoed: 'sdk-websocket' });
-			assert.equal(typeof output.runId, 'string');
+			assert.equal(output.runId, runId);
 		} finally {
 			socket.close();
 		}

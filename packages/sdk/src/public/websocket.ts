@@ -85,6 +85,8 @@ export interface AgentSocket {
 export interface WorkflowSocket {
 	/** Resolves after the server accepts the connection. */
 	readonly ready: Promise<void>;
+	/** Resolves with the workflow run id after the invocation is admitted. */
+	readonly runId: Promise<string>;
 	/** Starts the workflow. A workflow socket accepts only one invocation. */
 	invoke(payload?: unknown): Promise<WorkflowSocketInvokeResult>;
 	/** Subscribes to workflow-run events. Returns an unsubscribe function. */
@@ -111,6 +113,8 @@ export class FlueSocketError extends Error {
 type PendingRequest<TResult> = {
 	resolve(value: TResult): void;
 	reject(error: Error): void;
+	onStarted?: (runId: string) => void;
+	hasStarted: boolean;
 };
 
 type PendingPing = {
@@ -126,6 +130,7 @@ class ProtocolSocket<TResult, TContext, TEvent extends FlueEvent = FlueEvent> {
 	private readonly target: SocketTarget;
 	private readonly agentInstanceId: string | undefined;
 	private readonly acceptsReady: (message: WebSocketServerMessage) => boolean;
+	private readonly onFailure: ((error: Error) => void) | undefined;
 	private readonly pendingRequests = new Map<string, PendingRequest<TResult>>();
 	private readonly pendingPings = new Map<string, PendingPing>();
 	private readonly listeners = new Set<(event: TEvent, context: TContext) => void>();
@@ -141,11 +146,13 @@ class ProtocolSocket<TResult, TContext, TEvent extends FlueEvent = FlueEvent> {
 		target: SocketTarget,
 		acceptsReady: (message: WebSocketServerMessage) => boolean,
 		agentInstanceId?: string,
+		onFailure?: (error: Error) => void,
 	) {
 		this.socket = socket;
 		this.target = target;
 		this.agentInstanceId = agentInstanceId;
 		this.acceptsReady = acceptsReady;
+		this.onFailure = onFailure;
 		this.ready = new Promise<void>((resolve, reject) => {
 			this.resolveReady = resolve;
 			this.rejectReady = reject;
@@ -173,11 +180,17 @@ class ProtocolSocket<TResult, TContext, TEvent extends FlueEvent = FlueEvent> {
 		message:
 			| Extract<AgentWebSocketClientMessage, { type: 'prompt' }>
 			| WorkflowWebSocketClientMessage,
+		options: { onStarted?: (runId: string) => void } = {},
 	): Promise<TResult> {
 		await this.ready;
 		this.assertOpen();
 		return new Promise<TResult>((resolve, reject) => {
-			this.pendingRequests.set(message.requestId, { resolve, reject });
+			this.pendingRequests.set(message.requestId, {
+				resolve,
+				reject,
+				onStarted: options.onStarted,
+				hasStarted: false,
+			});
 			try {
 				this.socket.send(JSON.stringify(message));
 			} catch (error) {
@@ -236,8 +249,14 @@ class ProtocolSocket<TResult, TContext, TEvent extends FlueEvent = FlueEvent> {
 			return;
 		}
 		switch (message.type) {
-			case 'started':
+			case 'started': {
+				if (!('runId' in message) || typeof message.runId !== 'string') return;
+				const pending = this.pendingRequests.get(message.requestId);
+				if (!pending?.onStarted) return;
+				pending.hasStarted = true;
+				pending.onStarted(message.runId);
 				return;
+			}
 			case 'event': {
 				const context =
 					this.target === 'workflow'
@@ -253,6 +272,10 @@ class ProtocolSocket<TResult, TContext, TEvent extends FlueEvent = FlueEvent> {
 			case 'result': {
 				const pending = this.pendingRequests.get(message.requestId);
 				if (!pending) return;
+				if (pending.onStarted && !pending.hasStarted) {
+					this.protocolFailure();
+					return;
+				}
 				this.pendingRequests.delete(message.requestId);
 				const result =
 					this.target === 'workflow'
@@ -308,6 +331,7 @@ class ProtocolSocket<TResult, TContext, TEvent extends FlueEvent = FlueEvent> {
 		if (this.isClosed) return;
 		this.isClosed = true;
 		this.terminalError = error;
+		this.onFailure?.(error);
 		if (!this.isReady) this.rejectReady(error);
 		for (const pending of this.pendingRequests.values()) pending.reject(error);
 		for (const pending of this.pendingPings.values()) pending.reject(error);
@@ -364,19 +388,29 @@ class AgentSocketClient implements AgentSocket {
 
 class WorkflowSocketClient implements WorkflowSocket {
 	readonly ready: Promise<void>;
+	readonly runId: Promise<string>;
 	private readonly connection: ProtocolSocket<
 		WorkflowSocketInvokeResult,
 		WorkflowSocketEventContext,
 		FlueEvent
 	>;
+	private resolveRunId!: (runId: string) => void;
+	private rejectRunId!: (error: Error) => void;
 	private invoked = false;
 
 	constructor(socket: WebSocketLike, name: string) {
+		this.runId = new Promise<string>((resolve, reject) => {
+			this.resolveRunId = resolve;
+			this.rejectRunId = reject;
+		});
+		void this.runId.catch(() => undefined);
 		this.connection = new ProtocolSocket(
 			socket,
 			'workflow',
 			(message) =>
 				message.type === 'ready' && message.target === 'workflow' && message.name === name,
+			undefined,
+			(error) => this.rejectRunId(error),
 		);
 		this.ready = this.connection.ready;
 	}
@@ -385,12 +419,17 @@ class WorkflowSocketClient implements WorkflowSocket {
 		if (this.invoked)
 			return Promise.reject(new Error('A workflow WebSocket accepts only one invocation.'));
 		this.invoked = true;
-		return this.connection.request({
-			version: 1,
-			type: 'invoke',
-			requestId: this.connection.requestId(),
-			...(payload === undefined ? {} : { payload }),
-		});
+		const completion = this.connection.request(
+			{
+				version: 1,
+				type: 'invoke',
+				requestId: this.connection.requestId(),
+				...(payload === undefined ? {} : { payload }),
+			},
+			{ onStarted: (runId) => this.resolveRunId(runId) },
+		);
+		void completion.catch((error) => this.rejectRunId(asError(error)));
+		return completion;
 	}
 
 	onEvent(listener: WorkflowSocketEventListener): () => void {

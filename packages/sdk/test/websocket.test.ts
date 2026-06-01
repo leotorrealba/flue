@@ -312,6 +312,13 @@ describe('WebSocket clients', () => {
 		expect(request).toMatchObject({ version: 1, type: 'invoke', payload: { issue: 123 } });
 		connection?.socket.message({
 			version: 1,
+			type: 'started',
+			requestId: request.requestId,
+			runId: 'run_workflow',
+		});
+		await expect(workflow.runId).resolves.toBe('run_workflow');
+		connection?.socket.message({
+			version: 1,
 			type: 'event',
 			requestId: request.requestId,
 			runId: 'run_workflow',
@@ -352,6 +359,56 @@ describe('WebSocket clients', () => {
 		const error = await pending.catch((error: unknown) => error);
 		expect(error).toBeInstanceOf(FlueSocketError);
 		expect(error).toMatchObject({ requestId: request.requestId, runId: 'run_workflow' });
+		await expect(workflow.runId).rejects.toBe(error);
+	});
+
+	it('rejects workflow run identity when the socket closes before invocation', async () => {
+		const { client, sockets } = socketClient();
+		const workflow = client.workflows.connect('triage');
+		const socket = sockets[0]?.socket;
+		socket?.message({ version: 1, type: 'ready', target: 'workflow', name: 'triage' });
+		socket?.closed();
+		await expect(workflow.runId).rejects.toThrow('connection closed');
+	});
+
+	it('rejects workflow results received before admission', async () => {
+		const { client, sockets } = socketClient();
+		const workflow = client.workflows.connect('triage');
+		const socket = sockets[0]?.socket;
+		socket?.message({ version: 1, type: 'ready', target: 'workflow', name: 'triage' });
+		const pending = workflow.invoke({ issue: 123 });
+		await Promise.resolve();
+		const request = JSON.parse(socket?.sent[0] ?? '{}') as { requestId: string };
+		socket?.message({
+			version: 1,
+			type: 'result',
+			requestId: request.requestId,
+			runId: 'run_workflow',
+			result: { ok: true },
+		});
+		await expect(workflow.runId).rejects.toThrow('invalid protocol message');
+		await expect(pending).rejects.toThrow('invalid protocol message');
+		expect(socket?.closeCalls).toEqual([{ code: 1008, reason: 'Invalid protocol message' }]);
+	});
+
+	it('retains admitted workflow run identity after connection loss', async () => {
+		const { client, sockets } = socketClient();
+		const workflow = client.workflows.connect('triage');
+		const socket = sockets[0]?.socket;
+		socket?.message({ version: 1, type: 'ready', target: 'workflow', name: 'triage' });
+		const pending = workflow.invoke({ issue: 123 });
+		await Promise.resolve();
+		const request = JSON.parse(socket?.sent[0] ?? '{}') as { requestId: string };
+		socket?.message({
+			version: 1,
+			type: 'started',
+			requestId: request.requestId,
+			runId: 'run_workflow',
+		});
+		await expect(workflow.runId).resolves.toBe('run_workflow');
+		socket?.closed();
+		await expect(pending).rejects.toThrow('connection closed');
+		await expect(workflow.runId).resolves.toBe('run_workflow');
 	});
 
 	it('rejects workflow frames that omit required run identity', async () => {
