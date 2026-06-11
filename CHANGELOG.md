@@ -8,6 +8,7 @@
 
 ### Fixes & Other Changes
 
+- The grep tool now uses ripgrep when available, falls back to grep, treats patterns as extended regular expressions by default, and supports literal matching.
 - SQL-backed sessions now store each history entry in its own row instead of rewriting the entire session history as one JSON value. Session saves remain transactional and preserve ordered history across Cloudflare Durable Object SQLite, Node SQLite, and PostgreSQL.
 
 ## 0.11.0 - 2026-06-09

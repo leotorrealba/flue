@@ -383,7 +383,22 @@ const GrepParams = Type.Object({
 	pattern: Type.String({ description: 'Search pattern (regex)' }),
 	path: Type.Optional(Type.String({ description: 'Directory or file to search (default: .)' })),
 	include: Type.Optional(Type.String({ description: 'Glob filter, e.g. "*.ts"' })),
+	literal: Type.Optional(Type.Boolean({ description: 'Match the pattern as literal text' })),
 });
+
+const grepBackends = new WeakMap<SessionEnv, Promise<'rg' | 'grep'>>();
+
+function resolveGrepBackend(env: SessionEnv): Promise<'rg' | 'grep'> {
+	let backend = grepBackends.get(env);
+	if (!backend) {
+		backend = env
+			.exec('rg --version')
+			.then((result) => (result.exitCode === 0 ? 'rg' : 'grep'))
+			.catch(() => 'grep');
+		grepBackends.set(env, backend);
+	}
+	return backend;
+}
 
 function createGrepTool(env: SessionEnv): AgentTool<typeof GrepParams> {
 	return {
@@ -396,9 +411,16 @@ function createGrepTool(env: SessionEnv): AgentTool<typeof GrepParams> {
 			throwIfAborted(signal);
 
 			const searchPath = params.path || '.';
-			let cmd = `grep -rn ${shellQuote(params.pattern)} ${shellQuote(searchPath)}`;
-			if (params.include) {
-				cmd = `grep -rn --include=${shellQuote(params.include)} ${shellQuote(params.pattern)} ${shellQuote(searchPath)}`;
+			const backend = await resolveGrepBackend(env);
+			let cmd: string;
+			if (backend === 'rg') {
+				const literalFlag = params.literal ? ' --fixed-strings' : '';
+				const includeFlag = params.include ? ` --glob ${shellQuote(params.include)}` : '';
+				cmd = `rg --line-number --with-filename --color never${literalFlag}${includeFlag} -- ${shellQuote(params.pattern)} ${shellQuote(searchPath)}`;
+			} else {
+				const patternFlag = params.literal ? '-F' : '-E';
+				const includeFlag = params.include ? ` --include=${shellQuote(params.include)}` : '';
+				cmd = `grep -rnH ${patternFlag}${includeFlag} -- ${shellQuote(params.pattern)} ${shellQuote(searchPath)}`;
 			}
 
 			const result = await env.exec(cmd);
