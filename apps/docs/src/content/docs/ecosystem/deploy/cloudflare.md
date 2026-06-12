@@ -469,7 +469,7 @@ Flue workflows do not resume from checkpointed durable steps after Durable Objec
 
 ### Beta persisted-schema boundary
 
-Flue supports the Cloudflare Durable Object SQL table shape created by `v0.8.0` or newer. Existing supported SQLite-backed databases receive additive execution-store tables such as `flue_agent_submissions` at runtime and may retain unused historical columns; they do not require table rebuilds. KV-backed Durable Object classes remain outside this boundary because Cloudflare cannot convert them to SQLite in place. Persisted agent session records still follow Flue's beta session-data version boundary. Clear or separately migrate records written by an older session-data schema before upgrading.
+Flue supports the Cloudflare Durable Object SQL table shape created by `v0.8.0` or newer. Existing supported SQLite-backed databases receive additive execution-store tables such as `flue_agent_submissions` at runtime and may retain unused historical columns; they do not require table rebuilds. Flue stamps every Durable Object database with its persisted schema version in a one-row `flue_meta` table the first time it opens it, and refuses to open a database stamped by a newer Flue version (for example, after rolling back a deploy). KV-backed Durable Object classes remain outside this boundary because Cloudflare cannot convert them to SQLite in place. Persisted agent session records still follow Flue's beta session-data version boundary. Clear or separately migrate records written by an older session-data schema before upgrading.
 
 ## Sandbox context
 

@@ -38,7 +38,7 @@ interface PersistenceAdapter {
 }
 ```
 
-A persistence adapter provides the database-backed stores used by a generated Node server. Flue calls `migrate()` once at startup when present, then calls `connect()`, `connectRunStore()`, `connectRunRegistry()`, and `connectEventStreamStore()`. On shutdown, Flue calls `close()` when present.
+A persistence adapter provides the database-backed stores used by a generated Node server. Flue calls `migrate()` once at startup when present, then calls `connect()`, `connectRunStore()`, `connectRunRegistry()`, and `connectEventStreamStore()`. On shutdown, Flue calls `close()` when present. Adapters that create schema implicitly may omit `migrate()`, but must still uphold the schema-versioning obligation below in their store-creating paths.
 
 | Method | Contract |
 | --- | --- |
@@ -46,8 +46,18 @@ A persistence adapter provides the database-backed stores used by a generated No
 | `connectRunStore()` | Return workflow-run records and metadata. |
 | `connectRunRegistry()` | Return workflow-run indexing and listing storage. |
 | `connectEventStreamStore()` | Return durable event-stream storage for agent and workflow events. |
-| `migrate?()` | Run idempotent schema setup before connecting. |
+| `migrate?()` | Bring the store to the current schema/format version before connecting. |
 | `close?()` | Release connections, pools, or file handles during shutdown. |
+
+### Schema versioning
+
+Every adapter must durably record its schema/format version when it first creates the store, and fail loudly — before reading or writing any data — when opened against a store recorded with an unknown or newer version (for example, a database last touched by a newer Flue version after a rollback). The built-in SQL adapters record the version in a one-row `flue_meta` key/value table (key `'schema_version'`); non-SQL adapters implement the same obligation natively (a key, a meta document, etc.).
+
+`@flue/runtime/adapter` exports the pieces an adapter needs:
+
+- `FLUE_SCHEMA_VERSION` — the current schema/format version to record at store creation.
+- `assertSupportedFlueSchemaVersion(storedVersion)` — throws unless the recorded version matches the current one.
+- `PersistedSchemaVersionError` — the error thrown on a version mismatch.
 
 ## `AgentExecutionStore`
 
@@ -199,6 +209,8 @@ interface SessionData {
 
 - `createSessionStorageKey(...)`
 - `parseAcceptedAt(...)`
+- `FLUE_SCHEMA_VERSION`
+- `assertSupportedFlueSchemaVersion(...)`
 - `isSubmissionPayload(...)`
 - `SUBMISSION_HARNESS_NAME`
 - `DEFAULT_LIST_LIMIT`
