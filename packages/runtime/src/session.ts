@@ -1241,7 +1241,6 @@ export class Session implements FlueSession {
 	): Promise<T> {
 		const previousTools = this.harness.state.tools;
 		const previousModel = this.harness.state.model;
-		const previousSystemPrompt = this.harness.state.systemPrompt;
 		const previousThinkingLevel = this.harness.state.thinkingLevel;
 
 		const resolvedModel = this.resolveModelForCall(options.model, options.callSite);
@@ -1264,7 +1263,6 @@ export class Session implements FlueSession {
 		} finally {
 			this.harness.state.tools = previousTools;
 			this.harness.state.model = previousModel;
-			this.harness.state.systemPrompt = previousSystemPrompt;
 			this.harness.state.thinkingLevel = previousThinkingLevel;
 		}
 	}
