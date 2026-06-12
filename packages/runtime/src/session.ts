@@ -887,10 +887,13 @@ export class Session implements FlueSession, AgentSubmissionSession {
 	): CallHandle<PromptResultResponse<v.InferOutput<S>>>;
 	task(text: string, options?: TaskOptions): CallHandle<PromptResponse>;
 	task(text: string, options?: TaskOptions<v.GenericSchema | undefined>): CallHandle<any> {
-		return createCallHandle(options?.signal, async (signal) => {
-			const result = await this.runTask(text, options, signal);
-			return result.output;
-		});
+		return createCallHandle(options?.signal, (signal) =>
+			this.runOperation(
+				'task',
+				signal,
+				async () => (await this.executeTask(text, options, signal)).output,
+			),
+		);
 	}
 
 	shell(command: string, options?: ShellOptions): CallHandle<ShellResult> {
@@ -1317,51 +1320,6 @@ export class Session implements FlueSession, AgentSubmissionSession {
 				cwd: result.cwd,
 			},
 		};
-	}
-
-	private async runTask<S extends v.GenericSchema | undefined>(
-		text: string,
-		options: InternalTaskOptions<S> | undefined,
-		signal: AbortSignal | undefined,
-	): Promise<
-		InternalTaskResult<
-			S extends v.GenericSchema ? PromptResultResponse<v.InferOutput<S>> : PromptResponse
-		>
-	> {
-		return this.runExclusive('task', async () => {
-			if (signal?.aborted) throw abortErrorFor(signal);
-			this.activeOperationId = generateOperationId();
-			const operationId = this.activeOperationId;
-			const startedAt = Date.now();
-			this.emit({ type: 'operation_start', operationId, operationKind: 'task' });
-			try {
-				const result = await this.executeTask(text, options, signal);
-				this.emit({
-					type: 'operation',
-					operationId,
-					operationKind: 'task',
-					durationMs: durationSince(startedAt),
-					isError: false,
-					result: result.output,
-					usage: usageFromResult(result.output),
-				});
-				return result;
-			} catch (error) {
-				const surfaced = signal?.aborted ? abortErrorFor(signal) : error;
-				this.emit({
-					type: 'operation',
-					operationId,
-					operationKind: 'task',
-					durationMs: durationSince(startedAt),
-					isError: true,
-					error: serializeError(surfaced),
-				});
-				throw surfaced;
-			} finally {
-				this.emit({ type: 'idle' });
-				this.activeOperationId = undefined;
-			}
-		});
 	}
 
 	private async executeTask<S extends v.GenericSchema | undefined>(
