@@ -14,7 +14,7 @@ const editor = defineAgentProfile({
 
 const agent = createAgent(() => ({ model: 'anthropic/claude-haiku-4-5', subagents: [editor] }));
 
-export async function run({ init, payload }: FlueContext) {
+export async function run({ init, payload }: FlueContext<{ draft?: string }>) {
 	const harness = await init(agent);
 	const session = await harness.session();
 	const draft =

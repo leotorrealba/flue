@@ -7,7 +7,7 @@ import {
 } from '../src/index.ts';
 import type { FlueContextConfig } from '../src/internal.ts';
 import { createFlueContext, InMemorySessionStore } from '../src/internal.ts';
-import type { AgentProfile, ToolDefinition } from '../src/types.ts';
+import type { AgentProfile, CreatedAgent, FlueContext, ToolDefinition } from '../src/types.ts';
 import { createNoopSessionEnv } from './fixtures/session-env.ts';
 
 function createContext(overrides: Partial<FlueContextConfig> = {}) {
@@ -73,6 +73,30 @@ describe('createAgent()', () => {
 		await expect(createContext().init(createAgent(() => ({})))).rejects.toThrow(
 			'createAgent() requires a model',
 		);
+	});
+
+	// Compile-time contract, enforced by `check:types` over this file: typed
+	// created agents stay usable in untyped positions such as `dispatch(agent)`
+	// and an untyped workflow's `init(agent)`.
+	it('keeps a typed created agent assignable to bare CreatedAgent positions when payload and env type parameters are supplied', () => {
+		interface Env {
+			DB: { query(sql: string): unknown };
+		}
+		const typed = createAgent<{ text: string }, Env>(() => ({ model: false }));
+		const bare: CreatedAgent = typed;
+		const initFromUntypedContext = (ctx: FlueContext) => ctx.init(typed);
+
+		expect(bare.__flueCreatedAgent).toBe(true);
+		expect(initFromUntypedContext).toBeInstanceOf(Function);
+	});
+
+	it('rejects a typed created agent at compile time when a typed context expects an incompatible payload', () => {
+		const typed = createAgent<{ text: string }>(() => ({ model: false }));
+		const initFromMismatchedContext = (ctx: FlueContext<{ other: number }>) =>
+			// @ts-expect-error — the agent's payload shape does not match the context's payload.
+			ctx.init(typed);
+
+		expect(initFromMismatchedContext).toBeInstanceOf(Function);
 	});
 });
 

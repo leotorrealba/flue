@@ -40,7 +40,7 @@ export const route: WorkflowRouteHandler = async (_c, next) => next();
 
 const translator = createAgent(() => ({ model: 'anthropic/claude-sonnet-4-6' }));
 
-export async function run({ init, payload }: FlueContext) {
+export async function run({ init, payload }: FlueContext<{ text: string; language: string }>) {
   const harness = await init(translator);
   const session = await harness.session();
 
@@ -246,7 +246,7 @@ export const route: WorkflowRouteHandler = async (_c, next) => next();
 
 const reporter = createAgent(() => ({ model: 'openai/gpt-5.5' }));
 
-export async function run({ init, payload }: FlueContext) {
+export async function run({ init, payload }: FlueContext<{ topic: string }>) {
   const harness = await init(reporter);
   const session = await harness.session();
 
@@ -282,7 +282,7 @@ export const route: WorkflowRouteHandler = async (_c, next) => next();
 
 const support = createAgent(() => ({ model: 'openrouter/moonshotai/kimi-k2.6' }));
 
-export async function run({ init, payload }: FlueContext) {
+export async function run({ init, payload }: FlueContext<{ message: string }>) {
   const harness = await init(support);
   const session = await harness.session();
 

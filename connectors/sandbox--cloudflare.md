@@ -124,7 +124,7 @@ The short version, for your reference:
 
    export const route: WorkflowRouteHandler = async (_c, next) => next();
 
-   export async function run ({ init, id, env, payload }: FlueContext) {
+   export async function run ({ init, id, env, payload }: FlueContext<{ message: string }>) {
      const sandbox = getSandbox(env.Sandbox, id);
      const agent = createAgent(() => ({ sandbox, model: 'anthropic/claude-opus-4-7' }));
      const harness = await init(agent);

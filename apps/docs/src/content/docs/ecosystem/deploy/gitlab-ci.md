@@ -31,7 +31,7 @@ import * as v from 'valibot';
 
 const agent = createAgent(() => ({ sandbox: local(), model: 'anthropic/claude-sonnet-4-6' }));
 
-export async function run({ init, payload }: FlueContext) {
+export async function run({ init, payload }: FlueContext<{ name?: string }>) {
   const harness = await init(agent);
   const session = await harness.session();
 
@@ -174,7 +174,7 @@ const agent = createAgent(() => ({
   model: 'anthropic/claude-opus-4-7',
 }));
 
-export async function run({ init, payload }: FlueContext) {
+export async function run({ init, payload }: FlueContext<{ issueIid: number; projectId: string }>) {
   const harness = await init(agent);
   const session = await harness.session();
 
@@ -294,7 +294,7 @@ import * as v from 'valibot';
 
 const agent = createAgent(() => ({ sandbox: local(), model: 'anthropic/claude-sonnet-4-6' }));
 
-export async function run({ init, payload }: FlueContext) {
+export async function run({ init, payload }: FlueContext<{ issueIid: number }>) {
   const harness = await init(agent);
   const session = await harness.session();
 

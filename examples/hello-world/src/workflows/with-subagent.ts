@@ -15,7 +15,7 @@ const greeter = defineAgentProfile({
 
 const agent = createAgent(() => ({ model: 'anthropic/claude-sonnet-4-6', subagents: [greeter] }));
 
-export async function run({ init, payload }: FlueContext) {
+export async function run({ init, payload }: FlueContext<{ name?: string }>) {
 	const harness = await init(agent);
 	const session = await harness.session();
 

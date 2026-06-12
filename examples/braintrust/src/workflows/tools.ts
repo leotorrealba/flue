@@ -17,7 +17,7 @@ const lookup = defineTool({
 	execute: async ({ city }) => `${city}: sunny, 72 F`,
 });
 
-export async function run({ init, payload }: FlueContext) {
+export async function run({ init, payload }: FlueContext<{ city?: string }>) {
 	const harness = await init(agent);
 	const session = await harness.session();
 	const city = typeof payload.city === 'string' ? payload.city : 'San Francisco';
