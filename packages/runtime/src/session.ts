@@ -90,6 +90,12 @@ import { createFlueFs } from './sandbox.ts';
 import { createUserContextMessage, renderSignalMessage, SessionHistory } from './session-history.ts';
 import { childTaskSessionStorageKey } from './session-identity.ts';
 import { execShellWithEvents, getErrorMessage } from './shell.ts';
+import {
+	classifySubmissionState,
+	countConsecutiveRetryableModelErrors,
+	isCompletedAssistantResponse,
+	isRetryableModelError,
+} from './submission-state.ts';
 import { normalizeToolDefinition } from './tool.ts';
 import type {
 	AgentConfig,
@@ -109,7 +115,6 @@ import type {
 	PromptResultResponse,
 	PromptUsage,
 	SessionData,
-	SessionEntry,
 	SessionEnv,
 	SessionStore,
 	SessionToolFactory,
@@ -332,35 +337,9 @@ function sortJsonLike(value: unknown): unknown {
 	return sorted;
 }
 
-function isRetryableModelError(message: AssistantMessage): boolean {
-	if (message.stopReason !== 'error' || !message.errorMessage) return false;
-	return /overloaded|rate.?limit|too many requests|429|500|502|503|504|service.?unavailable|server.?error|network.?error|connection.?(?:reset|refused|lost)|socket hang up|fetch failed|timed? out|timeout|terminated/i.test(
-		message.errorMessage,
-	);
-}
-
-function isCompletedAssistantResponse(message: AssistantMessage): boolean {
-	return message.stopReason === 'stop' || message.stopReason === 'length';
-}
-
 function modelRetryDelayMs(attempt: number): number {
 	const baseDelay = TRANSIENT_MODEL_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
 	return Math.round(baseDelay * (0.75 + Math.random() * 0.25));
-}
-
-function countConsecutiveRetryableModelErrors(entries: SessionEntry[]): number {
-	let count = 0;
-	for (let i = entries.length - 1; i >= 0; i--) {
-		const entry = entries[i];
-		if (entry?.type !== 'message') continue;
-		// User messages mark an operation boundary: errors from a previous
-		// operation must not count against the current one.
-		if (entry.message.role === 'user') return count;
-		if (entry.message.role !== 'assistant') continue;
-		if (!isRetryableModelError(entry.message as AssistantMessage)) return count;
-		count += 1;
-	}
-	return count;
 }
 
 function sleepUntilRetry(delayMs: number, signal: AbortSignal): Promise<void> {
@@ -1987,33 +1966,31 @@ export class Session implements FlueSession, AgentSubmissionSession {
 	}
 
 	private inspectPersistedInput(inputEntry: MessageEntry | undefined): AgentSubmissionInspection {
-		if (!inputEntry) return 'absent';
-		const following = this.history.getActivePathSince(inputEntry.id);
-		if (following.some((entry) => entry.type === 'message' && entry.message.role === 'user')) {
-			return 'uncertain';
+		const state = classifySubmissionState(
+			inputEntry ? this.history.getActivePathSince(inputEntry.id) : undefined,
+			{ contextWindow: this.agentLoop.state.model?.contextWindow ?? 0 },
+		);
+		switch (state.kind) {
+			case 'absent':
+				return 'absent';
+			case 'completed':
+				// Inspection ignores the overflow flag: a stop/length response is a
+				// settled canonical result for reconciliation, even though the
+				// processing preamble would compact-and-continue a silent overflow
+				// (see submission-state.ts).
+				return 'completed';
+			case 'resume':
+				// Divergence preserved from before consolidation (see
+				// submission-state.ts): only tool-result repair and a recovered
+				// stream are reported continuable; overflow, transient-retry, and
+				// input-only states stay 'uncertain', and reconciliation compensates
+				// with its uncertain-before-provider retry special case.
+				return state.mode === 'tool_results' || state.mode === 'stream_continuation'
+					? 'continuable'
+					: 'uncertain';
+			default:
+				return 'uncertain';
 		}
-		const assistant = following.findLast(
-			(entry): entry is MessageEntry => entry.type === 'message' && entry.message.role === 'assistant',
-		)?.message as AssistantMessage | undefined;
-		if (assistant && isCompletedAssistantResponse(assistant)) return 'completed';
-		if (
-			assistant?.stopReason === 'toolUse' &&
-			following.some((entry) => entry.type === 'message' && entry.message.role === 'toolResult')
-		) {
-			return 'continuable';
-		}
-		if (
-			assistant?.stopReason === 'aborted' &&
-			following.some(
-				(entry) =>
-					entry.type === 'message' &&
-					entry.message.role === 'signal' &&
-					entry.message.type === 'stream_continued',
-			)
-		) {
-			return 'continuable';
-		}
-		return 'uncertain';
 	}
 
 	private async runPersistedDispatchInput(
@@ -2111,77 +2088,89 @@ export class Session implements FlueSession, AgentSubmissionSession {
 						});
 					}
 					await options.onInputApplied?.(durability);
-					const following = this.history.getActivePathSince(inputEntry.id);
-					if (following.some((entry) => entry.type === 'message' && entry.message.role === 'user')) {
-						throw new OperationFailedError({
-							operation: options.errorLabel,
-							reason: 'the session advanced past this input before it completed',
-						});
-					}
-					const persistedAssistants = following.filter(
-						(entry): entry is MessageEntry =>
-							entry.type === 'message' && entry.message.role === 'assistant',
-					);
-					const persistedAssistant = persistedAssistants.at(-1);
-					const assistant = persistedAssistant?.message as AssistantMessage | undefined;
-					const model = this.agentLoop.state.model;
-					const overflow = assistant ? isContextOverflow(assistant, model.contextWindow ?? 0) : false;
-					const streamContinuation =
-						assistant?.stopReason === 'aborted' &&
-						following.some(
-							(entry) =>
-								entry.type === 'message' &&
-								entry.message.role === 'signal' &&
-								entry.message.type === 'stream_continued',
-						);
-					if (
-						!assistant ||
-						overflow ||
-						isRetryableModelError(assistant) ||
-						streamContinuation ||
-						(assistant.stopReason === 'toolUse' &&
-							following.some((entry) => entry.type === 'message' && entry.message.role === 'toolResult'))
-					) {
-				const transientRetries = countConsecutiveRetryableModelErrors(following);
-					// Check timeout before entering the preamble (compaction, transient
-					// retry backoff) which can add significant time. The main timeout
-					// check lives in runModelTurnWithRecovery, but these preamble paths
-					// run before that loop is entered.
-					if (this.activeTimeoutAt !== undefined && Date.now() >= this.activeTimeoutAt) {
-						throw new SubmissionTimeoutError();
-					}
-					if (assistant && overflow) {
-							this.rebuildHarnessContext();
-							this.internalLog(
-								'info',
-								'[flue:compaction] Overflow detected, compacting and retrying...',
-							);
-							if (!(await this.runCompaction('overflow'))) {
-								throw new OperationFailedError({
-									operation: options.errorLabel,
-									reason: assistant.errorMessage ?? assistant.stopReason,
-								});
+					const state = classifySubmissionState(this.history.getActivePathSince(inputEntry.id), {
+						contextWindow: this.agentLoop.state.model.contextWindow ?? 0,
+					});
+					switch (state.kind) {
+						case 'absent':
+							// Unreachable: `following` is only classified for a found input
+							// entry, and absence was already handled above.
+							throw new OperationFailedError({
+								operation: options.errorLabel,
+								reason: 'the input could not be persisted',
+							});
+						case 'advanced_past_input':
+							throw new OperationFailedError({
+								operation: options.errorLabel,
+								reason: 'the session advanced past this input before it completed',
+							});
+						case 'terminal_error':
+							throw new OperationFailedError({
+								operation: options.errorLabel,
+								reason: state.reason,
+							});
+						case 'completed':
+						case 'resume': {
+							// Divergence preserved from before consolidation (see
+							// submission-state.ts): a completed response flagged as silent
+							// overflow is compacted and continued here, while inspection
+							// reports it 'completed'.
+							const overflowAssistant =
+								state.kind === 'completed'
+									? state.overflow
+										? state.assistant
+										: undefined
+									: state.mode === 'overflow'
+										? state.assistant
+										: undefined;
+							if (state.kind === 'completed' && !overflowAssistant) break;
+							// Check timeout before entering the preamble (compaction, transient
+							// retry backoff) which can add significant time. The main timeout
+							// check lives in runModelTurnWithRecovery, but these preamble paths
+							// run before that loop is entered.
+							if (this.activeTimeoutAt !== undefined && Date.now() >= this.activeTimeoutAt) {
+								throw new SubmissionTimeoutError();
 							}
-							this.internalLog('info', '[flue:compaction] Retrying after overflow recovery...');
-						} else if (assistant && isRetryableModelError(assistant)) {
-							if (!(await this.waitForTransientModelRetry(assistant, transientRetries))) {
-								throw new OperationFailedError({
-									operation: options.errorLabel,
-									reason: assistant.errorMessage ?? assistant.stopReason,
-								});
+							if (overflowAssistant) {
+								this.rebuildHarnessContext();
+								this.internalLog(
+									'info',
+									'[flue:compaction] Overflow detected, compacting and retrying...',
+								);
+								if (!(await this.runCompaction('overflow'))) {
+									throw new OperationFailedError({
+										operation: options.errorLabel,
+										reason: overflowAssistant.errorMessage ?? overflowAssistant.stopReason,
+									});
+								}
+								this.internalLog('info', '[flue:compaction] Retrying after overflow recovery...');
+							} else if (state.kind === 'resume' && state.mode === 'transient_retry') {
+								if (
+									!(await this.waitForTransientModelRetry(
+										state.assistant,
+										state.consecutiveRetryableErrors,
+									))
+								) {
+									throw new OperationFailedError({
+										operation: options.errorLabel,
+										reason: state.assistant.errorMessage ?? state.assistant.stopReason,
+									});
+								}
 							}
+							await this.runModelTurnWithRecovery({
+								start: () => this.agentLoop.continue(),
+								signal: options.signal,
+								overflowRecoveryAttempted: overflowAssistant !== undefined,
+							});
+							this.throwIfError(options.errorLabel);
+							break;
 						}
-						await this.runModelTurnWithRecovery({
-							start: () => this.agentLoop.continue(),
-							signal: options.signal,
-							overflowRecoveryAttempted: overflow,
-						});
-						this.throwIfError(options.errorLabel);
-					} else if (assistant.stopReason === 'error' || assistant.stopReason === 'aborted') {
-						throw new OperationFailedError({
-							operation: options.errorLabel,
-							reason: assistant.errorMessage ?? assistant.stopReason,
-						});
+						case 'tool_use_unresolved':
+							// Divergence preserved from before consolidation (see
+							// submission-state.ts): an unresolved tool call settles with the
+							// persisted response here, while inspection reports it
+							// 'uncertain'.
+							break;
 					}
 					return {
 						text: this.getAssistantText(),
