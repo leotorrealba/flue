@@ -302,7 +302,7 @@ class CloudflareAgentCoordinator {
 			// CAS and attempt-id ownership checks.
 			let attemptMarkers: ReadonlySet<string>;
 			try {
-				attemptMarkers = this.listActiveAttemptMarkers();
+				attemptMarkers = await this.listActiveAttemptMarkers();
 			} catch (error) {
 				attemptMarkers = new Set();
 				console.error(
@@ -342,7 +342,7 @@ class CloudflareAgentCoordinator {
 			});
 				if (!claimed) continue;
 				try {
-					this.startSubmissionAttempt(claimed);
+					await this.startSubmissionAttempt(claimed);
 				} catch (error) {
 					this.logSubmissionReconciliationFailure(claimed, 'start_submission', error);
 				}
@@ -397,26 +397,32 @@ class CloudflareAgentCoordinator {
 			),
 		);
 		if (replacement) {
-			this.startSubmissionAttempt(replacement);
+			await this.startSubmissionAttempt(replacement);
 		} else if (failedError && submission.kind === 'direct') {
 			this.observers.fail(submission.submissionId, failedError);
 		}
 	}
 
-	private startSubmissionAttempt(submission: AgentSubmission): void {
+	private async startSubmissionAttempt(submission: AgentSubmission): Promise<void> {
 		if (submission.status !== 'running' || !submission.attemptId) return;
+		const attempt = { submissionId: submission.submissionId, attemptId: submission.attemptId };
 		const attemptKey = this.submissionAttemptLocalKey(submission);
 		if (this.activeAttempts.has(attemptKey)) return;
 		this.assertAgentsDurabilityApi('runFiber');
 		this.activeAttempts.add(attemptKey);
 		let running: Promise<void>;
 		try {
+			// Flue's own durable evidence that this attempt started; deleted at
+			// settlement. The fiber stash below stays for the SDK's crash replay
+			// (onFiberRecovered); the marker is what reconciliation reads.
+			await this.submissions.insertAttemptMarker(attempt);
 			running = this.instance.runFiber(FLUE_AGENT_SUBMISSION_ATTEMPT_FIBER, async (fiberCtx) => {
 				fiberCtx.stash({ submissionId: submission.submissionId, attemptId: submission.attemptId });
 				await this.processSubmissionEntry(submission);
 			});
 		} catch (error) {
 			this.activeAttempts.delete(attemptKey);
+			await this.deleteAttemptMarkerSafely(attempt);
 			throw error;
 		}
 		void running
@@ -435,45 +441,43 @@ class CloudflareAgentCoordinator {
 			})
 			.finally(() => {
 				this.activeAttempts.delete(attemptKey);
+				void this.deleteAttemptMarkerSafely(attempt);
 			});
+	}
+
+	/**
+	 * Delete the attempt marker at settlement. Deletion failures are logged
+	 * rather than thrown: a leftover marker only delays reconciliation of
+	 * this attempt until the staleness cutoff expires.
+	 */
+	private async deleteAttemptMarkerSafely(attempt: { submissionId: string; attemptId: string }): Promise<void> {
+		try {
+			await this.submissions.deleteAttemptMarker(attempt);
+		} catch (error) {
+			console.error(
+				'[flue:submission-reconciliation]',
+				{
+					agentName: this.agentName,
+					instanceId: this.instance.name,
+					submissionId: attempt.submissionId,
+					attemptId: attempt.attemptId,
+					operation: 'delete_attempt_marker',
+					outcome: 'marker_left_until_stale',
+				},
+				error,
+			);
+		}
 	}
 
 	private submissionAttemptLocalKey(submission: AgentSubmission): string {
 		return `${this.instance.ctx.id.toString()}:${submission.attemptId}`;
 	}
 
-	private listActiveAttemptMarkers(): Set<string> {
+	private async listActiveAttemptMarkers(): Promise<Set<string>> {
 		const keys = new Set<string>();
-		const rows = this.instance.ctx.storage.sql
-			?.exec(
-				'SELECT snapshot, created_at FROM cf_agents_runs WHERE name = ?',
-				FLUE_AGENT_SUBMISSION_ATTEMPT_FIBER,
-			)
-			.toArray();
-		if (!rows) throw new Error('[flue] Cloudflare durable agent SQL storage is unavailable.');
-		for (const row of rows) {
-			if (typeof row.created_at !== 'number') {
-				console.warn('[flue:submission-reconciliation] Skipping attempt marker with non-numeric created_at.');
-				continue;
-			}
-			if (Date.now() - row.created_at > FLUE_AGENT_SUBMISSION_ATTEMPT_STALE_MS) continue;
-			if (row.snapshot === null) continue;
-			if (typeof row.snapshot !== 'string') {
-				console.warn('[flue:submission-reconciliation] Skipping attempt marker with non-string snapshot.');
-				continue;
-			}
-			let snapshot: unknown;
-			try {
-				snapshot = JSON.parse(row.snapshot);
-			} catch {
-				console.warn('[flue:submission-reconciliation] Skipping attempt marker with unparseable snapshot.');
-				continue;
-			}
-			if (!isAttemptMarkerSnapshot(snapshot)) {
-				console.warn('[flue:submission-reconciliation] Skipping attempt marker with invalid snapshot shape.');
-				continue;
-			}
-			keys.add(`${snapshot.submissionId}:${snapshot.attemptId}`);
+		for (const marker of await this.submissions.listAttemptMarkers()) {
+			if (Date.now() - marker.createdAt > FLUE_AGENT_SUBMISSION_ATTEMPT_STALE_MS) continue;
+			keys.add(`${marker.submissionId}:${marker.attemptId}`);
 		}
 		return keys;
 	}
@@ -569,12 +573,6 @@ class CloudflareAgentCoordinator {
 		return Response.json({ dispatchId: admission.submission.submissionId, acceptedAt: input.acceptedAt });
 	}
 
-}
-
-function isAttemptMarkerSnapshot(value: unknown): value is { submissionId: string; attemptId: string } {
-	if (!value || typeof value !== 'object') return false;
-	const snapshot = value as Record<string, unknown>;
-	return typeof snapshot.submissionId === 'string' && typeof snapshot.attemptId === 'string';
 }
 
 function submissionAttemptMarkerKey(submission: AgentSubmission): string {

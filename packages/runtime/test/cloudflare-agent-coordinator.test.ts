@@ -23,7 +23,6 @@ function queryExpectsRows(query: string): boolean {
 
 function makeFakeSql(events: string[] = []) {
 	const db = new DatabaseSync(':memory:');
-	db.exec('CREATE TABLE cf_agents_runs (name TEXT NOT NULL, snapshot TEXT, created_at INTEGER NOT NULL)');
 	return {
 		db,
 		storage: {
@@ -238,39 +237,92 @@ describe('createCloudflareAgentRuntime()', () => {
 		expect(events).toEqual(['schedule-idempotent', 'request-recovery']);
 	});
 
-	it('ignores SQL NULL pre-stash markers so queued submissions remain claimable', async () => {
-		const { db, storage } = makeFakeSql();
-		const runtime = makeRuntime();
+	it('skips interrupted-attempt reconciliation while a fresh attempt marker covers the running attempt', async () => {
+		const events: string[] = [];
+		const { storage } = makeFakeSql(events);
+		const recovery = makeRecoveryContext({ inspection: 'absent' });
+		const runtime = makeRuntime({
+			createdAgent: {} as never,
+			createContext: () => recovery.ctx,
+		});
 		const instance = makeInstance(storage);
 		const executionStore = prepare(runtime, instance);
-		db.prepare('INSERT INTO cf_agents_runs (name, snapshot, created_at) VALUES (?, ?, ?)').run(
-			'flue:submission-attempt',
-			null,
-			Date.now(),
-		);
 		await executionStore.submissions.admitDirect(directInput());
+		await executionStore.submissions.claimSubmission({ submissionId: 'direct-1', attemptId: 'attempt-1', ownerId: 'test-owner', leaseExpiresAt: Date.now() + 30_000 });
+		await executionStore.submissions.insertAttemptMarker({ submissionId: 'direct-1', attemptId: 'attempt-1' });
 
 		await runtime.onStart(instance, () => {});
 
+		expect(events).not.toContain('requeue');
+		expect(await executionStore.submissions.getSubmission('direct-1')).toMatchObject({
+			status: 'running',
+			attemptId: 'attempt-1',
+		});
+	});
+
+	it('reconciles running attempts when the attempt marker is stale', async () => {
+		const events: string[] = [];
+		const { db, storage } = makeFakeSql(events);
+		const recovery = makeRecoveryContext({ inspection: 'absent' });
+		const runtime = makeRuntime({
+			createdAgent: {} as never,
+			createContext: () => recovery.ctx,
+		});
+		const instance = makeInstance(storage);
+		const executionStore = prepare(runtime, instance);
+		await executionStore.submissions.admitDirect(directInput());
+		await executionStore.submissions.claimSubmission({ submissionId: 'direct-1', attemptId: 'attempt-1', ownerId: 'test-owner', leaseExpiresAt: Date.now() + 30_000 });
+		db.prepare(
+			'INSERT INTO flue_agent_attempt_markers (submission_id, attempt_id, created_at) VALUES (?, ?, ?)',
+		).run('direct-1', 'attempt-1', Date.now() - 16 * 60 * 1000);
+
+		await runtime.onStart(instance, () => {});
+
+		expect(events).toContain('requeue');
 		expect(await executionStore.submissions.getSubmission('direct-1')).toMatchObject({ status: 'running' });
 	});
 
-	it('skips malformed raw Fiber markers and continues reconciliation', async () => {
-		const { db, storage } = makeFakeSql();
-		const runtime = makeRuntime();
+	it('inserts an attempt marker before the fiber starts and deletes it after settlement', async () => {
+		const { storage } = makeFakeSql();
+		const session = {
+			async processSubmissionInput() {},
+			async recordSubmissionTerminal() {},
+		};
+		const runtime = makeRuntime({
+			createdAgent: {} as never,
+			createContext: () =>
+				({
+					async initializeCreatedAgent() {
+						return {
+							async session() {
+								return session;
+							},
+						};
+					},
+					setEventCallback() {},
+					subscribeEvent() {
+						return () => {};
+					},
+				}) as unknown as FlueContextInternal,
+		});
 		const instance = makeInstance(storage);
 		const executionStore = prepare(runtime, instance);
-		db.prepare('INSERT INTO cf_agents_runs (name, snapshot, created_at) VALUES (?, ?, ?)').run(
-			'flue:submission-attempt',
-			'null',
-			Date.now(),
-		);
+		let markersAtFiberStart: unknown[] | undefined;
+		instance.runFiber = async (_name, callback) => {
+			markersAtFiberStart = await executionStore.submissions.listAttemptMarkers();
+			await callback({ stash() {} });
+		};
 		await executionStore.submissions.admitDirect(directInput());
 
 		await runtime.onStart(instance, () => {});
 
-		// Malformed marker is skipped; the queued submission is claimed and processed.
-		expect(await executionStore.submissions.getSubmission('direct-1')).toMatchObject({ status: 'running' });
+		expect(markersAtFiberStart).toEqual([
+			expect.objectContaining({ submissionId: 'direct-1' }),
+		]);
+		await vi.waitFor(async () => {
+			expect(await executionStore.submissions.listAttemptMarkers()).toEqual([]);
+		});
+		expect(await executionStore.submissions.getSubmission('direct-1')).toMatchObject({ status: 'settled' });
 	});
 
 	it('degrades to an empty marker set when the marker scan fails so queued submissions remain claimable', async () => {
@@ -278,9 +330,8 @@ describe('createCloudflareAgentRuntime()', () => {
 		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const runtime = makeRuntime();
 		const instance = makeInstance(storage);
-		instance.runFiber = () => new Promise<void>(() => {});
 		const executionStore = prepare(runtime, instance);
-		db.exec('DROP TABLE cf_agents_runs');
+		db.exec('DROP TABLE flue_agent_attempt_markers');
 		await executionStore.submissions.admitDirect(directInput());
 
 		await runtime.onStart(instance, () => {});
