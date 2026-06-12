@@ -383,10 +383,8 @@ if (isLocalCliMode) {
   console.log('[flue] Server listening on http://localhost:' + port);
   if (isLocalMode) {
     console.log('[flue] Mode: local');
-    console.log('[flue] Agents: ' + ${JSON.stringify(agents.map((a) => a.name).join(', '))});
-  } else {
-    console.log('[flue] Agents: ' + ${JSON.stringify(agents.map((a) => a.name).join(', '))});
   }
+  console.log('[flue] Agents: ' + ${JSON.stringify(agents.map((a) => a.name).join(', '))});
   let shuttingDown = false;
   async function stop(signal, exitCode) {
     if (shuttingDown) return;

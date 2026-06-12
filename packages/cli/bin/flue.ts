@@ -127,7 +127,6 @@ function printUsage() {
 			'Examples:\n' +
 			'  flue dev --target node\n' +
 			'  flue dev --target cloudflare --port 8787\n' +
-			'  flue dev --target node\n' +
 			'  flue run hello --target node\n' +
 			'  flue run hello --target node --payload \'{"name": "World"}\' --env .env.staging\n' +
 			'  flue connect assistant thread-1 --target node\n' +
