@@ -860,12 +860,13 @@ Recommended sequence:
    - Commit provider research briefs, package names, likely route surfaces,
      target spikes, and consequential deferrals.
 2. **Provider commits**
-   - Commit after completing each provider before beginning implementation of
-     the next provider.
-   - Keep each provider independently understandable, reviewable, and
-     revertible.
-   - Meta providers may be researched near each other, but their completed
-     implementations still receive separate provider commits.
+   - Prefer a coherent commit after completing each provider so its
+     implementation remains independently understandable and reviewable.
+   - Split a provider across commits or group closely related provider work
+     when shared research, infrastructure, or validation makes that history
+     clearer.
+   - Avoid commits that mix unrelated partial provider implementations merely
+     to follow a fixed sequence.
    - Existing GitHub, Slack, and Discord audits may be separate commits.
 3. **Recipe and example commits**
    - May travel with each provider when focused validation is easier.
@@ -877,11 +878,10 @@ Recommended sequence:
    - Regenerate prepared docs, connector indexes, and other intentional
      generated outputs.
 
-The implementation goal for this plan should explicitly authorize these
-provider-scoped commits. Before each commit, inspect the worktree and stage only
-that provider's intended package, example, recipe, documentation, test, and
-shared generated changes. Never absorb unrelated user edits merely to satisfy
-the commit boundary.
+The implementation goal for this plan should authorize commits as work reaches
+coherent review points. Before each commit, inspect the worktree and stage only
+the intended provider or shared changes. Never absorb unrelated user edits
+merely to satisfy a preferred commit boundary.
 
 ## Consequential decisions and deferrals
 
