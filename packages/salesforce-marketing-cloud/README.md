@@ -32,11 +32,11 @@ The callback receives an ordered, nonempty batch of at most 1000 events. Each
 event is passed through with Marketing Cloud's own field names and nesting —
 there is no `raw` wrapper and no field projection. Ingress requires only a
 nonempty `eventCategoryType`; every other field, including `timestampUTC`, is
-forwarded exactly as ENS delivered it. The modeled `composite`
-(`{ jobId, batchId, listId, … }`), `definitionKey`, and `definitionId` fields
-appear on the email send and engagement families that carry them, `info` holds
-the family-specific details, and `mid`/`eid` arrive as `number` on some families
-and `string` on others. An open index signature forwards any authenticated field
+forwarded exactly as ENS delivered it. Fields not validated by ingress —
+including `timestampUTC`, `composite`, `compositeId`, `definitionKey`,
+`definitionId`, `info`, `mid`, and `eid` — are optional `unknown`; narrow them
+according to the event family before use. An open index signature forwards any
+authenticated field
 this type does not model, so narrow on `eventCategoryType` and read the family
 fields you expect. The batch also exposes the exact decoded `rawBody`. ENS has no
 universal delivery or conversation id; `compositeId` is deprecated for

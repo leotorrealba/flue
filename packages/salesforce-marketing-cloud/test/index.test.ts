@@ -373,6 +373,11 @@ describe('createSalesforceMarketingCloudChannel()', () => {
 				expectTypeOf(input).toEqualTypeOf<SalesforceMarketingCloudEventsHandlerInput<AppEnv>>();
 				expectTypeOf(input.c.env).toEqualTypeOf<Bindings>();
 				expectTypeOf(input.c.get('requestId')).toEqualTypeOf<string>();
+				type Event = (typeof input.batch.events)[number];
+				expectTypeOf<Event['eventCategoryType']>().toEqualTypeOf<string>();
+				expectTypeOf<Event['timestampUTC']>().toEqualTypeOf<unknown>();
+				expectTypeOf<Event['composite']>().toEqualTypeOf<unknown>();
+				expectTypeOf<Event['info']>().toEqualTypeOf<unknown>();
 			},
 		});
 

@@ -48,13 +48,13 @@ interface SalesforceMarketingCloudChannelOptions<E extends Env = Env> {
 }
 ```
 
-| Field          | Description                                                                 |
-| -------------- | --------------------------------------------------------------------------- |
+| Field          | Description                                                                    |
+| -------------- | ------------------------------------------------------------------------------ |
 | `signatureKey` | Required opaque callback HMAC key. Used directly as UTF-8; not base64-decoded. |
-| `callbackId`   | Optional expected id for unsigned callback verification.                    |
-| `bodyLimit`    | Maximum request-body size in bytes. Defaults to 1 MiB.                      |
-| `verification` | Optional handler enabling the unsigned setup challenge.                     |
-| `events`       | Receives every authenticated, structurally valid ENS batch.                 |
+| `callbackId`   | Optional expected id for unsigned callback verification.                       |
+| `bodyLimit`    | Maximum request-body size in bytes. Defaults to 1 MiB.                         |
+| `verification` | Optional handler enabling the unsigned setup challenge.                        |
+| `events`       | Receives every authenticated, structurally valid ENS batch.                    |
 
 `signatureKey` is required and must be a nonempty string. `callbackId` must be a
 nonempty trimmed string. `bodyLimit` must be a positive safe integer.
@@ -116,37 +116,37 @@ interface SalesforceMarketingCloudComposite {
 
 interface SalesforceMarketingCloudEvent {
   eventCategoryType: string;
-  timestampUTC: number;
-  compositeId?: string;
-  composite?: SalesforceMarketingCloudComposite;
-  definitionKey?: string;
-  definitionId?: string;
-  mid?: number | string;
-  eid?: number | string;
-  info?: { [key: string]: unknown };
+  timestampUTC?: unknown;
+  compositeId?: unknown;
+  composite?: unknown;
+  definitionKey?: unknown;
+  definitionId?: unknown;
+  mid?: unknown;
+  eid?: unknown;
+  info?: unknown;
   [key: string]: unknown;
 }
 ```
 
-| Field               | Constraint or meaning                                                       |
-| ------------------- | --------------------------------------------------------------------------- |
-| `eventCategoryType` | Nonempty open ENS event taxonomy string. The only field ingress validates.  |
-| `timestampUTC`      | Provider UTC epoch timestamp in milliseconds. Forwarded as delivered; not validated. |
-| `compositeId`       | Optional flattened tracking id; deprecated for transactional email.         |
-| `composite`         | Optional broken-down tracking id present on email families.                 |
-| `definitionKey`     | Optional Send Definition customer key (transactional sent events).          |
-| `definitionId`      | Optional Send Definition id (transactional sent events).                    |
-| `mid`               | Optional business-unit id. Delivered as `number` on some families, `string` on others. |
-| `eid`               | Optional enterprise id. Delivered as `number` on some families, `string` on others. |
-| `info`              | Optional family-specific details object.                                    |
-| `[key: string]`     | Any authenticated field this type does not model, forwarded unchanged.      |
+| Field               | Constraint or meaning                                                         |
+| ------------------- | ----------------------------------------------------------------------------- |
+| `eventCategoryType` | Nonempty open ENS event taxonomy string. The only field ingress validates.    |
+| `timestampUTC`      | Optional provider timestamp, forwarded without validating its representation. |
+| `compositeId`       | Optional flattened tracking id, forwarded without shape validation.           |
+| `composite`         | Optional broken-down tracking id, forwarded without shape validation.         |
+| `definitionKey`     | Optional Send Definition customer key, forwarded without shape validation.    |
+| `definitionId`      | Optional Send Definition id, forwarded without shape validation.              |
+| `mid`               | Optional business-unit id, forwarded without shape validation.                |
+| `eid`               | Optional enterprise id, forwarded without shape validation.                   |
+| `info`              | Optional family-specific details, forwarded without shape validation.         |
+| `[key: string]`     | Any authenticated field this type does not model, forwarded unchanged.        |
 
 Ingress validates only that each event is a JSON object carrying a nonempty
-`eventCategoryType`; one malformed item does not reject the whole batch beyond
-that. Every other field — including `timestampUTC`, whose representation varies
-across families — is forwarded exactly as ENS delivered it. The open index
-signature carries fields outside the modeled set, so narrow on
-`eventCategoryType` and validate every family-specific field you consume.
+`eventCategoryType`. Any item that fails that minimum rejects the batch. Every
+other field is forwarded exactly as ENS delivered it rather than projected into
+a narrower event-family schema. The open index signature carries
+fields outside the modeled set, so narrow on `eventCategoryType` and validate
+every family-specific field you consume.
 
 ENS does not provide a universal delivery id, resource id, actor id, or
 conversation id. The package does not construct canonical identity from these

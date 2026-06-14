@@ -49,22 +49,22 @@ export interface SalesforceMarketingCloudComposite {
 export interface SalesforceMarketingCloudEvent {
 	/** Open provider event taxonomy, such as `EngagementEvents.EmailOpen`. */
 	eventCategoryType: string;
-	/** Provider UTC epoch timestamp, in milliseconds. */
-	timestampUTC: number;
-	/** Deprecated flattened tracking id present on some event families. */
-	compositeId?: string;
-	/** Broken-down tracking id present on email families. */
-	composite?: SalesforceMarketingCloudComposite;
-	/** Send Definition customer key (transactional sent events only). */
-	definitionKey?: string;
-	/** Send Definition id (transactional sent events only). */
-	definitionId?: string;
-	/** Marketing Cloud business-unit id. Some event families deliver it as a string. */
-	mid?: number | string;
-	/** Marketing Cloud enterprise id. Some event families deliver it as a string. */
-	eid?: number | string;
-	/** Event-family-specific details. */
-	info?: { [key: string]: unknown };
+	/** Provider timestamp, forwarded without validating its representation. */
+	timestampUTC?: unknown;
+	/** Deprecated flattened tracking id, forwarded without shape validation. */
+	compositeId?: unknown;
+	/** Broken-down tracking id, forwarded without shape validation. */
+	composite?: unknown;
+	/** Send Definition customer key, forwarded without shape validation. */
+	definitionKey?: unknown;
+	/** Send Definition id, forwarded without shape validation. */
+	definitionId?: unknown;
+	/** Marketing Cloud business-unit id, forwarded without shape validation. */
+	mid?: unknown;
+	/** Marketing Cloud enterprise id, forwarded without shape validation. */
+	eid?: unknown;
+	/** Event-family-specific details, forwarded without shape validation. */
+	info?: unknown;
 	[key: string]: unknown;
 }
 
