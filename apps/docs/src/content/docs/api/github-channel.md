@@ -23,25 +23,22 @@ construction and runs only for a verified non-ping delivery.
 interface GitHubChannelOptions<E extends Env = Env> {
   webhookSecret: string;
   bodyLimit?: number;
-  handlerTimeoutMs?: number;
   webhook(input: {
     c: Context<E>;
-    event: GitHubEvent;
+    delivery: GitHubWebhookDelivery;
   }): void | JsonValue | Response | Promise<void | JsonValue | Response>;
 }
 ```
 
-| Field              | Description                                               |
-| ------------------ | --------------------------------------------------------- |
-| `webhookSecret`    | Secret configured on the GitHub webhook.                  |
-| `bodyLimit`        | Maximum request body in bytes. Default: 25 MiB.           |
-| `handlerTimeoutMs` | Handler deadline. Default and maximum: 9000 milliseconds. |
-| `webhook`          | Receives every verified non-ping delivery.                |
+| Field           | Description                                     |
+| --------------- | ----------------------------------------------- |
+| `webhookSecret` | Secret configured on the GitHub webhook.        |
+| `bodyLimit`     | Maximum request body in bytes. Default: 25 MiB. |
+| `webhook`       | Receives every verified non-ping delivery.      |
 
 Returning nothing produces an empty `200`. A JSON-compatible value becomes a
 JSON response. An ordinary Hono or Fetch `Response` passes through unchanged.
-Thrown and timed-out callbacks produce a server error. A timed-out callback
-cannot be forcibly stopped and may continue running after the response.
+A thrown callback falls through to Hono's framework error handler.
 
 ## `GitHubChannel`
 
@@ -60,83 +57,59 @@ routing. A file named `channels/github.ts` is served at
 Conversation keys are canonical identifiers, not authorization capabilities.
 Pull requests use their issue number.
 
-## Events
+## Deliveries
+
+Every verified non-ping delivery reaches `webhook` as a `GitHubWebhookDelivery`.
+The package does not normalize, rename, or enumerate a fixed set of events: the
+parsed event is forwarded with GitHub's own field names and nesting.
 
 ```ts
-type GitHubEvent = GitHubEvents[keyof GitHubEvents] | GitHubUnknownEvent;
-```
-
-Known variants:
-
-- `issues.opened`
-- `issue_comment.created`
-- `pull_request.opened`
-- `pull_request_review_comment.created`
-
-```ts
-interface GitHubWebhookEvent<TType extends string, TPayload> {
-  type: TType;
-  deliveryId: string;
-  hookId?: string;
-  installationTarget?: { id: string; type: string };
-  installationId?: number;
-  repository: GitHubRepositoryRef;
-  sender: GitHubUserRef;
-  payload: TPayload;
-  raw: unknown;
-}
-```
-
-`issue_comment.created` identifies whether the containing conversation is an
-issue or pull request. `pull_request_review_comment.created` includes the
-comment id, top-level thread id, review id, path, and line.
-
-```ts
-interface GitHubIssueCommentCreatedPayload {
-  issue: {
-    number: number;
-    title: string;
-    kind: 'issue' | 'pull_request';
+type GitHubWebhookDelivery = {
+  [Name in WebhookEventName]: {
+    name: Name;
+    payload: EventPayloadMap[Name];
+    deliveryId: string;
+    hookId?: string;
+    installationTarget?: { id: string; type: string };
   };
-  comment: { id: number; body: string };
-}
-
-interface GitHubPullRequestReviewCommentCreatedPayload {
-  pullRequest: { number: number; title: string };
-  comment: GitHubPullRequestReviewCommentRef;
-}
-
-interface GitHubPullRequestReviewCommentRef {
-  id: number;
-  // Top-level review comment id used when replying to this thread.
-  threadId: number;
-  reviewId: number;
-  body: string;
-  path: string;
-  line: number | null;
-}
+}[WebhookEventName];
 ```
 
-Unsupported verified event/action combinations use:
+| Field                | Description                                                            |
+| -------------------- | --------------------------------------------------------------------- |
+| `name`               | The `X-GitHub-Event` value. Discriminates `payload`.                  |
+| `payload`            | GitHub's parsed event, typed by `@octokit/webhooks-types`.            |
+| `deliveryId`         | The `X-GitHub-Delivery` GUID. Manual redeliveries reuse it; dedupe on it. |
+| `hookId`             | Header-derived hook id, when GitHub supplies one.                     |
+| `installationTarget` | Header-derived installation target, when GitHub supplies one.         |
+
+`name` is the discriminant. Narrowing on it narrows `payload` to the matching
+native event — `name: 'issues'` gives an `IssuesEvent`, `name: 'pull_request'`
+gives a `PullRequestEvent`, and so on. Within an event, branch on the native
+`payload.action`. Read fields with GitHub's own names
+(`payload.repository.owner.login`, `payload.issue.number`,
+`payload.comment.in_reply_to_id`, `payload.installation?.id`).
+
+Choosing which events to act on is application policy: subscribe to the minimum
+set in GitHub and branch in the handler. Events without an `action` (for
+example `push`) are forwarded like any other verified delivery.
+
+The package re-exports the underlying types from `@octokit/webhooks-types`:
 
 ```ts
-interface GitHubUnknownEvent {
-  type: 'unknown';
-  event: string;
-  action?: string;
-  deliveryId: string;
-  hookId?: string;
-  installationTarget?: { id: string; type: string };
-  installationId?: number;
-  raw: unknown;
-}
+import type {
+  EventPayloadMap,
+  WebhookEvent,
+  WebhookEventName,
+} from '@flue/github';
 ```
 
 GitHub `ping` is acknowledged internally and does not invoke `webhook`.
-Signatures are checked against exact request bytes before form or JSON parsing.
-The package does not deduplicate `deliveryId`. Header-derived delivery, hook,
-and installation-target metadata must not be treated as an authorization
-capability.
+Signatures are checked against the exact request bytes before JSON parsing.
+Ingress is JSON-only; form-encoded (`application/x-www-form-urlencoded`)
+deliveries are rejected on content type before verification. The package does
+not deduplicate `deliveryId`. Header-derived delivery, hook, and
+installation-target metadata must not be treated as an authorization capability.
 
 ## Identity
 
@@ -145,18 +118,6 @@ interface GitHubIssueRef {
   owner: string;
   repo: string;
   issueNumber: number;
-}
-
-interface GitHubRepositoryRef {
-  id: number;
-  owner: string;
-  name: string;
-}
-
-interface GitHubUserRef {
-  id: number;
-  login: string;
-  type: 'Bot' | 'User' | 'Organization';
 }
 ```
 

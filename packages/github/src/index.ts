@@ -1,8 +1,10 @@
+import type { EventPayloadMap, WebhookEvent, WebhookEventName } from '@octokit/webhooks-types';
 import type { Context, Env, Handler } from 'hono';
 import { InvalidGitHubConversationKeyError, InvalidGitHubInputError } from './errors.ts';
 import { createGitHubWebhookHandler } from './webhook.ts';
 
 export { InvalidGitHubConversationKeyError, InvalidGitHubInputError } from './errors.ts';
+export type { EventPayloadMap, WebhookEvent, WebhookEventName } from '@octokit/webhooks-types';
 
 export type JsonValue =
 	| null
@@ -24,11 +26,6 @@ export interface GitHubChannelOptions<E extends Env = Env> {
 	webhookSecret: string;
 	/** Maximum request-body size in bytes. Defaults to 25 MiB. */
 	bodyLimit?: number;
-	/**
-	 * Handler deadline in milliseconds. Defaults to and may not exceed 9000.
-	 * A timed-out handler may continue running after the failure response.
-	 */
-	handlerTimeoutMs?: number;
 	/** Receives every verified non-ping GitHub delivery. */
 	webhook(input: GitHubWebhookHandlerInput<E>): GitHubWebhookHandlerResult;
 }
@@ -40,113 +37,40 @@ export interface GitHubIssueRef {
 	issueNumber: number;
 }
 
-export interface GitHubRepositoryRef {
-	id: number;
-	owner: string;
-	name: string;
-}
-
-/** GitHub account that triggered a known webhook event. */
-export interface GitHubUserRef {
-	id: number;
-	login: string;
-	type: 'Bot' | 'User' | 'Organization';
-}
-
-/** Fields normalized from an opened issue. */
-export interface GitHubIssuesOpenedPayload {
-	issue: { number: number; title: string; body: string | null };
-}
-
-/** Fields normalized from a new issue or pull-request conversation comment. */
-export interface GitHubIssueCommentCreatedPayload {
-	issue: { number: number; title: string; kind: 'issue' | 'pull_request' };
-	comment: { id: number; body: string };
-}
-
-/** Fields normalized from an opened pull request. */
-export interface GitHubPullRequestOpenedPayload {
-	pullRequest: { number: number; title: string; body: string | null };
-}
-
-/** Fields normalized from an inline pull-request review comment. */
-export interface GitHubPullRequestReviewCommentRef {
-	id: number;
-	/** Top-level review comment id used when replying to this thread. */
-	threadId: number;
-	reviewId: number;
-	body: string;
-	path: string;
-	line: number | null;
-}
-
-/** Fields normalized from a new inline pull-request review comment. */
-export interface GitHubPullRequestReviewCommentCreatedPayload {
-	pullRequest: { number: number; title: string };
-	comment: GitHubPullRequestReviewCommentRef;
-}
-
-export interface GitHubWebhookEvent<TType extends string, TPayload> {
-	type: TType;
-	/** GitHub delivery id. Replays and manual redeliveries retain this value. */
-	deliveryId: string;
-	/** Header-derived hook id. It is metadata, not an authorization capability. */
-	hookId?: string;
-	/** Header-derived installation target. It is metadata, not an authorization capability. */
-	installationTarget?: {
-		id: string;
-		type: string;
+/**
+ * A verified GitHub webhook delivery.
+ *
+ * `name` is the `X-GitHub-Event` value and discriminates `payload`, which is the
+ * provider's parsed event with GitHub's own field names and nesting. The
+ * remaining fields are delivery metadata read from the request headers — they
+ * are identifiers, not authorization capabilities.
+ */
+export type GitHubWebhookDelivery = {
+	[Name in WebhookEventName]: {
+		/** The `X-GitHub-Event` value. Narrows the native `payload`. */
+		name: Name;
+		/** GitHub's parsed event payload, typed by `@octokit/webhooks-types`. */
+		payload: EventPayloadMap[Name];
+		/** GitHub delivery id. Manual redeliveries retain this value; use it to deduplicate. */
+		deliveryId: string;
+		/** Header-derived hook id, when GitHub supplies one. */
+		hookId?: string;
+		/** Header-derived installation target, when GitHub supplies one. */
+		installationTarget?: { id: string; type: string };
 	};
-	/** Installation id from the signed payload when GitHub supplies one. */
-	installationId?: number;
-	repository: GitHubRepositoryRef;
-	sender: GitHubUserRef;
-	payload: TPayload;
-	/** Parsed provider payload. Treat this as untrusted provider data. */
-	raw: unknown;
-}
-
-export interface GitHubUnknownEvent {
-	type: 'unknown';
-	/** Original `X-GitHub-Event` value. */
-	event: string;
-	/** Provider action when present. */
-	action?: string;
-	deliveryId: string;
-	/** Header-derived hook id. It is metadata, not an authorization capability. */
-	hookId?: string;
-	/** Header-derived installation target. It is metadata, not an authorization capability. */
-	installationTarget?: {
-		id: string;
-		type: string;
-	};
-	installationId?: number;
-	/** Parsed provider payload. Treat this as untrusted provider data. */
-	raw: unknown;
-}
-
-export interface GitHubEvents {
-	'issues.opened': GitHubWebhookEvent<'issues.opened', GitHubIssuesOpenedPayload>;
-	'issue_comment.created': GitHubWebhookEvent<
-		'issue_comment.created',
-		GitHubIssueCommentCreatedPayload
-	>;
-	'pull_request.opened': GitHubWebhookEvent<'pull_request.opened', GitHubPullRequestOpenedPayload>;
-	'pull_request_review_comment.created': GitHubWebhookEvent<
-		'pull_request_review_comment.created',
-		GitHubPullRequestReviewCommentCreatedPayload
-	>;
-}
-
-export type GitHubEvent = GitHubEvents[keyof GitHubEvents] | GitHubUnknownEvent;
+}[WebhookEventName];
 
 export interface GitHubWebhookHandlerInput<E extends Env = Env> {
 	c: Context<E>;
-	event: GitHubEvent;
+	delivery: GitHubWebhookDelivery;
 }
 
 type GitHubWebhookHandlerValue = undefined | JsonValue | Response;
 
+/**
+ * Returning nothing produces an empty `200`. JSON-compatible values become
+ * JSON responses, and Hono or Fetch responses pass through unchanged.
+ */
 export type GitHubWebhookHandlerResult =
 	| GitHubWebhookHandlerValue
 	| Promise<GitHubWebhookHandlerValue>;
@@ -163,20 +87,20 @@ export interface GitHubChannel<E extends Env = Env> {
 /**
  * Creates a fixed-webhook GitHub channel.
  *
- * Successful acknowledgement waits for the configured handler to finish. The
- * channel is stateless and does not deduplicate delivery ids.
+ * Requests are verified against the exact delivered bytes with `X-Hub-Signature-256`
+ * before the handler runs. GitHub `ping` deliveries are answered internally. The
+ * channel is stateless and does not deduplicate delivery ids: GitHub expects a
+ * `2xx` within ten seconds and never auto-retries, so admit durable work quickly
+ * and deduplicate on `deliveryId` when it matters.
  */
 export function createGitHubChannel<E extends Env = Env>(
 	options: GitHubChannelOptions<E>,
 ): GitHubChannel<E> {
 	validateOptions(options);
-	const webhookSecret = options.webhookSecret;
-	const webhook = options.webhook;
 	const webhookHandler = createGitHubWebhookHandler<E>({
-		webhookSecret,
+		webhookSecret: options.webhookSecret,
 		bodyLimit: options.bodyLimit,
-		handlerTimeoutMs: options.handlerTimeoutMs,
-		webhook,
+		webhook: options.webhook,
 	});
 
 	const channel: GitHubChannel<E> = {

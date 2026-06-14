@@ -21,10 +21,11 @@ Configure the GitHub webhook URL as:
 https://example.com/channels/github/webhook
 ```
 
-If `flue()` is mounted beneath an outer prefix, include that prefix. Configure
-`application/json` or `application/x-www-form-urlencoded`, set a webhook
-secret, and subscribe to the minimum event set the application handles. The
-example uses **Issue comments** and **Pull request review comments**.
+If `flue()` is mounted beneath an outer prefix, include that prefix. Set the
+content type to `application/json` (ingress is JSON-only; form-encoded
+deliveries are not accepted), set a webhook secret, and subscribe to the
+minimum event set the application handles. The example uses **Issue comments**
+and **Pull request review comments**.
 
 `GITHUB_WEBHOOK_SECRET` verifies inbound deliveries.
 `GITHUB_TOKEN` authenticates outbound Octokit calls. Keep them in the
@@ -46,33 +47,55 @@ export const channel = createGitHubChannel({
   webhookSecret: process.env.GITHUB_WEBHOOK_SECRET!,
 
   // Path: /channels/github/webhook
-  async webhook({ event }) {
-    switch (event.type) {
-      case 'issue_comment.created':
-      case 'pull_request_review_comment.created': {
-        const issue = {
-          owner: event.repository.owner,
-          repo: event.repository.name,
-          issueNumber:
-            event.type === 'issue_comment.created'
-              ? event.payload.issue.number
-              : event.payload.pullRequest.number,
-        };
-        await dispatch(assistant, {
-          id: channel.conversationKey(issue),
-          input: {
-            type: `github.${event.type}`,
-            deliveryId: event.deliveryId,
-            installationId: event.installationId,
-            issue,
-            sender: event.sender,
-            comment: event.payload.comment,
+  async webhook({ delivery }) {
+    // `delivery.name` is the X-GitHub-Event value and narrows `delivery.payload`
+    // to the native @octokit/webhooks-types event. Filtering is application
+    // policy: subscribe to the events you want in GitHub and branch here.
+    if (delivery.name === 'issue_comment' && delivery.payload.action === 'created') {
+      const { repository, issue, comment } = delivery.payload;
+      const issueRef = {
+        owner: repository.owner.login,
+        repo: repository.name,
+        issueNumber: issue.number,
+      };
+      await dispatch(assistant, {
+        id: channel.conversationKey(issueRef),
+        input: {
+          type: 'github.issue_comment.created',
+          deliveryId: delivery.deliveryId,
+          installationId: delivery.payload.installation?.id,
+          issue: issueRef,
+          sender: delivery.payload.sender,
+          comment: { id: comment.id, body: comment.body },
+        },
+      });
+      return;
+    }
+
+    if (delivery.name === 'pull_request_review_comment' && delivery.payload.action === 'created') {
+      const { repository, pull_request, comment } = delivery.payload;
+      const issueRef = {
+        owner: repository.owner.login,
+        repo: repository.name,
+        issueNumber: pull_request.number,
+      };
+      await dispatch(assistant, {
+        id: channel.conversationKey(issueRef),
+        input: {
+          type: 'github.pull_request_review_comment.created',
+          deliveryId: delivery.deliveryId,
+          installationId: delivery.payload.installation?.id,
+          issue: issueRef,
+          sender: delivery.payload.sender,
+          comment: {
+            id: comment.id,
+            // Replies attach to the top-level review comment in a thread.
+            threadId: comment.in_reply_to_id ?? comment.id,
+            body: comment.body,
           },
-        });
-        return;
-      }
-      default:
-        return;
+        },
+      });
+      return;
     }
   },
 });
@@ -100,12 +123,17 @@ export function commentOnIssue(ref: { owner: string; repo: string; issueNumber: 
 }
 ```
 
-The package forwards verified `issues.opened`, `issue_comment.created`,
-`pull_request.opened`, and `pull_request_review_comment.created` variants.
-Issue comments distinguish issue and pull-request conversations. Review
-comments include the top-level thread comment id needed for an inline reply.
-Verified unsupported deliveries arrive as `type: 'unknown'`. GitHub `ping` is
-handled internally.
+Every verified non-ping delivery is forwarded with its native
+`@octokit/webhooks-types` payload. `delivery.name` is the `X-GitHub-Event`
+value and discriminates `delivery.payload`, narrowing it to the matching event
+type (for example `name: 'issues'` gives an `IssuesEvent` payload). There is no
+fixed list of supported events and no normalization layer: the payload keeps
+GitHub's own field names and nesting (`payload.repository.owner.login`,
+`payload.issue.number`, `payload.comment.in_reply_to_id`). Choosing which
+events to act on is application policy — subscribe to them in GitHub and branch
+on `delivery.name` (and, where it matters, `delivery.payload.action`) in the
+handler. GitHub `ping` is acknowledged internally and never reaches the
+callback.
 
 ## Bind the tool
 
@@ -124,11 +152,13 @@ comment body; trusted code binds the repository and issue. The channel-agent
 import cycle is supported because both imported bindings are read only inside
 deferred callbacks or initializers.
 
-GitHub requires a `2xx` response within ten seconds. The package's handler
-deadline defaults to nine seconds. A timed-out handler may continue running, so
-claim `deliveryId` in application storage before dispatch when duplicate
-admission matters. GitHub does not automatically retry every failed webhook
-delivery; use its delivery inspection and manual redelivery tools when needed.
+GitHub expects a `2xx` response within ten seconds and does not auto-retry.
+The package does not enforce a handler deadline; treat the ten-second window as
+guidance and admit durable work quickly rather than blocking the response on it.
+The channel is stateless and does not deduplicate delivery ids, so claim
+`delivery.deliveryId` in application storage before dispatch when duplicate
+admission matters. Failed deliveries can be inspected and manually redelivered
+from GitHub with the same delivery id.
 
 Octokit's REST methods use Fetch and the example's typed
 `issues.createComment()` operation is tested in workerd with Flue's required

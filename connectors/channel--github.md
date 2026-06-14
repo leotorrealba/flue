@@ -40,33 +40,55 @@ export const channel = createGitHubChannel({
   webhookSecret: process.env.GITHUB_WEBHOOK_SECRET!,
 
   // Path: /channels/github/webhook
-  async webhook({ event }) {
-    switch (event.type) {
-      case 'issue_comment.created':
-      case 'pull_request_review_comment.created': {
-        const issue = {
-          owner: event.repository.owner,
-          repo: event.repository.name,
-          issueNumber:
-            event.type === 'issue_comment.created'
-              ? event.payload.issue.number
-              : event.payload.pullRequest.number,
-        };
-        await dispatch(assistant, {
-          id: channel.conversationKey(issue),
-          input: {
-            type: `github.${event.type}`,
-            deliveryId: event.deliveryId,
-            installationId: event.installationId,
-            issue,
-            sender: event.sender,
-            comment: event.payload.comment,
+  async webhook({ delivery }) {
+    // `delivery.name` is the X-GitHub-Event value and narrows `delivery.payload`
+    // to the native @octokit/webhooks-types event. Filtering is application
+    // policy: subscribe to the events you want in GitHub and branch here.
+    if (delivery.name === 'issue_comment' && delivery.payload.action === 'created') {
+      const { repository, issue, comment } = delivery.payload;
+      const issueRef = {
+        owner: repository.owner.login,
+        repo: repository.name,
+        issueNumber: issue.number,
+      };
+      await dispatch(assistant, {
+        id: channel.conversationKey(issueRef),
+        input: {
+          type: 'github.issue_comment.created',
+          deliveryId: delivery.deliveryId,
+          installationId: delivery.payload.installation?.id,
+          issue: issueRef,
+          sender: delivery.payload.sender,
+          comment: { id: comment.id, body: comment.body },
+        },
+      });
+      return;
+    }
+
+    if (delivery.name === 'pull_request_review_comment' && delivery.payload.action === 'created') {
+      const { repository, pull_request, comment } = delivery.payload;
+      const issueRef = {
+        owner: repository.owner.login,
+        repo: repository.name,
+        issueNumber: pull_request.number,
+      };
+      await dispatch(assistant, {
+        id: channel.conversationKey(issueRef),
+        input: {
+          type: 'github.pull_request_review_comment.created',
+          deliveryId: delivery.deliveryId,
+          installationId: delivery.payload.installation?.id,
+          issue: issueRef,
+          sender: delivery.payload.sender,
+          comment: {
+            id: comment.id,
+            // Replies attach to the top-level review comment in a thread.
+            threadId: comment.in_reply_to_id ?? comment.id,
+            body: comment.body,
           },
-        });
-        return;
-      }
-      default:
-        return;
+        },
+      });
+      return;
     }
   },
 });
@@ -129,9 +151,15 @@ agent binding while constructing `channel`.
 `GITHUB_TOKEN` authenticates outbound Octokit calls. They serve different
 purposes. Follow existing project secret conventions and never invent values.
 
+Configure the GitHub webhook content type as `application/json`. Ingress is
+JSON-only; form-encoded (`application/x-www-form-urlencoded`) deliveries are
+rejected before verification. Subscribe to the minimum event set the
+application handles.
+
 Run the project's typecheck and configured Flue build. Create a local JSON
 payload and `X-Hub-Signature-256` HMAC to test success, invalid signatures,
-issue and pull-request comment variants, grouped cases,
-`/channels/github/webhook`, the nine-second handler deadline, and the empty
-`200` default. Exercise one Octokit call through a fake Fetch transport in
-workerd. Do not contact GitHub.
+the issue-comment and pull-request review-comment variants,
+`/channels/github/webhook`, and the empty `200` default. GitHub expects a `2xx`
+within ten seconds and does not auto-retry, so admit durable work quickly and
+deduplicate on `deliveryId` when it matters. Exercise one Octokit call through a
+fake Fetch transport in workerd. Do not contact GitHub.

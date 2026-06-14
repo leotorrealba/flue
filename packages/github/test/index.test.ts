@@ -9,7 +9,7 @@ import {
 const encoder = new TextEncoder();
 
 describe('createGitHubChannel()', () => {
-	it('invokes one constructor handler with a normalized signed event', async () => {
+	it('invokes one constructor handler with the native signed payload', async () => {
 		const webhook = vi.fn();
 		const github = createGitHubChannel({
 			webhookSecret: 'secret',
@@ -41,29 +41,27 @@ describe('createGitHubChannel()', () => {
 		expect(webhook).toHaveBeenCalledOnce();
 		expect(webhook.mock.calls[0]?.[0]).toMatchObject({
 			c: expect.any(Object),
-			event: {
-				type: 'issues.opened',
+			delivery: {
+				name: 'issues',
 				deliveryId: 'delivery-1',
 				hookId: '1234',
 				installationTarget: { id: '5678', type: 'repository' },
-				installationId: 90,
-				repository: { id: 12, owner: 'acme', name: 'widgets' },
-				sender: { id: 77, login: 'octo-reviewer', type: 'User' },
-				payload: { issue: { number: 42, title: 'Unicode café', body: null } },
-				raw,
+				payload: raw,
 			},
 		});
 	});
 
-	it('supports grouped event handling in one callback', async () => {
+	it('discriminates the native payload by the X-GitHub-Event name', async () => {
 		const seen: string[] = [];
 		const github = createGitHubChannel({
 			webhookSecret: 'secret',
-			webhook({ event }) {
-				switch (event.type) {
-					case 'issues.opened':
-					case 'pull_request.opened':
-						seen.push(event.type);
+			webhook({ delivery }) {
+				switch (delivery.name) {
+					case 'issues':
+						seen.push(`issues:${delivery.payload.action}`);
+						return;
+					case 'pull_request':
+						seen.push(`pull_request:${delivery.payload.action}`);
 						return;
 					default:
 						return;
@@ -99,10 +97,10 @@ describe('createGitHubChannel()', () => {
 
 		expect(issueResponse.status).toBe(200);
 		expect(pullResponse.status).toBe(200);
-		expect(seen).toEqual(['issues.opened', 'pull_request.opened']);
+		expect(seen).toEqual(['issues:opened', 'pull_request:opened']);
 	});
 
-	it('normalizes pull request review comments and their top-level thread id', async () => {
+	it('forwards the full native pull-request review comment payload unchanged', async () => {
 		const webhook = vi.fn();
 		const github = createGitHubChannel({ webhookSecret: 'secret', webhook });
 		const raw = {
@@ -129,83 +127,43 @@ describe('createGitHubChannel()', () => {
 		);
 
 		expect(response.status).toBe(200);
-		expect(webhook.mock.calls[0]?.[0].event).toEqual({
-			type: 'pull_request_review_comment.created',
+		expect(webhook.mock.calls[0]?.[0].delivery).toEqual({
+			name: 'pull_request_review_comment',
 			deliveryId: 'delivery-1',
 			hookId: undefined,
 			installationTarget: undefined,
-			installationId: undefined,
-			repository: { id: 12, owner: 'acme', name: 'widgets' },
-			sender: { id: 77, login: 'octo-reviewer', type: 'User' },
-			payload: {
-				pullRequest: { number: 7, title: 'Keep edge auth portable' },
-				comment: {
-					id: 6002,
-					threadId: 6001,
-					reviewId: 7001,
-					body: '@flue-bot can you check this branch?',
-					path: 'src/auth.ts',
-					line: 42,
-				},
-			},
-			raw,
+			payload: raw,
 		});
 	});
 
-	it('uses the comment id as the thread id for a top-level pull request review comment', async () => {
+	it('forwards every verified delivery, including events without an action', async () => {
 		const webhook = vi.fn();
 		const github = createGitHubChannel({ webhookSecret: 'secret', webhook });
 
-		const response = await channelApp(github).request(
-			await signedRequest({
-				secret: 'secret',
-				event: 'pull_request_review_comment',
-				body: JSON.stringify({
-					action: 'created',
-					repository: { id: 12, name: 'widgets', owner: { login: 'acme' } },
-					sender: { id: 77, login: 'octo-reviewer', type: 'User' },
-					pull_request: { number: 7, title: 'Keep edge auth portable' },
-					comment: {
-						id: 6001,
-						pull_request_review_id: 7001,
-						body: 'Can this use Web Crypto?',
-						path: 'src/auth.ts',
-						line: 18,
-					},
-				}),
-			}),
-		);
-
-		expect(response.status).toBe(200);
-		expect(webhook.mock.calls[0]?.[0].event).toMatchObject({
-			type: 'pull_request_review_comment.created',
-			payload: {
-				comment: {
-					id: 6001,
-					threadId: 6001,
-				},
-			},
-		});
-	});
-
-	it('forwards unsupported verified deliveries as an explicit unknown event', async () => {
-		const webhook = vi.fn();
-		const github = createGitHubChannel({ webhookSecret: 'secret', webhook });
-
-		const response = await channelApp(github).request(
+		const archived = await channelApp(github).request(
 			await signedRequest({
 				secret: 'secret',
 				event: 'repository',
 				body: JSON.stringify({ action: 'archived', repository: { id: 12 } }),
 			}),
 		);
+		const pushed = await channelApp(github).request(
+			await signedRequest({
+				secret: 'secret',
+				event: 'push',
+				body: JSON.stringify({ ref: 'refs/heads/main', after: 'abc123' }),
+			}),
+		);
 
-		expect(response.status).toBe(200);
-		expect(webhook.mock.calls[0]?.[0].event).toMatchObject({
-			type: 'unknown',
-			event: 'repository',
-			action: 'archived',
-			deliveryId: 'delivery-1',
+		expect(archived.status).toBe(200);
+		expect(pushed.status).toBe(200);
+		expect(webhook.mock.calls[0]?.[0].delivery).toMatchObject({
+			name: 'repository',
+			payload: { action: 'archived' },
+		});
+		expect(webhook.mock.calls[1]?.[0].delivery).toMatchObject({
+			name: 'push',
+			payload: { ref: 'refs/heads/main' },
 		});
 	});
 
@@ -254,13 +212,16 @@ describe('createGitHubChannel()', () => {
 		expect(await honoResponse.json()).toEqual({ accepted: true });
 	});
 
-	it('returns 500 for thrown handlers and unsupported return values', async () => {
+	it('lets the Hono error handler handle thrown handlers and non-serializable returns', async () => {
+		const failure = new Error('dispatch failed');
 		const throwing = createGitHubChannel({
 			webhookSecret: 'secret',
 			webhook() {
-				throw new Error('dispatch failed');
+				throw failure;
 			},
 		});
+		// A BigInt return is not JSON-serializable; `Response.json` throws and the
+		// failure falls through to Hono's framework error handler.
 		const invalid = createGitHubChannel({
 			webhookSecret: 'secret',
 			webhook: () => 1n as never,
@@ -272,18 +233,28 @@ describe('createGitHubChannel()', () => {
 				body: JSON.stringify({ action: 'archived' }),
 			});
 
-		expect((await channelApp(throwing).request(await request())).status).toBe(500);
-		expect((await channelApp(invalid).request(await request())).status).toBe(500);
+		let received: unknown;
+		const throwingApp = channelApp(throwing);
+		throwingApp.onError((error, c) => {
+			received = error;
+			return c.text('handled', 503);
+		});
+		const throwingResponse = await throwingApp.request(await request());
+		expect(throwingResponse.status).toBe(503);
+		expect(await throwingResponse.text()).toBe('handled');
+		expect(received).toBe(failure);
+
+		const invalidApp = channelApp(invalid);
+		invalidApp.onError((_error, c) => c.text('handled', 503));
+		expect((await invalidApp.request(await request())).status).toBe(503);
 	});
 
-	it('returns 500 when the handler misses its configured deadline', async () => {
-		const github = createGitHubChannel({
+	it('serializes a non-finite number return as JSON null with a 200', async () => {
+		const channel = createGitHubChannel({
 			webhookSecret: 'secret',
-			handlerTimeoutMs: 5,
-			webhook: () => new Promise(() => {}),
+			webhook: () => Number.NaN as never,
 		});
-
-		const response = await channelApp(github).request(
+		const response = await channelApp(channel).request(
 			await signedRequest({
 				secret: 'secret',
 				event: 'repository',
@@ -291,7 +262,8 @@ describe('createGitHubChannel()', () => {
 			}),
 		);
 
-		expect(response.status).toBe(500);
+		expect(response.status).toBe(200);
+		expect(await response.json()).toBe(null);
 	});
 
 	it('rejects missing invalid and changed signatures before invoking the callback', async () => {
@@ -329,7 +301,7 @@ describe('createGitHubChannel()', () => {
 		expect(webhook).not.toHaveBeenCalled();
 	});
 
-	it('supports signed form payloads and rejects oversized bodies', async () => {
+	it('rejects form-encoded ingress and oversized bodies', async () => {
 		const webhook = vi.fn();
 		const github = createGitHubChannel({
 			webhookSecret: 'secret',
@@ -345,6 +317,8 @@ describe('createGitHubChannel()', () => {
 		};
 		const body = new URLSearchParams({ payload: JSON.stringify(raw) }).toString();
 
+		// Ingress is JSON-only; a form-encoded delivery is rejected on content type
+		// before signature verification runs.
 		const formResponse = await channelApp(github).request(
 			await signedRequest({
 				secret: 'secret',
@@ -364,15 +338,8 @@ describe('createGitHubChannel()', () => {
 			}),
 		);
 
-		expect(formResponse.status).toBe(200);
-		expect(webhook.mock.calls[0]?.[0].event).toMatchObject({
-			type: 'issue_comment.created',
-			sender: { id: 77, login: 'octo-reviewer', type: 'User' },
-			payload: {
-				issue: { number: 42, title: 'Review edge support', kind: 'pull_request' },
-				comment: { id: 99, body: 'Looks good +1' },
-			},
-		});
+		expect(formResponse.status).toBe(415);
+		expect(webhook).not.toHaveBeenCalled();
 		expect(oversized.status).toBe(413);
 	});
 
@@ -388,16 +355,6 @@ describe('createGitHubChannel()', () => {
 			},
 		]);
 		expect(webhook).not.toHaveBeenCalled();
-	});
-
-	it('rejects a handler deadline longer than the GitHub response window', () => {
-		expect(() =>
-			createGitHubChannel({
-				webhookSecret: 'secret',
-				handlerTimeoutMs: 9_001,
-				webhook() {},
-			}),
-		).toThrow(TypeError);
 	});
 
 	it('round-trips canonical issue references and rejects foreign keys', () => {
