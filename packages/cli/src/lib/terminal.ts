@@ -16,7 +16,7 @@ export function blue(text: string): string {
 	return paint(BLUE, text);
 }
 
-export function bold(text: string): string {
+function bold(text: string): string {
 	return paint(BOLD, text);
 }
 

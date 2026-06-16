@@ -19,15 +19,7 @@ import {
 import { resolveConfigCandidates } from '../src/lib/config-paths.ts';
 import { DEFAULT_DEV_PORT, dev } from '../src/lib/dev.ts';
 import { createEnvLoader, type EnvLoader, selectEnvFile } from '../src/lib/env.ts';
-import {
-	brand,
-	brandRows,
-	dim,
-	error as cliError,
-	note,
-	row,
-	success,
-} from '../src/lib/terminal.ts';
+import { brand, dim, error as cliError, note, row, success } from '../src/lib/terminal.ts';
 import { BLUEPRINTS, KIND_ROOTS } from './_blueprints.generated.ts';
 
 interface ApplicationConfigArgs {
