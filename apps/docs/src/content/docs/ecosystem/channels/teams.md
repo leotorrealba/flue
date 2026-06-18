@@ -194,4 +194,4 @@ authority.
 The package does not deduplicate activity ids. Claim them in application-owned
 durable storage before dispatch when duplicate admission is unacceptable.
 
-See the [`@flue/teams` API reference](/docs/api/teams-channel/).
+See the [`@flue/teams` README](https://github.com/withastro/flue/tree/main/packages/teams#readme).

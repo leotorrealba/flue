@@ -219,4 +219,4 @@ Octokit's REST methods use Fetch and the example's typed
 through `process.env` or typed Worker bindings and should verify their complete
 target build.
 
-See the [`@flue/github` API reference](/docs/api/github-channel/).
+See the [`@flue/github` README](https://github.com/withastro/flue/tree/main/packages/github#readme).

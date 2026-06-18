@@ -256,4 +256,4 @@ The channel requires Linear's UUID-v4 `Linear-Delivery` header and exposes it
 for application-owned deduplication, but does not persist delivery state.
 Conversation keys validate syntax, not authorization.
 
-See the [`@flue/linear` API reference](/docs/api/linear-channel/).
+See the [`@flue/linear` README](https://github.com/withastro/flue/tree/main/packages/linear#readme).

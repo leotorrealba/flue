@@ -239,4 +239,4 @@ overrides on the webhook URL can opt into retries with `rc` (retry count) and
 the signed URL. Acknowledge before slow work and make admission idempotent when
 retries are enabled.
 
-See the [`@flue/twilio` API reference](/docs/api/twilio-channel/).
+See the [`@flue/twilio` README](https://github.com/withastro/flue/tree/main/packages/twilio#readme).

@@ -222,4 +222,4 @@ your application needs rather than treating process memory as provider
 history.
 
 See the
-[`@flue/messenger` API reference](/docs/api/messenger-channel/).
+[`@flue/messenger` README](https://github.com/withastro/flue/tree/main/packages/messenger#readme).

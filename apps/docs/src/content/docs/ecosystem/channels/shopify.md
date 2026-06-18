@@ -402,4 +402,4 @@ topics, malformed JSON, body limits, and handler results. Test
 rejects unexpected hosts and paths. No test should register a webhook or
 contact Shopify.
 
-See the [`@flue/shopify` API reference](/docs/api/shopify-channel/).
+See the [`@flue/shopify` README](https://github.com/withastro/flue/tree/main/packages/shopify#readme).

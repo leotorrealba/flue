@@ -280,4 +280,4 @@ HMAC signatures with Web Crypto, and exercise `Client.pages.retrieve()` through
 an injected fake Fetch in Node and workerd. The fake transport should reject
 unexpected URLs so tests cannot contact Notion.
 
-See the [`@flue/notion` API reference](/docs/api/notion-channel/).
+See the [`@flue/notion` README](https://github.com/withastro/flue/tree/main/packages/notion#readme).

@@ -96,7 +96,7 @@ Set `GOOGLE_CHAT_APP_URL` to that exact URL. With endpoint-URL authentication,
 `@flue/google-chat` verifies Google's signature, issuer, expiration, exact
 audience, and `chat@system.gserviceaccount.com` identity before invoking the
 handler. The package also supports Google's project-number authentication mode;
-see the [API reference](/docs/api/google-chat-channel/) when the Chat app is
+see the [`@flue/google-chat` README](https://github.com/withastro/flue/tree/main/packages/google-chat#readme) when the Chat app is
 configured for that mode.
 
 For Workspace Events, the audience and service-account email must match the

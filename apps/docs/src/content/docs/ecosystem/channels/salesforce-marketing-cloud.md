@@ -392,4 +392,4 @@ tenant host, callback path, method, and Bearer header. Never register a live
 callback, perform OAuth, call `/ens-verify`, or contact Salesforce from tests.
 
 See the
-[`@flue/salesforce` API reference](/docs/api/salesforce-marketing-cloud-channel/).
+[`@flue/salesforce` README](https://github.com/withastro/flue/tree/main/packages/salesforce-marketing-cloud#readme).

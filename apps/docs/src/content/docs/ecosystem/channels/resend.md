@@ -228,4 +228,4 @@ Receiving-domain configuration, webhook registration, API keys, signing-secret
 rotation, deduplication, persistence, outbound mail, and reply behavior remain
 application-owned.
 
-See the [`@flue/resend` API reference](/docs/api/resend-channel/).
+See the [`@flue/resend` README](https://github.com/withastro/flue/tree/main/packages/resend#readme).

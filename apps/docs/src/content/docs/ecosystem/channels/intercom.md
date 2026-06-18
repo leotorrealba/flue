@@ -346,4 +346,4 @@ disable retries, assert the exact host, path, method, authorization, version,
 and region, and reject every unexpected destination. Do not register a webhook,
 perform OAuth, obtain a real token, or contact Intercom.
 
-See the [`@flue/intercom` API reference](/docs/api/intercom-channel/).
+See the [`@flue/intercom` README](https://github.com/withastro/flue/tree/main/packages/intercom#readme).

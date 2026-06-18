@@ -261,4 +261,4 @@ API versions, a transient `url`). Treat both as transport credentials: download
 media with the project-owned client using the verified id, and avoid forwarding
 the raw `payload` or media URLs into model context wholesale.
 
-See the [`@flue/whatsapp` API reference](/docs/api/whatsapp-channel/).
+See the [`@flue/whatsapp` README](https://github.com/withastro/flue/tree/main/packages/whatsapp#readme).

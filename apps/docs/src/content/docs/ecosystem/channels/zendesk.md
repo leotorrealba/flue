@@ -414,4 +414,4 @@ header, and reject every unexpected destination. Create original synthetic
 events and local HMACs for ingress tests. Do not create a webhook, subscribe to
 live events, obtain a real token, or contact Zendesk.
 
-See the [`@flue/zendesk` API reference](/docs/api/zendesk-channel/).
+See the [`@flue/zendesk` README](https://github.com/withastro/flue/tree/main/packages/zendesk#readme).

@@ -231,4 +231,4 @@ generic Stripe tools. It also does not claim support for specialized
 latency-sensitive workflows such as synchronous real-time Issuing
 authorization decisions.
 
-See the [`@flue/stripe` API reference](/docs/api/stripe-channel/).
+See the [`@flue/stripe` README](https://github.com/withastro/flue/tree/main/packages/stripe#readme).

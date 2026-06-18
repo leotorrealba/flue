@@ -247,4 +247,4 @@ short-lived `answerGuestQuery` response and must not enter model context, logs,
 durable session data, or agent identity. An inline `callback_query` without a
 `message` likewise supplies no accessible chat.
 
-See the [`@flue/telegram` API reference](/docs/api/telegram-channel/).
+See the [`@flue/telegram` README](https://github.com/withastro/flue/tree/main/packages/telegram#readme).
