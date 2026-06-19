@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixes & Other Changes
+
+- Fixed Cloudflare sandbox shell calls failing before execution because an `AbortSignal` was sent across the Durable Object RPC boundary.
+
 ## 1.0.0-beta.2 - 2026-06-17
 
 ### Fixes & Other Changes
