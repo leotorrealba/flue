@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
+import { embedDocsCatalog } from '../../../scripts/prepare-publish.mjs';
 
 const cli = new URL('../dist/flue.js', import.meta.url);
 
@@ -29,14 +31,25 @@ describe('flue docs', () => {
 		assert.equal(list.code, 0);
 
 		const lines = list.stdout.trim().split('\n');
-		assert.ok(lines.length > 10, `expected a catalog of pages, got ${lines.length} lines`);
+		assert.ok(lines.length > 20, `expected a catalog of pages, got ${lines.length} lines`);
 
-		// The catalog is the machine-readable payload; help text stays on stderr.
 		assert.ok(!list.stdout.includes('flue docs read <path>'));
 		assert.ok(list.stderr.includes('flue docs read <path>'));
+		for (let index = 0; index < lines.length; index += 1) {
+			const line = lines[index];
+			if (line.startsWith('  ')) {
+				assert.ok(line.slice(2).length <= 120);
+				continue;
+			}
+			assert.match(line, /^[^ ]+ -- .+$/);
+			if (line.startsWith('ecosystem/')) {
+				assert.ok(!lines[index + 1]?.startsWith('  '));
+			} else {
+				assert.match(lines[index + 1], /^ {2}\S.+$/);
+			}
+		}
 
-		// Round-trip: every listed path must be readable.
-		const firstPath = lines[0].split(/\s+/)[0];
+		const firstPath = lines[0].split(' -- ')[0];
 		const read = await runCli(['docs', 'read', firstPath]);
 		assert.equal(read.code, 0);
 		assert.ok(read.stdout.startsWith('# '), 'page output starts with a markdown title');
@@ -44,7 +57,7 @@ describe('flue docs', () => {
 
 	it('accepts website URL forms when reading a page', async () => {
 		const list = await runCli(['docs']);
-		const firstPath = list.stdout.trim().split('\n')[0].split(/\s+/)[0];
+		const firstPath = list.stdout.trim().split('\n')[0].split(' -- ')[0];
 
 		const plain = await runCli(['docs', 'read', firstPath]);
 		const urlForm = await runCli(['docs', 'read', `/docs/${firstPath}/`]);
@@ -81,5 +94,21 @@ describe('flue docs', () => {
 		const result = await runCli(['docs', 'search']);
 		assert.equal(result.code, 1);
 		assert.ok(result.stderr.includes('flue docs search <query>'));
+	});
+
+	it('embeds the catalog between skill markers without changing authored content', () => {
+		const source = `before\n<!-- flue-docs-catalog:start -->\nold\n<!-- flue-docs-catalog:end -->\nafter\n`;
+		assert.equal(
+			embedDocsCatalog(source, 'guide/channels -- Channels\n  Receive provider events.\n'),
+			`before\n<!-- flue-docs-catalog:start -->\n\n\`\`\`text\nguide/channels -- Channels\n  Receive provider events.\n\`\`\`\n\n<!-- flue-docs-catalog:end -->\nafter\n`,
+		);
+	});
+
+	it('keeps the tracked skill catalog synchronized with flue docs', async () => {
+		const list = await runCli(['docs']);
+		assert.equal(list.code, 0);
+		const skillUrl = new URL('../../../skills/flue/SKILL.md', import.meta.url);
+		const skillSource = await readFile(skillUrl, 'utf8');
+		assert.equal(embedDocsCatalog(skillSource, list.stdout), skillSource);
 	});
 });

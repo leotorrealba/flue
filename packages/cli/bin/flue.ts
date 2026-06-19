@@ -1933,6 +1933,16 @@ function extractDocsHeadings(source: string): string {
 	return matches.map((match) => docsMarkdownToPlainText(match[1] ?? '')).join(' ');
 }
 
+const DOCS_DESCRIPTION_MAX_LENGTH = 120;
+
+function truncateDocsDescription(description: string): string {
+	const characters = [...description];
+	if (characters.length <= DOCS_DESCRIPTION_MAX_LENGTH) return description;
+	const truncated = characters.slice(0, DOCS_DESCRIPTION_MAX_LENGTH - 1).join('');
+	const boundary = truncated.search(/\s+\S*$/u);
+	return boundary > 0 ? `${truncated.slice(0, boundary)}…` : '…';
+}
+
 const DOCS_EXCERPT_RADIUS = 120;
 
 function buildDocsExcerpt(content: string, terms: string[]): string {
@@ -1988,9 +1998,11 @@ function docsCommand(args: DocsArgs): void {
 				'  flue docs search <query>   Search the documentation (JSON results)\n\n' +
 				`Pages (${pages.length}):\n\n`,
 		);
-		const width = Math.max(...pages.map((page) => page.path.length));
 		for (const page of pages) {
-			process.stdout.write(`${page.path.padEnd(width)}  ${page.title}\n`);
+			process.stdout.write(`${page.path} -- ${page.title}\n`);
+			if (page.description && !page.path.startsWith('ecosystem/')) {
+				process.stdout.write(`  ${truncateDocsDescription(page.description)}\n`);
+			}
 		}
 		return;
 	}
