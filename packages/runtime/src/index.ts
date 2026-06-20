@@ -16,6 +16,12 @@ export {
 	ActionOutputSerializationError,
 	ActionOutputValidationError,
 	AttachmentNotAvailableError,
+	WorkflowAdmissionError,
+	WorkflowAdmissionUnavailableError,
+	WorkflowInputSerializationError,
+	WorkflowInputUnexpectedError,
+	WorkflowInvocationNotConfiguredError,
+	WorkflowNotDiscoveredError,
 	FlueError,
 	ModelNotConfiguredError,
 	OperationFailedError,
@@ -42,7 +48,8 @@ export { connectMcpServer } from './mcp.ts';
 export { ResultUnavailableError } from './result.ts';
 export { type FlueEventSubscriber, observe } from './runtime/events.ts';
 export type { AgentManifestEntry } from './runtime/flue-app.ts';
-export { dispatch } from './runtime/flue-app.ts';
+export { dispatch, invoke } from './runtime/flue-app.ts';
+export type { WorkflowInvocationReceipt, WorkflowInvokeRequest } from './runtime/invoke.ts';
 export { getRun, listAgents, listRuns } from './runtime/inspect.ts';
 export {
 	type HttpProviderRegistration,

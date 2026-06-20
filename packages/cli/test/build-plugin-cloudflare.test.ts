@@ -30,6 +30,19 @@ describe('CloudflarePlugin', () => {
 		expect(entry).toContain('createSqlRunStore');
 	});
 
+	it('wires ambient workflow invocation through a private per-run Durable Object request', async () => {
+		const entry = await new CloudflarePlugin().generateEntryPoint(
+			testBuildContext({
+				workflows: [{ name: 'report', filePath: '/fixture/workflows/report.ts' }],
+			}),
+		);
+
+		expect(entry).toContain('resolveWorkflowName: (workflow) => workflowNames.get(workflow)');
+		expect(entry).toContain("const INTERNAL_WORKFLOW_INVOKE_PATH = '/_flue/internal/workflow-invoke'");
+		expect(entry).toContain("doInstance.runFiber('flue:workflow:' + runId");
+		expect(entry).toContain('const workflow = workflows[workflowName]');
+	});
+
 	it('imports discovered channels and configures their normalized handlers', async () => {
 		const entry = await new CloudflarePlugin().generateEntryPoint(
 			testBuildContext({

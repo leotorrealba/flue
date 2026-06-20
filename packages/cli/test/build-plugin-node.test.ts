@@ -60,6 +60,18 @@ describe('NodePlugin', () => {
 		expect(entry).toContain("process.on('SIGTERM'");
 	});
 
+	it('wires ambient workflow invocation directly to detached in-process admission', () => {
+		const entry = new NodePlugin().generateEntryPoint(
+			testBuildContext({
+				workflows: [{ name: 'report', filePath: '/fixture/workflows/report.ts' }],
+			}),
+		);
+
+		expect(entry).toContain('resolveWorkflowName: (workflow) => workflowNames.get(workflow)');
+		expect(entry).toContain('admitDetachedWorkflow({');
+		expect(entry).not.toContain("flueApp.fetch(new Request('https://flue.invalid/_internal/workflows/");
+	});
+
 	it('imports discovered channels and configures their normalized handlers', () => {
 		const entry = new NodePlugin().generateEntryPoint(
 			testBuildContext({

@@ -56,6 +56,7 @@ export {
 	handleRunRouteRequest,
 } from './runtime/flue-app.ts';
 export type {
+	AdmitDetachedWorkflowOptions,
 	CreateContextFn,
 	DirectAttachedOptions,
 	FailRecoveredRunOptions,
@@ -80,6 +81,7 @@ export type {
 //
 // The user-facing `flue()` itself is re-exported from `@flue/runtime/routing`, not here.
 export {
+	admitDetachedWorkflow,
 	assertCreatedWorkflow,
 	failRecoveredRun,
 	handleWorkflowRequest,

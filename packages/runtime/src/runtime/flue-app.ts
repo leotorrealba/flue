@@ -37,6 +37,8 @@ import {
 } from './handle-agent.ts';
 import { handleStreamHead, handleStreamRead } from './handle-stream-routes.ts';
 import { generateWorkflowRunId } from './ids.ts';
+import { invokeWorkflow, type WorkflowInvokeRequest, type WorkflowInvocationReceipt } from './invoke.ts';
+import type { CreatedWorkflow } from '../workflow-definition.ts';
 import type { RunPointer, RunStore } from './run-store.ts';
 
 import {
@@ -135,6 +137,12 @@ export interface FlueRuntime {
 
 	/** Resolve discovered/default-exported created agent identities for global dispatch. */
 	resolveDispatchAgentName?: (agent: CreatedAgent) => string | undefined;
+
+	/** Resolve the exact discovered/default-exported Created Workflow identity. */
+	resolveWorkflowName?: (workflow: CreatedWorkflow) => string | undefined;
+
+	/** Admit an ambient workflow invocation through the target runtime. */
+	admitWorkflow?: (input: { workflowName: string; input: unknown }) => Promise<{ runId: string }>;
 }
 
 /** Cross-deployment run lookup/listing surface of a {@link RunStore}. */
@@ -203,6 +211,13 @@ export async function dispatch(
 		? resolveCreatedAgentDispatchRequest(agentOrRequest, maybeRequest, rt)
 		: agentOrRequest;
 	return enqueueDispatch({ request, dispatchQueue: rt.dispatchQueue, rt });
+}
+
+export function invoke<TWorkflow extends CreatedWorkflow>(
+	workflow: TWorkflow,
+	request: WorkflowInvokeRequest<TWorkflow>,
+): Promise<WorkflowInvocationReceipt> {
+	return invokeWorkflow(workflow, request, runtimeConfig);
 }
 
 function isCreatedAgentValue(

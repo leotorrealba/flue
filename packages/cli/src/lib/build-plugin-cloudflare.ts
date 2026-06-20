@@ -167,6 +167,7 @@ import { Agent, getAgentByName } from 'agents';
 import {
   Bash,
   InMemoryFs,
+  admitDetachedWorkflow,
   assertCreatedWorkflow,
   createFlueContext,
   createSqlRunStore,
@@ -181,6 +182,7 @@ import {
   handleStreamRead,
   handleStreamHead,
   failRecoveredRun,
+  generateWorkflowRunId,
   configureFlueRuntime,
   createDefaultFlueApp,
   hasRegisteredProvider,
@@ -232,7 +234,7 @@ const channelModules = {
 ${channelModuleEntries}
 };
 const normalized = normalizeBuiltModules(agentModules, workflowModules, channelModules);
-const { manifest, createdAgents, dispatchAgentNames, workflows, agentRouteMiddleware, workflowRouteMiddleware, channelHandlers } = normalized;
+const { manifest, createdAgents, dispatchAgentNames, workflows, workflowNames, agentRouteMiddleware, workflowRouteMiddleware, channelHandlers } = normalized;
 const agentIdentities = {
 ${agentIdentityEntries}
 };
@@ -270,6 +272,7 @@ async function createDefaultEnv() {
 }
 
 const INTERNAL_DISPATCH_PATH = CLOUDFLARE_AGENT_INTERNAL_DISPATCH_PATH;
+const INTERNAL_WORKFLOW_INVOKE_PATH = '/_flue/internal/workflow-invoke';
 const dispatchQueue = {
   async enqueue(input) {
     const identity = agentIdentities[input.agent];
@@ -431,10 +434,30 @@ async function dispatchWorkflow(request, doInstance, workflowName) {
     });
   }
 
-  if (!parseWorkflowStart(request, workflowName)) return null;
   const workflow = workflows[workflowName];
   if (!workflow) return null;
   const identity = workflowRuntimeIdentity(workflowName);
+  if (request.method === 'POST' && new URL(request.url).pathname === INTERNAL_WORKFLOW_INVOKE_PATH) {
+    const { input } = await request.json();
+    return runWithInstanceContext(doInstance, identity, async () => {
+      const receipt = await admitDetachedWorkflow({
+        workflowName,
+        runId: instanceId,
+        workflow,
+        input,
+        request,
+        runStore: createRunStoreForRequest(doInstance),
+        eventStreamStore: createEventStreamStoreForInstance(doInstance),
+        createContext: (id_, runId, payload, req, initialEventIndex, dispatchId) => createWorkflowContextForRequest(id_, runId, payload, doInstance, req, initialEventIndex, dispatchId),
+        startWorkflowAdmission: (runId, run) => {
+          assertAgentsDurabilityApi(doInstance, 'runFiber');
+          return doInstance.runFiber('flue:workflow:' + runId, () => runWithInstanceContext(doInstance, identity, run));
+        },
+      });
+      return new Response(JSON.stringify(receipt), { status: 202, headers: { 'content-type': 'application/json' } });
+    });
+  }
+  if (!parseWorkflowStart(request, workflowName)) return null;
   return runWithInstanceContext(doInstance, identity, () => handleWorkflowRequest({
       request,
       workflowName,
@@ -503,6 +526,20 @@ configureFlueRuntime({
   manifest,
   dispatchQueue,
   resolveDispatchAgentName: (agent) => dispatchAgentNames.get(agent),
+  resolveWorkflowName: (workflow) => workflowNames.get(workflow),
+  admitWorkflow: async ({ workflowName, input }) => {
+    const identity = workflowIdentities[workflowName];
+    const binding = env?.[identity?.bindingName];
+    if (!binding) throw new Error('[flue] invoke() target workflow Durable Object binding is unavailable.');
+    const runId = generateWorkflowRunId();
+    const response = await fetchAgent(binding, runId, new Request('https://flue.invalid' + INTERNAL_WORKFLOW_INVOKE_PATH, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ input }),
+    }));
+    if (!response.ok) throw new Error('[flue] invoke() target workflow rejected durable admission with status ' + response.status + '.');
+    return response.json();
+  },
   agentRouteMiddleware,
   workflowRouteMiddleware,
   channelHandlers,

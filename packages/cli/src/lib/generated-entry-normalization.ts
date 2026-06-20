@@ -25,6 +25,7 @@ function normalizeBuiltModules(agentModules, workflowModules, channelModules = {
   const createdAgents = {};
   const dispatchAgentNames = new Map();
   const workflows = {};
+  const workflowNames = new Map();
   const agentRouteMiddleware = {};
   const workflowRouteMiddleware = {};
   const channelHandlers = {};
@@ -51,6 +52,9 @@ function normalizeBuiltModules(agentModules, workflowModules, channelModules = {
     if (typeof mod.route === 'function') transports.http = true;
     manifest.workflows.push({ name, transports });
     workflows[name] = mod.default;
+    const previousWorkflowName = workflowNames.get(mod.default);
+    if (previousWorkflowName !== undefined) throw new Error('[flue] Workflows "' + previousWorkflowName + '" and "' + name + '" default-export the same created workflow value. Use distinct createWorkflow(...) values for workflow modules.');
+    workflowNames.set(mod.default, name);
     if (typeof mod.route === 'function') workflowRouteMiddleware[name] = mod.route;
   }
 
@@ -73,7 +77,7 @@ function normalizeBuiltModules(agentModules, workflowModules, channelModules = {
     channelHandlers[name] = routes;
   }
 
-  return { manifest, createdAgents, dispatchAgentNames, workflows, agentRouteMiddleware, workflowRouteMiddleware, channelHandlers };
+  return { manifest, createdAgents, dispatchAgentNames, workflows, workflowNames, agentRouteMiddleware, workflowRouteMiddleware, channelHandlers };
 }
 
 `;

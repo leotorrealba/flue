@@ -683,6 +683,81 @@ export class ActionOutputSerializationError extends FlueError {
 	}
 }
 
+export class WorkflowInvocationNotConfiguredError extends FlueError {
+	constructor() {
+		super({
+			type: 'workflow_invocation_not_configured',
+			message: 'Workflow invocation is not configured in this runtime.',
+			details: '',
+			dev: 'Call invoke() from a Flue-built server entry.',
+		});
+		this.name = 'WorkflowInvocationNotConfiguredError';
+	}
+}
+
+export class WorkflowNotDiscoveredError extends FlueError {
+	constructor() {
+		super({
+			type: 'workflow_not_discovered',
+			message: 'The workflow is not registered in this application.',
+			details: '',
+			dev: 'invoke() accepts the exact Created Workflow value default-exported by one discovered workflow module.',
+		});
+		this.name = 'WorkflowNotDiscoveredError';
+	}
+}
+
+export class WorkflowInputUnexpectedError extends FlueError {
+	constructor() {
+		super({
+			type: 'workflow_input_unexpected',
+			message: 'This workflow does not accept input.',
+			details: '',
+			dev: 'Remove the input value from invoke() for a workflow whose Action has no input schema.',
+		});
+		this.name = 'WorkflowInputUnexpectedError';
+	}
+}
+
+export class WorkflowInputSerializationError extends FlueError {
+	constructor({ cause }: { cause: unknown }) {
+		super({
+			type: 'workflow_input_serialization',
+			message: 'Workflow input is not JSON-serializable.',
+			details: '',
+			dev: 'Pass a plain JSON value as invoke().input.',
+			cause,
+		});
+		this.name = 'WorkflowInputSerializationError';
+	}
+}
+
+export class WorkflowAdmissionUnavailableError extends FlueError {
+	constructor() {
+		super({
+			type: 'workflow_admission_unavailable',
+			message: 'Workflow admission is not available in this runtime.',
+			details: '',
+			dev: 'The generated runtime did not configure a workflow admission hook.',
+		});
+		this.name = 'WorkflowAdmissionUnavailableError';
+	}
+}
+
+export class WorkflowAdmissionError extends FlueError {
+	constructor({ workflow, cause }: { workflow: string; cause: unknown }) {
+		super({
+			type: 'workflow_admission_failed',
+			message: 'Workflow admission failed.',
+			details: '',
+			dev: `The generated runtime could not admit workflow "${workflow}".`,
+			meta: { workflow },
+			cause,
+		});
+		this.name = 'WorkflowAdmissionError';
+	}
+}
+
 /**
  * Model-supplied tool arguments failed the tool's valibot `parameters`
  * schema. Thrown from the tool's wrapped `execute`; the agent loop converts

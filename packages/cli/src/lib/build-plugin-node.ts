@@ -77,6 +77,7 @@ import { sqlite } from '@flue/runtime/node';
 import {
   Bash,
   InMemoryFs,
+  admitDetachedWorkflow,
   assertCreatedWorkflow,
   createFlueContext,
   createNodeAgentCoordinator,
@@ -110,7 +111,7 @@ const channelModules = {
 ${channelModuleEntries}
 };
 const normalized = normalizeBuiltModules(agentModules, workflowModules, channelModules);
-const { manifest, createdAgents, dispatchAgentNames, workflows, agentRouteMiddleware, workflowRouteMiddleware, channelHandlers } = normalized;
+const { manifest, createdAgents, dispatchAgentNames, workflows, workflowNames, agentRouteMiddleware, workflowRouteMiddleware, channelHandlers } = normalized;
 
 const isLocalMode = process.env.FLUE_MODE === 'local';
 const localCliTarget = process.env.FLUE_CLI_TARGET;
@@ -228,6 +229,20 @@ configureFlueRuntime({
   createAdmission,
   dispatchQueue,
   resolveDispatchAgentName: (agent) => dispatchAgentNames.get(agent),
+  resolveWorkflowName: (workflow) => workflowNames.get(workflow),
+  admitWorkflow: ({ workflowName, input }) => {
+    const workflow = workflows[workflowName];
+    if (!workflow) throw new Error('[flue] Internal workflow admission target is not registered.');
+    return admitDetachedWorkflow({
+      workflowName,
+      workflow,
+      input,
+      request: new Request('https://flue.invalid/_internal/workflows/' + encodeURIComponent(workflowName), { method: 'POST' }),
+      createContext: createContextForRequest,
+      runStore,
+      eventStreamStore,
+    });
+  },
   workflows,
   agentRouteMiddleware,
   workflowRouteMiddleware,

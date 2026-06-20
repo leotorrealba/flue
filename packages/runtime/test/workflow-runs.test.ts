@@ -1,12 +1,23 @@
 import { DatabaseSync } from 'node:sqlite';
 import { Hono } from 'hono';
 import * as v from 'valibot';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createAgent, createWorkflow } from '../src/index.ts';
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
+import {
+	createAgent,
+	createWorkflow,
+	invoke,
+	WorkflowAdmissionError,
+	WorkflowInputSerializationError,
+	WorkflowInputUnexpectedError,
+	WorkflowInvocationNotConfiguredError,
+	WorkflowNotDiscoveredError,
+} from '../src/index.ts';
+import type { WorkflowInvokeRequest } from '../src/index.ts';
 import type { FlueContextInternal, FlueRuntime } from '../src/internal.ts';
 import {
 	configureFlueRuntime,
 	createFlueContext,
+	admitDetachedWorkflow,
 	failRecoveredRun,
 	InMemoryRunStore,
 	InMemorySessionStore,
@@ -61,6 +72,220 @@ function createApp(runtime: FlueRuntime): Hono {
 	app.route('/flue', flue());
 	return app;
 }
+
+describe('invoke()', () => {
+	it('infers caller input from Workflow Action input semantics', () => {
+		const required = createWorkflow({
+			agent: createAgent(() => ({ model: false })),
+			input: v.object({ count: v.number() }),
+			run: async ({ input }) => input,
+		});
+		const omitted = createWorkflow({
+			agent: createAgent(() => ({ model: false })),
+			run: async () => undefined,
+		});
+
+		expectTypeOf(invoke).toBeCallableWith(required, { input: { count: 1 } });
+		expectTypeOf(invoke).toBeCallableWith(omitted, {});
+		expectTypeOf<{ input: {} }>().not.toMatchTypeOf<WorkflowInvokeRequest<typeof omitted>>();
+	});
+
+	it('rejects supplied input when a Workflow Action declares no input', async () => {
+		const target = createWorkflow({
+			agent: createAgent(() => ({ model: false })),
+			run: async () => undefined,
+		});
+		const admitWorkflow = vi.fn(async () => ({ runId: 'run_no_input' }));
+		configureFlueRuntime({
+			target: 'node',
+			resolveWorkflowName: () => 'target',
+			admitWorkflow,
+		});
+
+		await expect(invoke(target, { input: {} } as never)).rejects.toBeInstanceOf(
+			WorkflowInputUnexpectedError,
+		);
+		expect(admitWorkflow).not.toHaveBeenCalled();
+	});
+
+	it('rejects calls when ambient workflow admission is unconfigured', async () => {
+		const target = workflow(async () => undefined);
+
+		await expect(invoke(target, { input: {} })).rejects.toBeInstanceOf(
+			WorkflowInvocationNotConfiguredError,
+		);
+	});
+
+	it('rejects Created Workflows that are not exact discovered identities', async () => {
+		const discovered = workflow(async () => undefined);
+		const undiscovered = workflow(async () => undefined);
+		configureFlueRuntime({
+			target: 'node',
+			resolveWorkflowName: (candidate) => (candidate === discovered ? 'discovered' : undefined),
+			admitWorkflow: async () => ({ runId: 'run_discovered' }),
+		});
+
+		await expect(invoke(undiscovered, { input: {} })).rejects.toBeInstanceOf(
+			WorkflowNotDiscoveredError,
+		);
+	});
+
+	it('strictly snapshots caller input before admission', async () => {
+		const target = workflow(async () => undefined);
+		const admitted: unknown[] = [];
+		const input = { nested: { count: 1 } };
+		configureFlueRuntime({
+			target: 'node',
+			resolveWorkflowName: (candidate) => (candidate === target ? 'target' : undefined),
+			admitWorkflow: async (admission) => {
+				admitted.push(admission.input);
+				return { runId: 'run_snapshot' };
+			},
+		});
+
+		await invoke(target, { input });
+		input.nested.count = 2;
+
+		expect(admitted).toEqual([{ nested: { count: 1 } }]);
+		await expect(invoke(target, { input: { invalid: 1n } } as never)).rejects.toBeInstanceOf(
+			WorkflowInputSerializationError,
+		);
+	});
+
+	it('wraps target admission failures in a structured public error', async () => {
+		const target = workflow(async () => undefined);
+		configureFlueRuntime({
+			target: 'node',
+			resolveWorkflowName: () => 'target',
+			admitWorkflow: async () => {
+				throw new Error('storage unavailable');
+			},
+		});
+
+		await expect(invoke(target, { input: {} })).rejects.toBeInstanceOf(WorkflowAdmissionError);
+	});
+
+	it('returns after persisted admission and before detached completion', async () => {
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const target = workflow(async () => {
+			await gate;
+			return { done: true };
+		});
+		const runStore = new InMemoryRunStore();
+		const eventStreamStore = createTestEventStreamStore();
+		configureFlueRuntime({
+			target: 'node',
+			resolveWorkflowName: (candidate) => (candidate === target ? 'target' : undefined),
+			admitWorkflow: ({ workflowName, input }) =>
+				admitDetachedWorkflow({
+					workflowName,
+					workflow: target,
+					input,
+					request: new Request('https://flue.invalid/_internal/workflow', { method: 'POST' }),
+					createContext,
+					runStore,
+					eventStreamStore,
+				}),
+		});
+
+		const receipt = await invoke(target, { input: { report: 'weekly' } });
+		expect((await runStore.getRun(receipt.runId))?.status).toBe('active');
+		expect(await eventStreamStore.getStreamMeta(`runs/${receipt.runId}`)).toBeDefined();
+		release();
+		await vi.waitFor(async () => {
+			expect((await runStore.getRun(receipt.runId))?.status).toBe('completed');
+		});
+	});
+
+	it('terminalizes before rejecting when detached scheduling fails before execution starts', async () => {
+		const target = workflow(async () => undefined);
+		const runStore = new InMemoryRunStore();
+		const eventStreamStore = createTestEventStreamStore();
+		const runId = 'run_scheduling_failure';
+
+		await expect(
+			admitDetachedWorkflow({
+				workflowName: 'target',
+				runId,
+				workflow: target,
+				input: {},
+				request: new Request('https://flue.invalid/_internal/workflow', { method: 'POST' }),
+				createContext,
+				runStore,
+				eventStreamStore,
+				startWorkflowAdmission: async () => {
+					throw new Error('fiber rejected before scheduling');
+				},
+			}),
+		).rejects.toThrow('fiber rejected before scheduling');
+
+		expect(await runStore.getRun(runId)).toMatchObject({ status: 'errored', isError: true });
+		const stream = await eventStreamStore.readEvents(`runs/${runId}`, { offset: '-1' });
+		expect(stream.events.map((event) => (event.data as { type: string }).type)).toEqual(['run_end']);
+		expect(stream.closed).toBe(true);
+	});
+
+	it('terminalizes the run when event stream creation fails after run persistence', async () => {
+		const target = workflow(async () => undefined);
+		const runStore = new InMemoryRunStore();
+		const eventStreamStore = createTestEventStreamStore();
+		vi.spyOn(eventStreamStore, 'createStream').mockRejectedValue(new Error('stream unavailable'));
+		const appendEvent = vi.spyOn(eventStreamStore, 'appendEvent');
+		const closeStream = vi.spyOn(eventStreamStore, 'closeStream');
+		const runId = 'run_stream_creation_failure';
+
+		await expect(
+			admitDetachedWorkflow({
+				workflowName: 'target',
+				runId,
+				workflow: target,
+				input: {},
+				request: new Request('https://flue.invalid/_internal/workflow', { method: 'POST' }),
+				createContext,
+				runStore,
+				eventStreamStore,
+			}),
+		).rejects.toThrow('stream unavailable');
+
+		expect(await runStore.getRun(runId)).toMatchObject({ status: 'errored', isError: true });
+		expect(appendEvent).not.toHaveBeenCalled();
+		expect(closeStream).not.toHaveBeenCalled();
+	});
+
+	it('records detached workflow failures without rejecting the admission receipt', async () => {
+		const target = workflow(async () => {
+			throw new Error('detached failure');
+		});
+		const runStore = new InMemoryRunStore();
+		const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+		configureFlueRuntime({
+			target: 'node',
+			resolveWorkflowName: () => 'target',
+			admitWorkflow: ({ workflowName, input }) =>
+				admitDetachedWorkflow({
+					workflowName,
+					workflow: target,
+					input,
+					request: new Request('https://flue.invalid/_internal/workflow', { method: 'POST' }),
+					createContext,
+					runStore,
+					eventStreamStore: createTestEventStreamStore(),
+				}),
+		});
+
+		try {
+			const receipt = await invoke(target, { input: {} });
+			await vi.waitFor(async () => {
+				expect((await runStore.getRun(receipt.runId))?.status).toBe('errored');
+			});
+		} finally {
+			consoleError.mockRestore();
+		}
+	});
+});
 
 describe('workflow invocation', () => {
 	it('returns accepted run stream coordinates when a workflow request uses default admission mode', async () => {
@@ -494,6 +719,11 @@ describe('workflow run lifecycle', () => {
 			// rejecting without a handler.
 			await vi.waitFor(async () => {
 				expect((await runStore.getRun(body.runId))?.status).toBe('errored');
+				expect(consoleError).toHaveBeenCalledWith(
+					'[flue] Workflow run failed:',
+					body.runId,
+					expect.objectContaining({ message: 'report generation failed' }),
+				);
 			});
 			expect(consoleError).toHaveBeenCalledWith(
 				'[flue] Workflow run failed:',

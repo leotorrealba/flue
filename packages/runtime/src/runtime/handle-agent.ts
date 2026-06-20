@@ -260,6 +260,18 @@ export interface FailRecoveredRunOptions {
 	eventStreamStore: EventStreamStore;
 }
 
+export interface AdmitDetachedWorkflowOptions {
+	workflowName: string;
+	workflow: CreatedWorkflow;
+	input: unknown;
+	request: Request;
+	createContext: CreateContextFn;
+	startWorkflowAdmission?: StartWorkflowAdmissionFn;
+	runStore?: RunStore;
+	eventStreamStore: EventStreamStore;
+	runId?: string;
+}
+
 interface WorkflowAdmissionOptions {
 	workflowName: string;
 	id: string;
@@ -284,6 +296,7 @@ interface AdmittedWorkflowExecution {
 	startWorkflowAdmission: StartWorkflowAdmissionFn;
 	workflow: CreatedWorkflow;
 	completion?: Promise<unknown>;
+	admission?: Promise<void>;
 }
 
 async function prepareWorkflowExecution(
@@ -327,49 +340,71 @@ async function prepareWorkflowExecution(
 	};
 }
 
-function startWorkflowExecution(execution: AdmittedWorkflowExecution): Promise<unknown> {
-	if (execution.completion) return execution.completion;
+function startWorkflowExecution(execution: AdmittedWorkflowExecution): Promise<void> {
+	if (execution.admission) return execution.admission;
 	const { runId, lifecycle, workflow, startWorkflowAdmission } = execution;
 	let didRun = false;
+	let markStarted!: () => void;
+	const started = new Promise<void>((resolve) => {
+		markStarted = resolve;
+	});
 	const run = async (): Promise<unknown> => {
 		didRun = true;
+		markStarted();
 		return await withWorkflowRunLifecycle(lifecycle, () =>
 			executeCreatedWorkflow(workflow, lifecycle.ctx, lifecycle.input),
 		);
 	};
-	let scheduled: Promise<unknown>;
 	try {
-		scheduled = startWorkflowAdmission(runId, run);
+		execution.completion = Promise.resolve(startWorkflowAdmission(runId, run));
 	} catch (error) {
-		execution.completion = emitRunEnd(lifecycle, { isError: true, error }).then(() =>
-			Promise.reject(error),
-		);
-		execution.completion.catch(() => undefined);
-		throw error;
+		execution.admission = emitRunEnd(lifecycle, { isError: true, error }).then(() => {
+			throw error;
+		});
+		return execution.admission;
 	}
-	execution.completion = scheduled.catch(async (error) => {
-		if (!didRun) {
+	const scheduling = execution.completion.then(
+		() => undefined,
+		async (error) => {
+			if (didRun) return;
 			await emitRunEnd(lifecycle, { isError: true, error });
-		}
-		throw error;
-	});
-	return execution.completion;
+			throw error;
+		},
+	);
+	execution.admission = Promise.race([started, scheduling]);
+	return execution.admission;
 }
 
-async function runWorkflowAdmissionMode(execution: AdmittedWorkflowExecution): Promise<Response> {
-	try {
-		startWorkflowExecution(execution);
-	} catch (error) {
-		await execution.completion?.catch(() => undefined);
-		throw error;
-	}
-	// The run continues in the background after the 202 response; a handler
-	// failure is already recorded as an errored run_end, so log it here instead
-	// of letting the floated completion reject unhandled (which would crash the
-	// Node process).
+async function detachWorkflowExecution(execution: AdmittedWorkflowExecution): Promise<void> {
+	const admission = startWorkflowExecution(execution);
 	execution.completion?.catch((error) => {
 		console.error('[flue] Workflow run failed:', execution.runId, error);
 	});
+	await admission;
+}
+
+export async function admitDetachedWorkflow(
+	opts: AdmitDetachedWorkflowOptions,
+): Promise<{ runId: string }> {
+	const runId = opts.runId ?? generateWorkflowRunId();
+	const execution = await prepareWorkflowExecution({
+		workflowName: opts.workflowName,
+		id: runId,
+		runId,
+		workflow: opts.workflow,
+		input: opts.input,
+		request: opts.request,
+		createContext: opts.createContext,
+		startWorkflowAdmission: opts.startWorkflowAdmission ?? defaultStartWorkflowAdmission,
+		runStore: opts.runStore,
+		eventStreamStore: opts.eventStreamStore,
+	});
+	await detachWorkflowExecution(execution);
+	return { runId };
+}
+
+async function runWorkflowAdmissionMode(execution: AdmittedWorkflowExecution): Promise<Response> {
+	await detachWorkflowExecution(execution);
 	return admissionResponse(
 		{ runId: execution.runId, streamUrl: execution.streamUrl, offset: execution.offset },
 		execution.streamUrl,
@@ -516,7 +551,8 @@ export async function invokeDirectAttached(
 async function runSyncMode(execution: AdmittedWorkflowExecution): Promise<Response> {
 	let result: unknown;
 	try {
-		result = await startWorkflowExecution(execution);
+		await startWorkflowExecution(execution);
+		result = await execution.completion;
 	} catch (error) {
 		await execution.completion?.catch(() => undefined);
 		throw error;
@@ -624,8 +660,21 @@ async function createWorkflowRunLifecycle(
 		);
 		throw error;
 	}
-	// Create the durable event stream for this workflow run.
-	await options.eventStreamStore.createStream(runStreamPath(options.runId));
+	try {
+		await options.eventStreamStore.createStream(runStreamPath(options.runId));
+	} catch (error) {
+		if (runStore) {
+			const endedAtMs = Date.now();
+			await runStore.endRun({
+				runId: options.runId,
+				endedAt: new Date(endedAtMs).toISOString(),
+				isError: true,
+				durationMs: endedAtMs - startedAtMs,
+				error: serializeError(error),
+			});
+		}
+		throw error;
+	}
 	return { ...options, ctx, startedAt, startedAtMs };
 }
 

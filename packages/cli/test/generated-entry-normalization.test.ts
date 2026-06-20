@@ -11,6 +11,7 @@ type NormalizeBuiltModules = (
 		workflows: Array<Record<string, unknown>>;
 	};
 	workflows: Record<string, unknown>;
+	workflowNames: Map<unknown, string>;
 	channelHandlers: Record<string, Record<string, (value: unknown) => unknown>>;
 };
 
@@ -93,6 +94,24 @@ describe('normalizeBuiltModules()', () => {
 		expect(normalized.manifest.workflows).toEqual([
 			{ name: 'report', transports: { http: true } },
 		]);
+	});
+
+	it('rejects duplicate Created Workflow identities across discovered modules', () => {
+		const shared = workflowModule();
+
+		expect(() =>
+			normalizeBuiltModules({}, { first: shared, second: { default: shared.default } }),
+		).toThrow(
+			'[flue] Workflows "first" and "second" default-export the same created workflow value.',
+		);
+	});
+
+	it('resolves exact Created Workflow identities to discovered names', () => {
+		const module = workflowModule();
+		const normalized = normalizeBuiltModules({}, { report: module });
+
+		expect(normalized.workflowNames.get(module.default)).toBe('report');
+		expect(normalized.workflowNames.get({ ...(module.default as object) })).toBeUndefined();
 	});
 
 	it('rejects legacy workflow run exports', () => {
