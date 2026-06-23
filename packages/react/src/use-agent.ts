@@ -7,6 +7,7 @@ import { useResolvedFlueClient } from './provider.ts';
 const emptySnapshot: AgentSnapshot = {
 	messages: emptyAgentState.messages,
 	status: 'idle',
+	historyReady: false,
 	error: undefined,
 };
 const emptySubscribe = () => () => {};

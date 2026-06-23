@@ -43,21 +43,57 @@ function client(overrides: Partial<FlueClient>): FlueClient {
 }
 
 describe('useFlueAgent()', () => {
-	it('forwards the configured live transport to the agent stream', async () => {
-		const stream = pendingStream<AttachedAgentEvent>();
-		const connect = vi.fn(() => stream);
+	it('reports history ready only after the atomic transcript is available', async () => {
+		let finishHistory!: () => void;
+		const history = {
+			offset: 'offset-history',
+			cancel: vi.fn(),
+			async *[Symbol.asyncIterator]() {
+				yield {
+					v: 3,
+					type: 'message_end',
+					message: { role: 'user', content: 'history' },
+					eventIndex: 0,
+					timestamp: '2026-06-12T00:00:00.000Z',
+					instanceId: 'id',
+					submissionId: 'submission-1',
+				} as AttachedAgentEvent;
+				await new Promise<void>((resolve) => {
+					finishHistory = resolve;
+				});
+			},
+		} satisfies FlueEventStream<AttachedAgentEvent>;
+		const live = pendingStream<AttachedAgentEvent>();
+		const connect = vi.fn().mockReturnValueOnce(history).mockReturnValueOnce(live);
+		const flue = client({ agents: { stream: connect } as unknown as FlueClient['agents'] });
+		const { result, unmount } = renderHook(() =>
+			useFlueAgent({ name: 'agent', id: 'id', history: 'all', client: flue }),
+		);
+		await waitFor(() => expect(connect).toHaveBeenCalledTimes(1));
+
+		expect(result.current.historyReady).toBe(false);
+		expect(result.current.messages).toEqual([]);
+		act(() => finishHistory());
+		await waitFor(() => expect(result.current.historyReady).toBe(true));
+		expect(result.current.messages[0]?.id).toBe('submission:submission-1:user:0');
+		unmount();
+	});
+
+	it('forwards the configured live transport after finite history hydration', async () => {
+		const live = pendingStream<AttachedAgentEvent>();
+		const connect = vi
+			.fn()
+			.mockReturnValueOnce(eventStream<AttachedAgentEvent>([], 'offset-history'))
+			.mockReturnValueOnce(live);
 		const flue = client({ agents: { stream: connect } as unknown as FlueClient['agents'] });
 		const { unmount } = renderHook(() =>
 			useFlueAgent({ name: 'agent', id: 'id', live: 'sse', client: flue }),
 		);
 
-		await waitFor(() => expect(connect).toHaveBeenCalled());
+		await waitFor(() => expect(connect).toHaveBeenCalledTimes(2));
 
-		expect(connect).toHaveBeenCalledWith('agent', 'id', {
-			live: 'sse',
-			offset: '-1',
-			tail: 100,
-		});
+		expect(connect.mock.calls[0]?.[2]).toEqual({ live: false, offset: '-1', tail: 100 });
+		expect(connect.mock.calls[1]?.[2]).toEqual({ live: 'sse', offset: 'offset-history' });
 		unmount();
 	});
 
@@ -66,20 +102,26 @@ describe('useFlueAgent()', () => {
 		const { result } = renderHook(() => useFlueAgent({ name: 'agent', client: flue }));
 
 		expect(result.current.status).toBe('idle');
+		expect(result.current.historyReady).toBe(false);
 		expect(result.current.messages).toEqual([]);
 	});
 
 	it('submits optimistically and reconciles the stream echo', async () => {
 		const stream = pendingStream<AttachedAgentEvent>();
+		const connect = vi
+			.fn()
+			.mockReturnValueOnce(eventStream<AttachedAgentEvent>([], 'offset-history'))
+			.mockReturnValueOnce(stream);
 		const send = vi.fn().mockResolvedValue({
 			streamUrl: 'https://flue.test/agents/agent/id',
 			offset: '-1',
 			submissionId: 'submission-1',
 		});
 		const flue = client({
-			agents: { stream: vi.fn(() => stream), send } as unknown as FlueClient['agents'],
+			agents: { stream: connect, send } as unknown as FlueClient['agents'],
 		});
 		const { result } = renderHook(() => useFlueAgent({ name: 'agent', id: 'id', client: flue }));
+		await waitFor(() => expect(result.current.historyReady).toBe(true));
 
 		await act(async () => result.current.sendMessage('hello'));
 		expect(result.current.status).toBe('submitted');

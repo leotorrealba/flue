@@ -72,6 +72,7 @@ Connects to one persistent agent instance, reconstructs its transcript, and foll
 interface UseFlueAgentResult {
   messages: UIMessage[];
   status: AgentStatus;
+  historyReady: boolean;
   error: Error | undefined;
   sendMessage(message: string, options?: SendMessageOptions): Promise<void>;
 }
@@ -96,6 +97,8 @@ type AgentStatus = 'idle' | 'connecting' | 'submitted' | 'streaming' | 'error';
 Adds an optimistic user message, calls `client.agents.send()`, and resolves when the server admits the prompt. It does not wait for generation. If admission fails, the hook removes the optimistic message, sets `error`, and rejects the promise. Calling it without an `id` rejects.
 
 The admission receipt reconciles the optimistic message with its durable stream copy. Concurrent sends use the runtime's per-session queue.
+
+The hook loads the requested durable history before publishing it, sets `historyReady` to `true`, and then follows live events from the exact completed-history checkpoint. Consumers receive one coherent initial transcript instead of progressively reordered history batches. `historyReady` remains `true` through later reconnects.
 
 A new agent instance has no stream until its first prompt is admitted. The hook treats the initial `404` as an empty conversation and attaches after its first successful send. Transient failures retry from the delivered checkpoint with capped exponential backoff, and `sendMessage()` wakes a pending retry.
 

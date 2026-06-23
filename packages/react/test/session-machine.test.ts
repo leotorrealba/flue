@@ -55,6 +55,37 @@ function pendingStream<T>(offset = '-1'): FlueEventStream<T> & { push(event: T):
 	};
 }
 
+function finiteControlledStream<T>(offset: string): FlueEventStream<T> & {
+	push(event: T): void;
+	finish(): void;
+} {
+	let done = false;
+	let wake: (() => void) | undefined;
+	const values: T[] = [];
+	return {
+		offset,
+		push(event) {
+			values.push(event);
+			wake?.();
+		},
+		finish() {
+			done = true;
+			wake?.();
+		},
+		cancel() {
+			done = true;
+			wake?.();
+		},
+		async *[Symbol.asyncIterator]() {
+			while (!done || values.length > 0) {
+				const value = values.shift();
+				if (value !== undefined) yield value;
+				else await new Promise<void>((resolve) => (wake = resolve));
+			}
+		},
+	};
+}
+
 function streamThenFail<T>(event: T, error: unknown, offset: string): FlueEventStream<T> {
 	return {
 		offset,
@@ -106,23 +137,195 @@ afterEach(() => {
 });
 
 describe('AgentSession', () => {
+	it('publishes initial durable history atomically when catch-up completes', async () => {
+		const history = finiteControlledStream<AttachedAgentEvent>('offset-history');
+		const live = pendingStream<AttachedAgentEvent>('offset-history');
+		const stream = vi.fn().mockReturnValueOnce(history).mockReturnValueOnce(live);
+		const session = new AgentSession(
+			client({ agents: { stream } as unknown as FlueClient['agents'] }),
+			'agent',
+			'id',
+			'all',
+		);
+		session.start();
+		history.push({
+			v: 3,
+			type: 'message_end',
+			message: { role: 'user', content: 'first' },
+			eventIndex: 0,
+			timestamp: '2026-06-12T00:00:00.000Z',
+			instanceId: 'id',
+			submissionId: 'submission-1',
+		} as AttachedAgentEvent);
+		await settle();
+
+		expect(session.getSnapshot()).toMatchObject({
+			messages: [],
+			status: 'connecting',
+			historyReady: false,
+		});
+
+		history.push({
+			v: 3,
+			type: 'message_end',
+			message: { role: 'assistant', content: [{ type: 'text', text: 'second' }] },
+			eventIndex: 1,
+			timestamp: '2026-06-12T00:00:01.000Z',
+			instanceId: 'id',
+			turnId: 'turn-1',
+		} as AttachedAgentEvent);
+		history.finish();
+		await settle();
+
+		expect(session.getSnapshot().historyReady).toBe(true);
+		expect(session.getSnapshot().messages.map((message) => message.id)).toEqual([
+			'submission:submission-1:user:0',
+			'turn:turn-1',
+		]);
+		await settle();
+		expect(stream.mock.calls[1]?.[2]).toEqual({ live: true, offset: 'offset-history' });
+		session.dispose();
+	});
+
+	it('retains optimistic sends made while initial history is loading', async () => {
+		const history = finiteControlledStream<AttachedAgentEvent>('offset-history');
+		const live = pendingStream<AttachedAgentEvent>('offset-history');
+		const stream = vi.fn().mockReturnValueOnce(history).mockReturnValueOnce(live);
+		const send = vi.fn().mockResolvedValue({
+			streamUrl: 'https://flue.test/agents/agent/id',
+			offset: 'offset-admitted',
+			submissionId: 'submission-2',
+		});
+		const session = new AgentSession(
+			client({ agents: { stream, send } as unknown as FlueClient['agents'] }),
+			'agent',
+			'id',
+		);
+		session.start();
+		history.push({
+			v: 3,
+			type: 'message_end',
+			message: { role: 'user', content: 'existing' },
+			eventIndex: 0,
+			timestamp: '2026-06-12T00:00:00.000Z',
+			instanceId: 'id',
+			submissionId: 'submission-1',
+		} as AttachedAgentEvent);
+		await session.sendMessage('new');
+		history.finish();
+		await settle();
+
+		expect(session.getSnapshot().historyReady).toBe(true);
+		expect(session.getSnapshot().messages.map((message) => message.parts[0])).toEqual([
+			{ type: 'text', text: 'existing', state: 'done' },
+			{ type: 'text', text: 'new', state: 'done' },
+		]);
+		session.dispose();
+	});
+
+	it('keeps durable message order when a send completes during hydration', async () => {
+		const history = finiteControlledStream<AttachedAgentEvent>('offset-history');
+		const live = pendingStream<AttachedAgentEvent>('offset-history');
+		const stream = vi.fn().mockReturnValueOnce(history).mockReturnValueOnce(live);
+		const send = vi.fn().mockResolvedValue({
+			streamUrl: 'https://flue.test/agents/agent/id',
+			offset: 'offset-admitted',
+			submissionId: 'submission-1',
+		});
+		const session = new AgentSession(
+			client({ agents: { stream, send } as unknown as FlueClient['agents'] }),
+			'agent',
+			'id',
+		);
+		session.start();
+		await session.sendMessage('new');
+		await settle();
+		history.push({
+			v: 3,
+			type: 'message_end',
+			message: { role: 'user', content: 'new' },
+			eventIndex: 0,
+			timestamp: '2026-06-12T00:00:00.000Z',
+			instanceId: 'id',
+			submissionId: 'submission-1',
+		} as AttachedAgentEvent);
+		history.push({
+			v: 3,
+			type: 'message_end',
+			message: { role: 'assistant', content: [{ type: 'text', text: 'reply' }] },
+			eventIndex: 1,
+			timestamp: '2026-06-12T00:00:01.000Z',
+			instanceId: 'id',
+			submissionId: 'submission-1',
+			turnId: 'turn-1',
+		} as AttachedAgentEvent);
+		history.finish();
+		await settle();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
+		expect(session.getSnapshot().messages.map((message) => message.id)).toEqual([
+			'submission:submission-1:user:0',
+			'turn:turn-1',
+		]);
+		session.dispose();
+	});
+
+	it('preserves a send failure when hydration completes', async () => {
+		const history = finiteControlledStream<AttachedAgentEvent>('offset-history');
+		const live = pendingStream<AttachedAgentEvent>('offset-history');
+		const stream = vi.fn().mockReturnValueOnce(history).mockReturnValueOnce(live);
+		const send = vi.fn().mockRejectedValue(new Error('send failed'));
+		const session = new AgentSession(
+			client({ agents: { stream, send } as unknown as FlueClient['agents'] }),
+			'agent',
+			'id',
+		);
+		session.start();
+		await expect(session.sendMessage('new')).rejects.toThrow('send failed');
+		history.finish();
+		await settle();
+
+		expect(session.getSnapshot()).toMatchObject({
+			historyReady: true,
+			status: 'error',
+			error: new Error('send failed'),
+		});
+		session.dispose();
+	});
+
 	it('uses the configured SSE transport for initial and resumed streams', async () => {
 		vi.useFakeTimers();
-		const first = streamThenFail<AttachedAgentEvent>(
-			{
-				v: 3,
-				type: 'message_end',
-				message: { role: 'assistant', content: [{ type: 'text', text: 'hello' }] },
-				eventIndex: 1,
-				timestamp: '2026-06-12T00:00:00.000Z',
-				instanceId: 'id',
-				turnId: 'turn-1',
-			} as AttachedAgentEvent,
-			new Error('disconnected'),
+		const history = streamFrom<AttachedAgentEvent>(
+			[
+				{
+					v: 3,
+					type: 'message_end',
+					message: { role: 'assistant', content: [{ type: 'text', text: 'hello' }] },
+					eventIndex: 1,
+					timestamp: '2026-06-12T00:00:00.000Z',
+					instanceId: 'id',
+					turnId: 'turn-1',
+				} as AttachedAgentEvent,
+			],
 			'offset-1',
 		);
-		const second = pendingStream<AttachedAgentEvent>('offset-1');
-		const stream = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second);
+		const live = streamThenFail<AttachedAgentEvent>(
+			{
+				v: 3,
+				type: 'idle',
+				eventIndex: 2,
+				timestamp: '2026-06-12T00:00:01.000Z',
+				instanceId: 'id',
+			},
+			new Error('disconnected'),
+			'offset-2',
+		);
+		const resumed = pendingStream<AttachedAgentEvent>('offset-2');
+		const stream = vi
+			.fn()
+			.mockReturnValueOnce(history)
+			.mockReturnValueOnce(live)
+			.mockReturnValueOnce(resumed);
 		const session = new AgentSession(
 			client({ agents: { stream } as unknown as FlueClient['agents'] }),
 			'agent',
@@ -135,8 +338,34 @@ describe('AgentSession', () => {
 		await settle();
 		await vi.runAllTimersAsync();
 
-		expect(stream.mock.calls[0]?.[2]).toMatchObject({ live: 'sse', offset: '-1', tail: 100 });
+		expect(stream.mock.calls[0]?.[2]).toMatchObject({ live: false, offset: '-1', tail: 100 });
 		expect(stream.mock.calls[1]?.[2]).toMatchObject({ live: 'sse', offset: 'offset-1' });
+		expect(stream.mock.calls[2]?.[2]).toMatchObject({ live: 'sse', offset: 'offset-2' });
+		session.dispose();
+	});
+
+	it('restarts live observation after completed hydration', async () => {
+		const history = streamFrom<AttachedAgentEvent>([], 'offset-history');
+		const firstLive = pendingStream<AttachedAgentEvent>('offset-history');
+		const secondLive = pendingStream<AttachedAgentEvent>('offset-history');
+		const stream = vi
+			.fn()
+			.mockReturnValueOnce(history)
+			.mockReturnValueOnce(firstLive)
+			.mockReturnValueOnce(secondLive);
+		const session = new AgentSession(
+			client({ agents: { stream } as unknown as FlueClient['agents'] }),
+			'agent',
+			'id',
+		);
+		session.start();
+		await settle();
+		session.dispose();
+		session.start();
+		await settle();
+
+		expect(stream).toHaveBeenCalledTimes(3);
+		expect(stream.mock.calls[2]?.[2]).toEqual({ live: true, offset: 'offset-history' });
 		session.dispose();
 	});
 
@@ -187,6 +416,42 @@ describe('AgentSession', () => {
 		expect(stream).toHaveBeenCalledTimes(2);
 		expect(stream.mock.calls[1]?.[2]).toMatchObject({ live: true, offset: 'offset-admitted' });
 		expect(session.getSnapshot().status).toBe('connecting');
+		session.dispose();
+	});
+
+	it('retries a fresh post-admission stream 404 from the admission offset', async () => {
+		vi.useFakeTimers();
+		const stream = vi
+			.fn()
+			.mockReturnValueOnce(
+				failedStream<AttachedAgentEvent>(
+					new FetchError(404, 'not found', undefined, {}, 'https://flue.test/agents/agent/id'),
+				),
+			)
+			.mockReturnValueOnce(
+				failedStream<AttachedAgentEvent>(
+					new FetchError(404, 'not ready', undefined, {}, 'https://flue.test/agents/agent/id'),
+				),
+			)
+			.mockReturnValueOnce(pendingStream<AttachedAgentEvent>('offset-admitted'));
+		const send = vi.fn().mockResolvedValue({
+			streamUrl: 'https://flue.test/agents/agent/id',
+			offset: 'offset-admitted',
+			submissionId: 'submission-1',
+		});
+		const session = new AgentSession(
+			client({ agents: { stream, send } as unknown as FlueClient['agents'] }),
+			'agent',
+			'id',
+		);
+		session.start();
+		await settle();
+		await session.sendMessage('hello');
+		await vi.advanceTimersByTimeAsync(1001);
+
+		expect(stream).toHaveBeenCalledTimes(3);
+		expect(stream.mock.calls[2]?.[2]).toEqual({ live: true, offset: 'offset-admitted' });
+		expect(session.getSnapshot().status).not.toBe('error');
 		session.dispose();
 	});
 
@@ -258,6 +523,7 @@ describe('AgentSession', () => {
 		vi.useFakeTimers();
 		const stream = vi
 			.fn()
+			.mockReturnValueOnce(streamFrom<AttachedAgentEvent>([], 'offset-history'))
 			.mockReturnValueOnce(streamFrom<AttachedAgentEvent>([], 'offset-checkpoint'))
 			.mockReturnValueOnce(pendingStream<AttachedAgentEvent>('offset-checkpoint'));
 		const session = new AgentSession(
@@ -271,8 +537,8 @@ describe('AgentSession', () => {
 
 		await vi.advanceTimersByTimeAsync(1001);
 
-		expect(stream).toHaveBeenCalledTimes(2);
-		expect(stream.mock.calls[1]?.[2]).toMatchObject({ offset: 'offset-checkpoint' });
+		expect(stream).toHaveBeenCalledTimes(3);
+		expect(stream.mock.calls[2]?.[2]).toMatchObject({ offset: 'offset-checkpoint' });
 		session.dispose();
 	});
 

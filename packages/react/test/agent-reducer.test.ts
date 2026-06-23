@@ -428,6 +428,40 @@ describe('reduceAgentEvent()', () => {
 		expect(state.messages[0]?.id).toBe('submission:submission-1:user:0');
 	});
 
+	it('keeps an optimistic user message position when its durable echo arrives late', () => {
+		let state = reduceAgentEvent(emptyAgentState, {
+			type: 'local_send_submitted',
+			localId: 'local-1',
+			message: 'hello',
+		});
+		state = reduceAgentEvent(state, {
+			type: 'local_send_admitted',
+			localId: 'local-1',
+			submissionId: 'submission-1',
+		});
+		state = reduceAgentEvent(
+			state,
+			message(
+				'message_end',
+				{ role: 'assistant', content: [{ type: 'text', text: 'reply' }] },
+				{ submissionId: 'submission-1', turnId: 'turn-1', eventIndex: 2 },
+			),
+		);
+		state = reduceAgentEvent(
+			state,
+			message(
+				'message_end',
+				{ role: 'user', content: 'hello' },
+				{ submissionId: 'submission-1', eventIndex: 3 },
+			),
+		);
+
+		expect(state.messages.map((item) => item.id)).toEqual([
+			'submission:submission-1:user:0',
+			'turn:turn-1',
+		]);
+	});
+
 	it('reconciles echo-before-receipt by dropping the optimistic duplicate', () => {
 		let state = reduceAgentEvent(emptyAgentState, {
 			type: 'local_send_submitted',

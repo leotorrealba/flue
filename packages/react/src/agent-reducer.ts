@@ -12,6 +12,7 @@ export type AgentStatus = 'idle' | 'connecting' | 'submitted' | 'streaming' | 'e
 export interface AgentSnapshot {
 	messages: UIMessage[];
 	status: AgentStatus;
+	historyReady: boolean;
 	error: Error | undefined;
 }
 
@@ -35,6 +36,7 @@ type LocalAgentEvent =
 	| { type: 'local_send_admitted'; localId: string; submissionId: string }
 	| { type: 'local_send_failed'; localId: string; error: Error }
 	| { type: 'local_connecting'; error?: Error }
+	| { type: 'local_history_ready' }
 	| { type: 'local_stream_not_found' }
 	| { type: 'local_stream_failed'; error: Error };
 
@@ -43,6 +45,7 @@ export type AgentReducerEvent = StreamAgentEvent | LocalAgentEvent;
 export const emptyAgentState: AgentState = {
 	messages: [],
 	status: 'idle',
+	historyReady: false,
 	error: undefined,
 	pendingSends: [],
 	activeSubmissionIds: [],
@@ -83,7 +86,7 @@ function reduceAgentEventOnce(state: AgentState, event: AgentReducerEvent): Agen
 			return {
 				...state,
 				messages: hasEcho
-					? state.messages.filter((message) => message.id !== event.localId)
+					? reconcileMessageIdentity(state.messages, event.localId, echoId)
 					: state.messages,
 				status: active
 					? 'streaming'
@@ -106,11 +109,25 @@ function reduceAgentEventOnce(state: AgentState, event: AgentReducerEvent): Agen
 				pendingSends: state.pendingSends.filter((send) => send.localId !== event.localId),
 			};
 		case 'local_connecting':
-			return { ...state, status: 'connecting', error: event.error };
+			return state.status === 'error'
+				? state
+				: { ...state, status: 'connecting', error: event.error };
+		case 'local_history_ready':
+			return {
+				...state,
+				historyReady: true,
+				status:
+					state.status === 'error'
+						? 'error'
+						: state.pendingSends.length > 0
+							? 'submitted'
+							: 'idle',
+				error: state.status === 'error' ? state.error : undefined,
+			};
 		case 'local_stream_not_found':
 			return state.pendingSends.length === 0
-				? { ...state, messages: [], status: 'idle', error: undefined }
-				: { ...state, status: 'submitted', error: undefined };
+				? { ...state, messages: [], status: 'idle', historyReady: true, error: undefined }
+				: { ...state, status: 'submitted', historyReady: true, error: undefined };
 		case 'local_stream_failed':
 			return { ...state, status: 'error', error: event.error };
 		case 'message_start':
@@ -172,9 +189,10 @@ function reduceMessageBoundary(
 	if (event.message.role === 'toolResult') return state;
 	const id = messageId(event, event.message.role);
 	const existing = state.messages.find((message) => message.id === id);
-	const local = event.submissionId
-		? state.pendingSends.find((send) => send.submissionId === event.submissionId)
-		: undefined;
+	const local =
+		event.message.role === 'user' && event.submissionId
+			? state.pendingSends.find((send) => send.submissionId === event.submissionId)
+			: undefined;
 	const optimistic = local
 		? state.messages.find((message) => message.id === local.localId)
 		: undefined;
@@ -184,8 +202,9 @@ function reduceMessageBoundary(
 		event.type === 'message_end',
 		optimistic ?? existing,
 	);
-	let messages = replaceById(state.messages, id, message);
-	if (local) messages = messages.filter((item) => item.id !== local.localId);
+	const messages = local
+		? replaceOptimisticMessage(state.messages, local.localId, id, message)
+		: replaceById(state.messages, id, message);
 	const ownAssistant =
 		event.message.role === 'assistant' &&
 		event.submissionId !== undefined &&
@@ -495,6 +514,40 @@ function imageUrl(data: string, mimeType: string): string {
 		: data.startsWith('data:')
 			? data
 			: `data:${mimeType};base64,${data}`;
+}
+
+function replaceOptimisticMessage(
+	messages: UIMessage[],
+	localId: string,
+	durableId: string,
+	message: UIMessage,
+): UIMessage[] {
+	const localIndex = messages.findIndex((item) => item.id === localId);
+	if (localIndex < 0) return replaceById(messages, durableId, message);
+	const next = messages.filter((item) => item.id !== durableId);
+	const targetIndex = next.findIndex((item) => item.id === localId);
+	if (targetIndex < 0) return replaceById(next, durableId, message);
+	next[targetIndex] = message;
+	return next;
+}
+
+function reconcileMessageIdentity(
+	messages: UIMessage[],
+	localId: string,
+	durableId: string,
+): UIMessage[] {
+	const localIndex = messages.findIndex((message) => message.id === localId);
+	const durableIndex = messages.findIndex((message) => message.id === durableId);
+	if (localIndex < 0 || durableIndex < 0)
+		return messages.filter((message) => message.id !== localId);
+	if (durableIndex < localIndex) return messages.filter((message) => message.id !== localId);
+	const durable = messages[durableIndex];
+	if (!durable) return messages;
+	const next = messages.filter((message) => message.id !== durableId);
+	const targetIndex = next.findIndex((message) => message.id === localId);
+	if (targetIndex < 0) return next;
+	next[targetIndex] = durable;
+	return next;
 }
 
 function replaceById(messages: UIMessage[], id: string, message: UIMessage): UIMessage[] {

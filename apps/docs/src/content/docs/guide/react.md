@@ -78,11 +78,11 @@ export function Chat({ conversationId }: { conversationId: string }) {
 }
 ```
 
-`sendMessage()` adds the user message immediately and resolves when the server admits the prompt, not when generation finishes. The stream then reconciles that optimistic message with its durable copy. Use `status` to distinguish connection, submission, streaming, and error states.
+`sendMessage()` adds the user message immediately and resolves when the server admits the prompt, not when generation finishes. The stream then reconciles that optimistic message with its durable copy without changing its transcript position. Use `status` to distinguish connection, submission, streaming, and error states. `historyReady` becomes `true` once the requested durable history has loaded as one coherent snapshot; it remains `true` through later live reconnects.
 
 Messages use a parts-based shape for text, reasoning, tool activity, and images. This shape mirrors AI SDK v5 `UIMessage`, but `@flue/react` neither depends on `ai` at runtime nor implements its transport protocol.
 
-By default, the hook rebuilds a transcript from the latest 100 server events rather than browser storage. Pass `history: 'all'` when the complete transcript is required. It follows live events with Durable Streams long-polling by default; pass `live: 'sse'` to use one SSE connection instead. Streaming deltas provide best-effort live progress, while `message_end` supplies the authoritative completed assistant message. If the hook attaches after generation starts, earlier partial output may be absent until `message_end` arrives. This delivery behavior does not affect the runtime's internal interrupted-turn recovery.
+By default, the hook rebuilds a transcript from the latest 100 server events rather than browser storage. Pass `history: 'all'` when the complete transcript is required. Requested history is published atomically in durable event order, then live observation continues from that exact checkpoint, so consumers do not need to sort `messages`. It follows live events with Durable Streams long-polling by default; pass `live: 'sse'` to use one SSE connection instead. Streaming deltas provide best-effort live progress, while `message_end` supplies the authoritative completed assistant message. If the hook attaches after generation starts, earlier partial output may be absent until `message_end` arrives. This delivery behavior does not affect the runtime's internal interrupted-turn recovery.
 
 ## Observe a workflow run
 
